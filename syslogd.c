@@ -2491,10 +2491,12 @@ static rsRetVal callAction(msg_t *pMsg, action_t *pAction)
 		 */
 		if(pAction->f_pMsg != NULL) {
 			if(pAction->f_prevcount > 0)
-				fprintlog(pAction);
-				/* we do not care about iRet above - I think it's right but if we have
-				 * some troubles, you know where to look at ;) -- rgerhards, 2007-08-01
-				 */
+				CHKiRet(fprintlog(pAction));
+			/* if we run into trouble (most importantly a suspended
+			 * action), we keep the old message (by virtue of not
+			 * destructing it) and discard the new one (done
+			 * automatically when we return.
+			 */
 			MsgDestruct(pAction->f_pMsg);
 		}
 		pAction->f_pMsg = MsgAddRef(pMsg);
@@ -3111,7 +3113,9 @@ static int parseLegacySyslogMsg(msg_t *pMsg, int flags)
 			 */
 			if(*p2parse == ':') {
 				bTAGCharDetected = 1;
-				++p2parse;
+				/* We will move hostname to tag, so preserve ':' (otherwise we 
+				 * will needlessly change the message format) */
+				*pWork++ = *p2parse++; 
 			} else if(*p2parse == ' ')
 				++p2parse;
 			*pWork = '\0';
@@ -3437,9 +3441,15 @@ DEFFUNC_llExecFunc(domarkActions)
 		dbgprintf("flush %s: repeated %d times, %d sec.\n",
 		    modGetStateName(pAction->pMod), pAction->f_prevcount,
 		    repeatinterval[pAction->f_repeatcount]);
+		if(actionIsSuspended(pAction) &&
+		   (actionTryResume(pAction) != RS_RET_OK)) {
+			goto finalize_it;
+		}
 		fprintlog(pAction);
 		BACKOFF(pAction);
 	}
+
+finalize_it:
 	UnlockObj(pAction);
 
 	return RS_RET_OK; /* we ignore errors, we can not do anything either way */
@@ -3563,7 +3573,7 @@ void logerror(char *type)
 	if (errno == 0)
 		snprintf(buf, sizeof(buf), "%s", type);
 	else {
-		strerror_r(errno, errStr, sizeof(errStr));
+		rs_strerror_r(errno, errStr, sizeof(errStr));
 		snprintf(buf, sizeof(buf), "%s: %s", type, errStr);
 	}
 	buf[sizeof(buf)/sizeof(char) - 1] = '\0'; /* just to be on the safe side... */
@@ -3605,7 +3615,7 @@ static void die(int sig)
 		dbgprintf(" exiting on signal %d\n", sig);
 		(void) snprintf(buf, sizeof(buf) / sizeof(char),
 		 " [origin software=\"rsyslogd\" " "swVersion=\"" VERSION \
-		 "\" x-pid=\"%d\"]" " exiting on signal %d.",
+		 "\" x-pid=\"%d\" x-info=\"http://www.rsyslog.com\"]" " exiting on signal %d.",
 		 (int) myPid, sig);
 		errno = 0;
 		logmsgInternal(LOG_SYSLOG|LOG_INFO, buf, ADDDATE);
@@ -4109,9 +4119,14 @@ DEFFUNC_llExecFunc(freeSelectorsActions)
 
 	/* flush any pending output */
 	if(pAction->f_prevcount) {
+		if(actionIsSuspended(pAction) &&
+		   (actionTryResume(pAction) != RS_RET_OK)) {
+			goto finalize_it;
+		}
 		fprintlog(pAction);
 	}
 
+finalize_it:
 	return RS_RET_OK; /* never fails ;) */
 }
 
@@ -4349,7 +4364,7 @@ finalize_it:
 		if(fCurr != NULL)
 			selectorDestruct(fCurr);
 
-		strerror_r(errno, errStr, sizeof(errStr));
+		rs_strerror_r(errno, errStr, sizeof(errStr));
 		dbgprintf("error %d processing config file '%s'; os error (if any): %s\n",
 			iRet, pConfFile, errStr);
 	}
@@ -4576,7 +4591,7 @@ static void init(void)
 	 */
 	snprintf(bufStartUpMsg, sizeof(bufStartUpMsg)/sizeof(char), 
 		 " [origin software=\"rsyslogd\" " "swVersion=\"" VERSION \
-		 "\" x-pid=\"%d\"][x-configInfo udpReception=\"%s\" " \
+		 "\" x-pid=\"%d\" x-info=\"http://www.rsyslog.com\"][x-configInfo udpReception=\"%s\" " \
 		 "udpPort=\"%s\" tcpReception=\"%s\" tcpPort=\"%s\"]" \
 		 " restart",
 		 (int) myPid,
@@ -5466,6 +5481,20 @@ void dbgprintf(char *fmt, ...)
 }
 
 
+char *rs_strerror_r(int errnum, char *buf, size_t buflen) {
+#ifdef STRERROR_R_CHAR_P
+	char *p = strerror_r(errnum, buf, buflen);
+	if (p != buf) {
+		strncpy(buf, p, buflen);
+		buf[buflen - 1] = '\0';
+	}
+#else
+	strerror_r(errnum, buf, buflen);
+#endif
+	return buf;
+}
+
+
 /*
  * The following function is resposible for handling a SIGHUP signal.  Since
  * we are now doing mallocs/free as part of init we had better not being
@@ -5507,13 +5536,12 @@ int getSubString(uchar **ppSrc,  char *pDst, size_t DstSize, char cSep)
 {
 	uchar *pSrc = *ppSrc;
 	int iErr = 0; /* 0 = no error, >0 = error */
-	while(*pSrc != cSep && *pSrc != '\n' && *pSrc != '\0' && DstSize>1) {
+	while((cSep == ' ' ? !isspace(*pSrc) : *pSrc != cSep) && *pSrc != '\n' && *pSrc != '\0' && DstSize>1) {
 		*pDst++ = *(pSrc)++;
 		DstSize--;
 	}
 	/* check if the Dst buffer was to small */
-	if (*pSrc != cSep && *pSrc != '\n' && *pSrc != '\0')
-	{ 
+	if ((cSep == ' ' ? !isspace(*pSrc) : *pSrc != cSep) && *pSrc != '\n' && *pSrc != '\0') { 
 		dbgprintf("in getSubString, error Src buffer > Dst buffer\n");
 		iErr = 1;
 	}	
@@ -5727,7 +5755,7 @@ static rsRetVal processSelectAfter(int maxfds, int nfds, fd_set *pReadfds, fd_se
 				printchopped(LocalHostName, line, iRcvd,  fd, funixParseHost[i]);
 			} else if (iRcvd < 0 && errno != EINTR) {
 				char errStr[1024];
-				strerror_r(errno, errStr, sizeof(errStr));
+				rs_strerror_r(errno, errStr, sizeof(errStr));
 				dbgprintf("UNIX socket error: %d = %s.\n", \
 					errno, errStr);
 				logerror("recvfrom UNIX");
@@ -5768,7 +5796,7 @@ static rsRetVal processSelectAfter(int maxfds, int nfds, fd_set *pReadfds, fd_se
 				       }
 			       } else if (l < 0 && errno != EINTR && errno != EAGAIN) {
 					char errStr[1024];
-					strerror_r(errno, errStr, sizeof(errStr));
+					rs_strerror_r(errno, errStr, sizeof(errStr));
 					dbgprintf("INET socket error: %d = %s.\n", errno, errStr);
 					       logerror("recvfrom inet");
 					       /* should be harmless */
@@ -5871,6 +5899,7 @@ static void mainloop(void)
 	int i;
 	int maxfds;
 	int nfds;
+	int errnoSave;
 #ifdef  SYSLOG_INET
 	selectHelperWriteFDSInfo_t writeFDSInfo;
 	fd_set writefds;
@@ -6009,6 +6038,7 @@ static void mainloop(void)
 #endif
 		nfds = select(maxfds+1, (fd_set *) &readfds, MAIN_SELECT_WRITEFDS,
 				  (fd_set *) NULL, MAIN_SELECT_TIMEVAL);
+		errnoSave = errno; /* save errno for later reference */
 
 		if(bRequestDoMark) {
 			domark();
@@ -6029,6 +6059,7 @@ static void mainloop(void)
 			continue;
 		}
 
+		errno = errnoSave; /* restore errno to state right after select (which is what we need) -- rgerhards, 2008-02-11 */
 		processSelectAfter(maxfds, nfds, &readfds, MAIN_SELECT_WRITEFDS);
 
 #undef MAIN_SELECT_TIMEVAL 
