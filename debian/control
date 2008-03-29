@@ -53,5 +53,5 @@ Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, rsyslog (= ${binary:Version}), dbconfig-common, ucf
 Recommends: postgresql
 Description: PostgreSQL output plugin for rsyslog
- This plugin allows rsyslog to write the syslog messages into a PostgresSQL 
+ This plugin allows rsyslog to write the syslog messages into a PostgreSQL 
  database.

@@ -1,3 +1,15 @@
+rsyslog (2.0.2-1) unstable; urgency=low
+
+  * New upstream release.
+  * debian/rsyslog.init
+    - Make /dev/xconsole readable by group adm. Closes: #464695
+  * debian/control
+    - Fix a typo in the rsyslog-pgsql package description.
+  * debian/patches/man_page_format.patch
+    - Fix a few format errors in the man pages.
+
+ -- Michael Biebl <biebl@debian.org>  Tue, 12 Feb 2008 19:56:47 +0100
+
 rsyslog (2.0.1-2) unstable; urgency=low
 
   * debian/control

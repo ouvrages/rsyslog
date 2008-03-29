@@ -1,1 +1,2 @@
-no_create_db.patch -p0
+no_create_db.patch
+man_page_format.patch

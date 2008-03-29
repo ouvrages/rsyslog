@@ -99,6 +99,7 @@ create_xconsole() {
 	if [ ! -e /dev/xconsole ]
 	then
 		mknod -m 640 /dev/xconsole p
+		chown root:adm /dev/xconsole
 	fi
 }
 

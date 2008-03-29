@@ -1,0 +1,76 @@
+Index: rsyslog/rsyslogd.8
+===================================================================
+--- rsyslog.orig/rsyslogd.8	2008-02-12 16:02:30.000000000 +0100
++++ rsyslog/rsyslogd.8	2008-02-12 16:03:24.000000000 +0100
+@@ -1,7 +1,7 @@
+ .\" Copyright 2004-2005 Rainer Gerhards and Adiscon for the rsyslog modifications
+ .\" May be distributed under the GNU General Public License
+ .\"
+-.TH RSYSLOGD 8 "11 December 2008" "Version 1.20.1 (devel)" "Linux System Administration"
++.TH RSYSLOGD 8 "12 February 2008" "Version 2.0.2" "Linux System Administration"
+ .SH NAME
+ rsyslogd \- reliable and extended syslogd 
+ .SH SYNOPSIS
+@@ -599,4 +599,3 @@
+ .TP
+ mmeckelein@adiscon.com
+ .PD
+-.zZ
+Index: rsyslog/rsyslog.conf.5
+===================================================================
+--- rsyslog.orig/rsyslog.conf.5	2008-02-12 16:02:30.000000000 +0100
++++ rsyslog/rsyslog.conf.5	2008-02-12 16:03:24.000000000 +0100
+@@ -17,7 +17,7 @@
+ .\" along with this program; if not, write to the Free Software
+ .\" Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111, USA.
+ .\"
+-.TH RSYSLOG.CONF 5 "04 September 2007" "Version 1.19.4" "Linux System Administration"
++.TH RSYSLOG.CONF 5 "12 February 2008" "Version 2.0.2" "Linux System Administration"
+ .SH NAME
+ rsyslog.conf \- rsyslogd(8) configuration file
+ .SH DESCRIPTION
+@@ -527,7 +527,7 @@
+ (e.g. %msg:10:$%, which will extract from position 10 to the end of the string).
+ 
+ There is also support for 
+-.Bregular expressions.
++.B regular expressions.
+ To use them, you need to place a "R" into FromChar. 
+ This tells rsyslog that a regular expression instead of position-based extraction is desired. The 
+ actual regular expression 
+Index: rsyslog/rfc3195d.8
+===================================================================
+--- rsyslog.orig/rfc3195d.8	2008-02-12 16:02:30.000000000 +0100
++++ rsyslog/rfc3195d.8	2008-02-12 16:03:24.000000000 +0100
+@@ -1,7 +1,7 @@
+ .\" Copyright 2005 Rainer Gerhards and Adiscon for the rsyslog modifications
+ .\" Distributed under the GNU General Public License.
+ .\"
+-.TH RSYSLOGD 8 "03 July 2007" "Version 1.14.2 (devel)" "Linux System Administration"
++.TH RSYSLOGD 8 "12 February 2008" "Version 2.0.2" "Linux System Administration"
+ .SH NAME
+ rfc3195d \- RFC 3195 listener
+ .SH SYNOPSIS
+@@ -82,4 +82,3 @@
+ .PD 0
+ .TP
+ Rainer Gerhards <rgerhards@adiscon.com>
+-.zZ
+Index: rsyslog/rklogd.8
+===================================================================
+--- rsyslog.orig/rklogd.8	2008-02-12 16:02:30.000000000 +0100
++++ rsyslog/rklogd.8	2008-02-12 16:03:24.000000000 +0100
+@@ -4,7 +4,7 @@
+ .\" Sun Nov 19 23:22:21 MET: Martin Schulze: Updates
+ .\" Mon Aug 19 09:42:08 CDT 1996: Dr. G.W. Wettstein: Updates
+ .\"
+-.TH RKLOGD 8 "03 JULY 2007" "Version 1.14.2 (devel)" "Linux System Administration"
++.TH RKLOGD 8 "12 February 2008" "Version 2.0.2" "Linux System Administration"
+ .SH NAME
+ rklogd \- Kernel Log Daemon
+ .LP
+@@ -438,4 +438,3 @@
+ .TP
+ Fargo, ND 58122
+ .PD
+-.zZ
