@@ -1,0 +1,62 @@
+.\" rsyslog.conf - rsyslogd(8) configuration file
+.\" Copyright 2003-2005 Rainer Gerhards and Adiscon GmbH.
+.\" 
+.\" This file is part of the rsyslog  package, an enhanced system log daemon.
+.\" 
+.\" This program is free software; you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License as published by
+.\" the Free Software Foundation; either version 2 of the License, or
+.\" (at your option) any later version.
+.\" 
+.\" This program is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\" 
+.\" You should have received a copy of the GNU General Public License
+.\" along with this program; if not, write to the Free Software
+.\" Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111, USA.
+.\"
+.TH RSYSLOG.CONF 5 "04 October 2006" "Version 1.12.3" "Linux System Administration"
+.SH NAME
+rsyslog.conf \- rsyslogd(8) configuration file
+.SH DESCRIPTION
+The
+.I rsyslog.conf
+file is the main configuration file for the
+.BR rsyslogd (8)
+which logs system messages on *nix systems.  This file specifies rules
+for logging.  For special features see the
+.BR rsyslogd (8)
+manpage.
+
+While rsyslogd contains enhancements over standard syslogd, efforts
+have been made to keep the configuration file as compatible as
+possible. While, for obvious reasons, enhanced features require
+a different config file syntax, rsyslogd should be able to work with
+a standard syslog.conf file. This is especially useful while you
+are migrating from syslogd to rsyslogd.
+
+This man page is now a stub. Full documentation can be found in
+the doc folder of the rsyslog distribution. If in doubt, you
+can also view it online at
+
+    http://www.rsyslog.com/doc
+
+.SH FILES
+.PD 0
+.TP
+.I /etc/rsyslog.conf
+Configuration file for
+.B rsyslogd
+
+.SH SEE ALSO
+.BR syslogd (8),
+.BR logger (1),
+.BR syslog (3)
+
+.SH AUTHORS
+The
+.B rsyslogd
+is taken from sysklogd sources, which have been heavily modified
+by Rainer Gerhards (rgerhards@adiscon.com) and others.
