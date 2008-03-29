@@ -100,7 +100,7 @@ static rsRetVal doAction(uchar __attribute__((unused)) **ppString, unsigned __at
 	DEFiRet;
 
 #define CODESTARTdoAction \
-	assert(ppString != NULL);
+	/* ppString may be NULL if the output module requested no strings */
 
 #define ENDdoAction \
 	return iRet;\
@@ -175,7 +175,7 @@ static rsRetVal onSelectReadyWrite(void *pModData)\
  * continue modularization.
  */
 #define BEGINgetWriteFDForSelect \
-static rsRetVal getWriteFDForSelect(void *pModData, short *fd)\
+static rsRetVal getWriteFDForSelect(void *pModData, short  __attribute__((unused)) *fd)\
 {\
 	rsRetVal iRet = RS_RET_NONE;\
 	instanceData *pData = NULL;

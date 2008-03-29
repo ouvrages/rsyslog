@@ -363,7 +363,7 @@ syslogCODE rs_facilitynames[] =
 
 static uchar	*ConfFile = (uchar*) _PATH_LOGCONF; /* read-only after startup */
 static char	*PidFile = _PATH_LOGPID; /* read-only after startup */
-static char	*ModDir = _PATH_MODDIR; /* read-only after startup */
+static uchar	*pModDir = NULL; /* read-only after startup */
 char	ctty[] = _PATH_CONSOLE;	/* this is read-only */
 
 static pid_t myPid;	/* our pid for use in self-generated messages, e.g. on startup */
@@ -542,8 +542,8 @@ static int	MarkSeq = 0;	/* mark sequence number - modified in domark() only */
 static int	NoFork = 0; 	/* don't fork - don't run in daemon mode - read-only after startup */
 static int	AcceptRemote = 0;/* receive messages that come via UDP - read-only after startup */
 int	DisableDNS = 0; /* don't look up IP addresses of remote messages */
-char	**StripDomains = NULL;/* these domains may be stripped before writing logs  - r/o after s.u.*/
-char	**LocalHosts = NULL;/* these hosts are logged with their hostname  - read-only after startup*/
+char	**StripDomains = NULL;/* these domains may be stripped before writing logs  - r/o after s.u., never touched by init */
+char	**LocalHosts = NULL;/* these hosts are logged with their hostname  - read-only after startup, never touched by init */
 int	NoHops = 1;	/* Can we bounce syslog messages through an
 				   intermediate host.  Read-only after startup */
 static int     Initialized = 0; /* set when we have initialized ourselves
@@ -647,6 +647,10 @@ static rsRetVal resetConfigVariables(uchar __attribute__((unused)) *pp, void __a
 	bEscapeCCOnRcv = 1; /* default is to escape control characters */
 	bReduceRepeatMsgs = (logEveryMsg == 1) ? 0 : 1;
 	bDropMalPTRMsgs = 0;
+	if(pModDir != NULL) {
+		free(pModDir);
+		pModDir = NULL;
+	}
 #ifdef USE_PTHREADS
 	iMainMsgQueueSize = 10000;
 #endif
@@ -700,14 +704,6 @@ static void freeSelectors(void);
 static rsRetVal processConfFile(uchar *pConfFile);
 static rsRetVal selectorAddList(selector_t *f);
 static void processImInternal(void);
-
-/* Access functions for the selector_t. These functions are primarily
- * necessary to make things thread-safe. Consequently, they are slim
- * if we compile without pthread support.
- * rgerhards 2005-10-24
- */
-
-/* END Access functions for the selector_t */
 
 /* Code for handling allowed/disallowed senders
  */
@@ -1597,11 +1593,12 @@ void getCurrTime(struct syslogTime *t)
 {
 	struct timeval tp;
 	struct tm *tm;
+	struct tm tmBuf;
 	long lBias;
 
 	assert(t != NULL);
 	gettimeofday(&tp, NULL);
-	tm = localtime((time_t*) &(tp.tv_sec));
+	tm = localtime_r((time_t*) &(tp.tv_sec), &tmBuf);
 
 	t->year = tm->tm_year + 1900;
 	t->month = tm->tm_mon + 1;
@@ -1844,6 +1841,18 @@ static rsRetVal selectorDestruct(void *pVal)
 
 	assert(pThis != NULL);
 
+	if(pThis->pCSHostnameComp != NULL)
+		rsCStrDestruct(pThis->pCSHostnameComp);
+	if(pThis->pCSProgNameComp != NULL)
+		rsCStrDestruct(pThis->pCSProgNameComp);
+
+	if(pThis->f_filter_type == FILTER_PROP) {
+		if(pThis->f_filterData.prop.pCSPropName != NULL)
+			rsCStrDestruct(pThis->f_filterData.prop.pCSPropName);
+		if(pThis->f_filterData.prop.pCSCompValue != NULL)
+			rsCStrDestruct(pThis->f_filterData.prop.pCSCompValue);
+	}
+
 	llDestroy(&pThis->llActList);
 	free(pThis);
 	
@@ -2007,13 +2016,28 @@ void printchopped(char *hname, char *msg, int len, int fd, int bParseHost)
 
 	dbgprintf("Message length: %d, File descriptor: %d.\n", len, fd);
 
-	/* we first check if we need to drop trailing LFs, which often make
+	/* we first check if we have a NUL character at the very end of the
+	 * message. This seems to be a frequent problem with a number of senders.
+	 * So I have now decided to drop these NULs. However, if they are intentional,
+	 * that may cause us some problems, e.g. with syslog-sign. On the other hand,
+	 * current code always has problems with intentional NULs (as it needs to escape
+	 * them to prevent problems with the C string libraries), so that does not
+	 * really matter. Just to be on the save side, we'll log destruction of such
+	 * NULs in the debug log.
+	 * rgerhards, 2007-09-14
+	 */
+	if(*(msg + len - 1) == '\0') {
+		dbgprintf("dropped NUL at very end of message\n");
+		len--;
+	}
+
+	/* then we check if we need to drop trailing LFs, which often make
 	 * their way into syslog messages unintentionally. In order to remain
 	 * compatible to recent IETF developments, we allow the user to
 	 * turn on/off this handling.  rgerhards, 2007-07-23
 	 */
 	if(bDropTrailingLF && *(msg + len - 1) == '\n') {
-		*(msg + len - 1) = '\0';
+		dbgprintf("dropped LF at very end of message (DropTrailingLF is set)\n");
 		len--;
 	}
 
@@ -2072,8 +2096,19 @@ void printchopped(char *hname, char *msg, int len, int fd, int bParseHost)
 			/* emergency, we now need to flush, no matter if
 			 * we are at end of message or not...
 			 */
-			*(pMsg + iMsg) = '\0'; /* space *is* reserved for this! */
-			printline(hname, tmpline, bParseHost);
+			if(iMsg == MAXLINE) {
+				*(pMsg + iMsg) = '\0'; /* space *is* reserved for this! */
+				printline(hname, tmpline, bParseHost);
+			} else {
+				/* This case in theory never can happen. If it happens, we have
+				 * a logic error. I am checking for it, because if I would not,
+				 * we would address memory invalidly with the code above. I
+				 * do not care much about this case, just a debug log entry
+				 * (I couldn't do any more smart things anyway...).
+				 * rgerhards, 2007-9-20
+				 */
+				dbgprintf("internal error: iMsg > MAXLINE in printchopped()\n");
+			}
 			return; /* in this case, we are done... nothing left we can do */
 		}
 		if(*pData == '\0') { /* guard against \0 characters... */
@@ -2125,11 +2160,7 @@ void printchopped(char *hname, char *msg, int len, int fd, int bParseHost)
  * rgerhards 2004-11-08: Please note
  * that this function does only a partial decoding. At best, it splits 
  * the PRI part. No further decode happens. The rest is done in 
- * logmsg(). Please note that printsys() calls logmsg() directly, so
- * this is something we need to restructure once we are moving the
- * real decoder in here. I now (2004-11-09) found that printsys() seems
- * not to be called from anywhere. So we might as well decode the full
- * message here.
+ * logmsg().
  * Added the iSource parameter so that we know if we have to parse
  * HOSTNAME or not. rgerhards 2004-11-16.
  * changed parameter iSource to bParseHost. For details, see comment in
@@ -2259,13 +2290,12 @@ static void logmsgInternal(int pri, char *msg, int flags)
 #endif
 }
 
-/*
- * This functions looks at the given message and checks if it matches the
+/* This functions looks at the given message and checks if it matches the
  * provided filter condition. If so, it returns true, else it returns
  * false. This is a helper to logmsg() and meant to drive the decision
  * process if a message is to be processed or not. As I expect this
  * decision code to grow more complex over time AND logmsg() is already
- * a very lengthe function, I thought a separate function is more appropriate.
+ * a very lengthy function, I thought a separate function is more appropriate.
  * 2005-09-19 rgerhards
  */
 int shouldProcessThisMessage(selector_t *f, msg_t *pMsg)
@@ -2289,22 +2319,22 @@ int shouldProcessThisMessage(selector_t *f, msg_t *pMsg)
 		if(rsCStrSzStrCmp(f->pCSHostnameComp, (uchar*) getHOSTNAME(pMsg), getHOSTNAMELen(pMsg))) {
 			/* not equal, so we are already done... */
 			dbgprintf("hostname filter '+%s' does not match '%s'\n", 
-				rsCStrGetSzStr(f->pCSHostnameComp), getHOSTNAME(pMsg));
+				rsCStrGetSzStrNoNULL(f->pCSHostnameComp), getHOSTNAME(pMsg));
 			return 0;
 		}
 	} else { /* must be -hostname */
 		if(!rsCStrSzStrCmp(f->pCSHostnameComp, (uchar*) getHOSTNAME(pMsg), getHOSTNAMELen(pMsg))) {
 			/* not equal, so we are already done... */
 			dbgprintf("hostname filter '-%s' does not match '%s'\n", 
-				rsCStrGetSzStr(f->pCSHostnameComp), getHOSTNAME(pMsg));
+				rsCStrGetSzStrNoNULL(f->pCSHostnameComp), getHOSTNAME(pMsg));
 			return 0;
 		}
 	}
 	
 	if(f->pCSProgNameComp != NULL) {
 		int bInv = 0, bEqv = 0, offset = 0;
-		if(*(rsCStrGetSzStr(f->pCSProgNameComp)) == '-') {
-			if(*(rsCStrGetSzStr(f->pCSProgNameComp) + 1) == '-')
+		if(*(rsCStrGetSzStrNoNULL(f->pCSProgNameComp)) == '-') {
+			if(*(rsCStrGetSzStrNoNULL(f->pCSProgNameComp) + 1) == '-')
 				offset = 1;
 			else {
 				bInv = 1;
@@ -2317,7 +2347,7 @@ int shouldProcessThisMessage(selector_t *f, msg_t *pMsg)
 		if((!bEqv && !bInv) || (bEqv && bInv)) {
 			/* not equal or inverted selection, so we are already done... */
 			dbgprintf("programname filter '%s' does not match '%s'\n", 
-				rsCStrGetSzStr(f->pCSProgNameComp), getProgramName(pMsg));
+				rsCStrGetSzStrNoNULL(f->pCSProgNameComp), getProgramName(pMsg));
 			return 0;
 		}
 	}
@@ -2368,27 +2398,21 @@ int shouldProcessThisMessage(selector_t *f, msg_t *pMsg)
 		if(f->f_filterData.prop.isNegated)
 			iRet = (iRet == 1) ?  0 : 1;
 
-		/* cleanup */
-		if(pbMustBeFreed)
-			free(pszPropVal);
-		
 		if(Debug) {
-			char *pszPropValDeb;
-			unsigned short pbMustBeFreedDeb;
-			pszPropValDeb = MsgGetProp(pMsg, NULL,
-					f->f_filterData.prop.pCSPropName, &pbMustBeFreedDeb);
 			printf("Filter: check for property '%s' (value '%s') ",
-			        rsCStrGetSzStr(f->f_filterData.prop.pCSPropName),
-			        pszPropValDeb);
+			        rsCStrGetSzStrNoNULL(f->f_filterData.prop.pCSPropName),
+			        pszPropVal);
 			if(f->f_filterData.prop.isNegated)
 				printf("NOT ");
 			printf("%s '%s': %s\n",
 			       getFIOPName(f->f_filterData.prop.operation),
-			       rsCStrGetSzStr(f->f_filterData.prop.pCSCompValue),
+			       rsCStrGetSzStrNoNULL(f->f_filterData.prop.pCSCompValue),
 			       iRet ? "TRUE" : "FALSE");
-			if(pbMustBeFreedDeb)
-				free(pszPropValDeb);
 		}
+
+		/* cleanup */
+		if(pbMustBeFreed)
+			free(pszPropVal);
 	}
 
 	return(iRet);
@@ -2445,7 +2469,7 @@ static rsRetVal callAction(msg_t *pMsg, action_t *pAction)
 		ABORT_FINALIZE(RS_RET_OK);
 	}
 
-	/* suppress duplicate lines to this file
+	/* suppress duplicate messages
 	 */
 	if ((pAction->f_ReduceRepeated == 1) && pAction->f_pMsg != NULL &&
 	    (pMsg->msgFlags & MARK) == 0 && getMSGLen(pMsg) == getMSGLen(pAction->f_pMsg) &&
@@ -2463,7 +2487,7 @@ static rsRetVal callAction(msg_t *pMsg, action_t *pAction)
 			BACKOFF(pAction);
 		}
 	} else {
-		/* new line, save it */
+		/* new message, save it */
 		/* first check if we have a previous message stored
 		 * if so, emit and then discard it first
 		 */
@@ -2496,7 +2520,7 @@ typedef struct processMsgDoActions_s {
 DEFFUNC_llExecFunc(processMsgDoActions)
 {
 	DEFiRet;
-	rsRetVal iRetMod;	/* return of module - we do not always pass that */
+	rsRetVal iRetMod;	/* return value of module - we do not always pass that back */
 	action_t *pAction = (action_t*) pData;
 	processMsgDoActions_t *pDoActData = (processMsgDoActions_t*) pParam;
 
@@ -2658,6 +2682,22 @@ static void queueDelete (msgQueue *q)
 	free (q);
 }
 
+
+/* In queueAdd() and queueDel() we have a potential race condition. If a message
+ * is dequeued and at the same time a message is enqueued and the queue is either
+ * full or empty, the full (or empty) indicator may be invalidly updated. HOWEVER,
+ * this does not cause any real problems. No queue pointers can be wrong. And even
+ * if one of the flags is set invalidly, that does not pose a real problem. If
+ * "full" is invalidly set, at mose one message might be lost, if we are already in
+ * a timeout situation (this is quite acceptable). And if "empty" is accidently set,
+ * the receiver will not continue the inner loop, but break out of the outer. So no
+ * harm is done at all. For this reason, I do not yet use a mutex to guard the two
+ * flags - there would be a notable performance hit with, IMHO, no gain in stability
+ * or functionality. But anyhow, now it's documented...
+ * rgerhards, 2007-09-20
+ * NOTE: this comment does not really apply - the callers handle the mutex, so it
+ * *is* guarded.
+ */
 static void queueAdd (msgQueue *q, void* in)
 {
 	q->pbuf[q->tail] = in;
@@ -2694,8 +2734,12 @@ static void *singleWorker()
 {
 	msgQueue *fifo = pMsgQueue;
 	msg_t *pMsg;
+	sigset_t sigSet;
 
 	assert(fifo != NULL);
+
+	sigfillset(&sigSet);
+	pthread_sigmask(SIG_BLOCK, &sigSet, NULL);
 
 	while(!bGlblDone || !fifo->empty) {
 		pthread_mutex_lock(fifo->mut);
@@ -3002,8 +3046,7 @@ static int parseLegacySyslogMsg(msg_t *pMsg, int flags)
 	assert(pMsg->pszUxTradMsg != NULL);
 	p2parse = (char*) pMsg->pszUxTradMsg;
 
-	/*
-	 * Check to see if msg contains a timestamp
+	/* Check to see if msg contains a timestamp
 	 */
 	if(srSLMGParseTIMESTAMP3164(&(pMsg->tTIMESTAMP), p2parse) == TRUE)
 		p2parse += 16;
@@ -3044,17 +3087,27 @@ static int parseLegacySyslogMsg(msg_t *pMsg, int flags)
 		bTAGCharDetected = 0;
 		if(pMsg->bParseHOSTNAME) {
 			/* TODO: quick and dirty memory allocation */
-			if((pBuf = malloc(sizeof(char)* strlen(p2parse) +1)) == NULL)
+			/* the memory allocated is far too much in most cases. But on the plus side,
+			 * it is quite fast... - rgerhards, 2007-09-20
+			 */
+			if((pBuf = malloc(sizeof(char)* (strlen(p2parse) +1))) == NULL)
 				return 1;
 			pWork = pBuf;
 			/* this is the actual parsing loop */
 			while(*p2parse && *p2parse != ' ' && *p2parse != ':') {
-				if(   *p2parse == '[' || *p2parse == ']' || *p2parse == '/')
+				if(*p2parse == '[' || *p2parse == ']' || *p2parse == '/')
 					bTAGCharDetected = 1;
 				*pWork++ = *p2parse++;
 			}
 			/* we need to handle ':' seperately, because it terminates the
 			 * TAG - so we also need to terminate the parser here!
+			 * rgerhards, 2007-09-10 *p2parse points to a valid address here in 
+			 * any case. We can reach this point only if we are at end of string,
+			 * or we have a ':' or ' '. What the if below does is check if we are
+			 * not at end of string and, if so, advance the parse pointer. If we 
+			 * are already at end of string, *p2parse is equal to '\0', neither if
+			 * will be true and the parse pointer remain as is. This is perfectly
+			 * well.
 			 */
 			if(*p2parse == ':') {
 				bTAGCharDetected = 1;
@@ -3091,7 +3144,7 @@ static int parseLegacySyslogMsg(msg_t *pMsg, int flags)
 		 * is the max size ;) we need to shuffle the code again... Just for 
 		 * the records: the code is currently clean, but we could optimize it! */
 		if(!bTAGCharDetected) {
-			char *pszTAG;
+			uchar *pszTAG;
 			if((pStrB = rsCStrConstruct()) == NULL) 
 				return 1;
 			rsCStrSetAllocIncrement(pStrB, 33);
@@ -3107,7 +3160,7 @@ static int parseLegacySyslogMsg(msg_t *pMsg, int flags)
 			}
 			rsCStrFinish(pStrB);
 
-			pszTAG = (char*) rsCStrConvSzStrAndDestruct(pStrB);
+			rsCStrConvSzStrAndDestruct(pStrB, &pszTAG, 1);
 			if(pszTAG == NULL)
 			{	/* rger, 2005-11-10: no TAG found - this implies that what
 				 * we have considered to be the HOSTNAME is most probably the
@@ -3120,9 +3173,7 @@ static int parseLegacySyslogMsg(msg_t *pMsg, int flags)
 				dbgprintf("No TAG in message, assuming that HOSTNAME is missing.\n");
 				moveHOSTNAMEtoTAG(pMsg);
 				MsgSetHOSTNAME(pMsg, getRcvFrom(pMsg));
-			}
-			else
-			{ /* we have a TAG, so we can happily set it ;) */
+			} else { /* we have a TAG, so we can happily set it ;) */
 				MsgAssignTAG(pMsg, pszTAG);
 			}
 		} else {
@@ -3273,6 +3324,9 @@ rsRetVal fprintlog(action_t *pAction)
 			/* it failed - nothing we can do against it... */
 			dbgprintf("Message duplication failed, dropping repeat message.\n");
 			return RS_RET_ERR;
+			/* This return is OK. The finalizer frees strings, which are not
+			 * yet allocated. So we can not use the finalizer.
+			 */
 		}
 
 		/* We now need to update the other message properties.
@@ -3298,12 +3352,7 @@ rsRetVal fprintlog(action_t *pAction)
 	/* here we must loop to process all requested strings */
 
 	for(i = 0 ; i < pAction->iNumTpls ; ++i) {
-		if((pAction->ppMsgs[i] = tplToString(pAction->ppTpl[i], pAction->f_pMsg)) == NULL) {
-			dbgprintf("memory alloc failed while generating message strings - message ignored\n");
-			glblHadMemShortage = 1;
-			iRet = RS_RET_OUT_OF_MEMORY;
-			goto finalize_it;
-		}
+		CHKiRet(tplToString(pAction->ppTpl[i], pAction->f_pMsg, &pAction->ppMsgs[i]));
 	}
 	/* call configured action */
 	iRet = pAction->pMod->mod.om.doAction(pAction->ppMsgs, pAction->f_pMsg->msgFlags, pAction->pModData);
@@ -3351,7 +3400,13 @@ finalize_it:
 static void reapchild()
 {
 	int saved_errno = errno;
-	signal(SIGCHLD, reapchild);	/* reset signal handler -ASP */
+	struct sigaction sigAct;
+
+	memset(&sigAct, 0, sizeof (sigAct));
+	sigemptyset(&sigAct.sa_mask);
+	sigAct.sa_handler = reapchild;
+	sigaction(SIGCHLD, &sigAct, NULL);  /* reset signal handler -ASP */
+
 	while(waitpid(-1, NULL, WNOHANG) > 0);
 	errno = saved_errno;
 }
@@ -3418,17 +3473,30 @@ static void domark(void)
  */
 static void domarkAlarmHdlr()
 {
-	bRequestDoMark = 1; /* request alarm */
-	(void) signal(SIGALRM, domarkAlarmHdlr);
-	(void) alarm(TIMERINTVL);
+	struct sigaction sigAct;
+
+ 	bRequestDoMark = 1; /* request alarm */
+
+	memset(&sigAct, 0, sizeof (sigAct));
+	sigemptyset(&sigAct.sa_mask);
+	sigAct.sa_handler = domarkAlarmHdlr;
+	sigaction(SIGALRM, &sigAct, NULL);
+
+ 	(void) alarm(TIMERINTVL);
 }
 
 
 static void debug_switch()
 {
-	dbgprintf("Switching debugging_on to %s\n", (debugging_on == 0) ? "true" : "false");
-	debugging_on = (debugging_on == 0) ? 1 : 0;
-	signal(SIGUSR1, debug_switch);
+	struct sigaction sigAct;
+
+ 	dbgprintf("Switching debugging_on to %s\n", (debugging_on == 0) ? "true" : "false");
+ 	debugging_on = (debugging_on == 0) ? 1 : 0;
+	
+	memset(&sigAct, 0, sizeof (sigAct));
+	sigemptyset(&sigAct.sa_mask);
+	sigAct.sa_handler = debug_switch;
+	sigaction(SIGUSR1, &sigAct, NULL);
 }
 
 
@@ -3469,13 +3537,14 @@ void logerrorInt(char *type, int errCode)
 void logerror(char *type)
 {
 	char buf[1024];
+	char errStr[1024];
 
 	dbgprintf("Called logerr, msg: %s\n", type);
 
 	if (errno == 0)
 		snprintf(buf, sizeof(buf), "%s", type);
 	else
-		snprintf(buf, sizeof(buf), "%s: %s", type, strerror(errno));
+		snprintf(buf, sizeof(buf), "%s: %s", type, strerror_r(errno, errStr, sizeof(errStr)));
 	buf[sizeof(buf)/sizeof(char) - 1] = '\0'; /* just to be on the safe side... */
 	errno = 0;
 	logmsgInternal(LOG_SYSLOG|LOG_ERR, buf, ADDDATE);
@@ -3577,6 +3646,10 @@ static void die(int sig)
 	 * into freeSelectors() - but that needs to be seen. -- rgerhards, 2007-08-09
 	 */
 	modUnloadAndDestructAll();
+
+	/* clean up auxiliary data */
+	if(pModDir != NULL)
+		free(pModDir);
 
 	dbgprintf("Clean shutdown completed, bye.\n");
 	exit(0); /* "good" exit, this is the terminator function for rsyslog [die()] */
@@ -3773,6 +3846,11 @@ finalize_it:
  * loader for plug-ins.
  * rgerhards, 2007-07-21
  * varmojfekoj added support for dynamically loadable modules on 2007-08-13
+ * rgerhards, 2007-09-25: please note that the non-threadsafe function dlerror() is
+ * called below. This is ok because modules are currently only loaded during
+ * configuration file processing, which is executed on a single thread. Should we
+ * change that design at any stage (what is unlikely), we need to find a
+ * replacement.
  */
 static rsRetVal doModLoad(uchar **pp, __attribute__((unused)) void* pVal)
 {
@@ -3805,8 +3883,12 @@ static rsRetVal doModLoad(uchar **pp, __attribute__((unused)) void* pVal)
 
 	dbgprintf("Requested to load module '%s'\n", szName);
 
-	strncpy((char *) szPath, ModDir, sizeof(szPath));
-	strncat((char *) szPath, (char *) pModName, sizeof(szPath) - strlen(szPath) - 1);
+	if(*pModName == '/') {
+		*szPath = '\0';	/* we do not need to append the path - its already in the module name */
+	} else {
+		strncpy((char *) szPath, (pModDir == NULL) ? _PATH_MODDIR : (char*) pModDir, sizeof(szPath));
+	}
+	strncat((char *) szPath, (char *) pModName, sizeof(szPath) - strlen((char*) szPath) - 1);
 	if(!(pModHdlr = dlopen((char *) szPath, RTLD_NOW))) {
 		snprintf((char *) errMsg, sizeof(errMsg), "could not load module '%s', dlopen: %s\n", szPath, dlerror());
 		errMsg[sizeof(errMsg)/sizeof(uchar) - 1] = '\0';
@@ -4039,12 +4121,12 @@ static void dbgPrintInitInfo(void)
 	for (f = Files; f != NULL ; f = f->f_next) {
 		printf("Selector %d:\n", iSelNbr++);
 		if(f->pCSProgNameComp != NULL)
-			printf("tag: '%s'\n", rsCStrGetSzStr(f->pCSProgNameComp));
+			printf("tag: '%s'\n", rsCStrGetSzStrNoNULL(f->pCSProgNameComp));
 		if(f->eHostnameCmpMode != HN_NO_COMP)
 			printf("hostname: %s '%s'\n",
 				f->eHostnameCmpMode == HN_COMP_MATCH ?
 					"only" : "allbut",
-				rsCStrGetSzStr(f->pCSHostnameComp));
+				rsCStrGetSzStrNoNULL(f->pCSHostnameComp));
 		if(f->f_filter_type == FILTER_PRI) {
 			for (i = 0; i <= LOG_NFACILITIES; i++)
 				if (f->f_filterData.f_pmask[i] == TABLE_NOPRI)
@@ -4054,13 +4136,13 @@ static void dbgPrintInitInfo(void)
 		} else {
 			printf("PROPERTY-BASED Filter:\n");
 			printf("\tProperty.: '%s'\n",
-			       rsCStrGetSzStr(f->f_filterData.prop.pCSPropName));
+			       rsCStrGetSzStrNoNULL(f->f_filterData.prop.pCSPropName));
 			printf("\tOperation: ");
 			if(f->f_filterData.prop.isNegated)
 				printf("NOT ");
 			printf("'%s'\n", getFIOPName(f->f_filterData.prop.operation));
 			printf("\tValue....: '%s'\n",
-			       rsCStrGetSzStr(f->f_filterData.prop.pCSCompValue));
+			       rsCStrGetSzStrNoNULL(f->f_filterData.prop.pCSCompValue));
 			printf("\tAction...: ");
 		}
 
@@ -4191,10 +4273,11 @@ static rsRetVal processConfFile(uchar *pConfFile)
 
 finalize_it:
 	if(iRet != RS_RET_OK) {
+		char errStr[1024];
 		if(fCurr != NULL)
 			selectorDestruct(fCurr);
 		dbgprintf("error %d processing config file '%s'; os error (if any): %s\n",
-			iRet, pConfFile, strerror(errno));
+			iRet, pConfFile, strerror_r(errno, errStr, sizeof(errStr)));
 	}
 	return iRet;
 }
@@ -4214,6 +4297,7 @@ static void init(void)
 #endif
 	char bufStartUpMsg[512];
 	struct servent *sp;
+	struct sigaction sigAct;
 
 	/* initialize some static variables */
 	pDfltHostnameCmp = NULL;
@@ -4244,6 +4328,8 @@ static void init(void)
         if(!strcmp(LogPort, "0")) {
                 /* we shall use the default syslog/udp port, so let's
                  * look it up.
+		 * NOTE: getservbyname() is not thread-safe, but this is OK as 
+		 * it is called only during init, in single-threading mode.
                  */
                 sp = getservbyname("syslog", "udp");
                 if (sp == NULL) {
@@ -4261,11 +4347,12 @@ static void init(void)
 			 * for the very same reason.
 			 */
 			static char defPort[8];
-			snprintf(defPort, sizeof(defPort) * sizeof(char), "%d", ntohs(sp->s_port));
+			snprintf(defPort, sizeof(defPort), "%d", ntohs(sp->s_port));
                         LogPort = defPort;
 		}
         }
 
+	dbgprintf("rsyslog %s.\n", VERSION);
 	dbgprintf("Called init.\n");
 
 	/*  Close all open log files and free log descriptor array. */
@@ -4286,7 +4373,6 @@ static void init(void)
 	}
 #endif
 	
-	
 	/* re-setting values to defaults (where applicable) */
 	/* TODO: once we have loadable modules, we must re-visit this code. The reason is
 	 * that config variables are not re-set, because the module is not yet loaded. On
@@ -4306,12 +4392,12 @@ static void init(void)
 		 * We ignore any errors while doing this - we would be lost anyhow...
 		 */
 		selector_t *f = NULL;
-		char *pTTY = ttyname(0);
+		char szTTYNameBuf[TTY_NAME_MAX+1]; /* +1 for NULL character */
 		dbgprintf("primary config file could not be opened - using emergency definitions.\n");
 		cfline((uchar*)"*.ERR\t" _PATH_CONSOLE, &f);
 		cfline((uchar*)"*.PANIC\t*", &f);
-		if(pTTY != NULL) {
-			snprintf(cbuf,sizeof(cbuf), "*.*\t%s", pTTY);
+		if(ttyname_r(0, szTTYNameBuf, sizeof(szTTYNameBuf)) == 0) {
+			snprintf(cbuf,sizeof(cbuf), "*.*\t%s", szTTYNameBuf);
 			cfline((uchar*)cbuf, &f);
 		}
 		selectorAddList(f);
@@ -4354,8 +4440,7 @@ static void init(void)
 			if((finet = create_udp_socket()) != NULL)
 				dbgprintf("Opened %d syslog UDP port(s).\n", *finet);
 		}
-	}
-	else {
+	} else {
 		/* this case can happen during HUP processing. */
 		closeUDPListenSockets();
 	}
@@ -4410,7 +4495,11 @@ static void init(void)
 		);
 	logmsgInternal(LOG_SYSLOG|LOG_INFO, bufStartUpMsg, ADDDATE);
 
-	(void) signal(SIGHUP, sighup_handler);
+	memset(&sigAct, 0, sizeof (sigAct));
+	sigemptyset(&sigAct.sa_mask);
+	sigAct.sa_handler = sighup_handler;
+	sigaction(SIGHUP, &sigAct, NULL);
+
 	dbgprintf(" restarted.\n");
 }
 
@@ -4461,11 +4550,11 @@ rsRetVal cflineParseTemplateName(uchar** pp, omodStringRequest_t *pOMSR, int iEn
 
 		/* now copy the string */
 		while(*p && *p != '#' && !isspace((int) *p)) {
-			if((iRet = rsCStrAppendChar(pStrB, *p)) != RS_RET_OK) goto finalize_it;
+			CHKiRet(rsCStrAppendChar(pStrB, *p));
 			++p;
 		}
-		if((iRet = rsCStrFinish(pStrB)) != RS_RET_OK) goto finalize_it;
-		tplName = rsCStrConvSzStrAndDestruct(pStrB);
+		CHKiRet(rsCStrFinish(pStrB));
+		CHKiRet(rsCStrConvSzStrAndDestruct(pStrB, &tplName, 0));
 	}
 
 	iRet = OMSRsetEntry(pOMSR, iEntry, tplName, iTplOpts);
@@ -4532,7 +4621,7 @@ static rsRetVal cflineProcessTradPRIFilter(uchar **pline, register selector_t *f
 	assert(f != NULL);
 
 	dbgprintf(" - traditional PRI filter\n");
-	errno = 0;	/* keep strerror() stuff out of logerror messages */
+	errno = 0;	/* keep strerror_r() stuff out of logerror messages */
 
 	f->f_filter_type = FILTER_PRI;
 	/* Note: file structure is pre-initialized to zero because it was
@@ -4691,7 +4780,7 @@ static rsRetVal cflineProcessPropFilter(uchar **pline, register selector_t *f)
 	assert(f != NULL);
 
 	dbgprintf(" - property-based filter\n");
-	errno = 0;	/* keep strerror() stuff out of logerror messages */
+	errno = 0;	/* keep strerror_r() stuff out of logerror messages */
 
 	f->f_filter_type = FILTER_PROP;
 
@@ -4745,7 +4834,7 @@ static rsRetVal cflineProcessPropFilter(uchar **pline, register selector_t *f)
 		f->f_filterData.prop.operation = FIOP_REGEX;
 	} else {
 		logerrorSz("error: invalid compare operation '%s' - ignoring selector",
-		           (char*) rsCStrGetSzStr(pCSCompOp));
+		           (char*) rsCStrGetSzStrNoNULL(pCSCompOp));
 	}
 	rsCStrDestruct (pCSCompOp); /* no longer needed */
 
@@ -4807,7 +4896,6 @@ static rsRetVal cflineProcessHostSelector(uchar **pline)
 		if(pDfltHostnameCmp != NULL) {
 			if((iRet = rsCStrSetSzStr(pDfltHostnameCmp, NULL)) != RS_RET_OK)
 				return(iRet);
-			pDfltHostnameCmp = NULL;
 		}
 	} else {
 		dbgprintf("setting BSD-like hostname filter to '%s'\n", *pline);
@@ -4852,7 +4940,6 @@ static rsRetVal cflineProcessTagSelector(uchar **pline)
 		if(pDfltProgNameCmp != NULL) {
 			if((iRet = rsCStrSetSzStr(pDfltProgNameCmp, NULL)) != RS_RET_OK)
 				return(iRet);
-			pDfltProgNameCmp = NULL;
 		}
 	} else {
 		dbgprintf("setting programname filter to '%s'\n", *pline);
@@ -5293,8 +5380,15 @@ void dbgprintf(char *fmt, ...)
  */
 void sighup_handler()
 {
+	struct sigaction sigAct;
+	
 	restart = 1;
-	signal(SIGHUP, sighup_handler);
+
+	memset(&sigAct, 0, sizeof (sigAct));
+	sigemptyset(&sigAct.sa_mask);
+	sigAct.sa_handler = sighup_handler;
+	sigaction(SIGHUP, &sigAct, NULL);
+
 	return;
 }
 
@@ -5489,7 +5583,7 @@ static rsRetVal processSelectAfter(int maxfds, int nfds, fd_set *pReadfds, fd_se
 	/* the following macro is used to decrement the number of to-be-probed
 	 * fds and abort this function when we are done with all.
 	 */
-#	define FDPROCESSED() if(--nfds == 0) { dbgprintf("nfds == 0, aborting\n");ABORT_FINALIZE(RS_RET_OK); }
+#	define FDPROCESSED() if(--nfds == 0) { ABORT_FINALIZE(RS_RET_OK); }
 
 	if (nfds < 0) {
 		if (errno != EINTR)
@@ -5539,8 +5633,9 @@ static rsRetVal processSelectAfter(int maxfds, int nfds, fd_set *pReadfds, fd_se
 			if (iRcvd > 0) {
 				printchopped(LocalHostName, line, iRcvd,  fd, funixParseHost[i]);
 			} else if (iRcvd < 0 && errno != EINTR) {
+				char errStr[1024];
 				dbgprintf("UNIX socket error: %d = %s.\n", \
-					errno, strerror(errno));
+					errno, strerror_r(errno, errStr, sizeof(errStr)));
 				logerror("recvfrom UNIX");
 			}
 		FDPROCESSED();
@@ -5553,12 +5648,11 @@ static rsRetVal processSelectAfter(int maxfds, int nfds, fd_set *pReadfds, fd_se
 	       for (i = 0; i < *finet; i++) {
 		       if (FD_ISSET(finet[i+1], pReadfds)) {
 			       socklen = sizeof(frominet);
-			       memset(line, '\0', sizeof(line));
+			       memset(line, 0xff, sizeof(line)); // TODO: I think we need this for debug only - remove after bug hunt
 			       l = recvfrom(finet[i+1], line, MAXLINE - 1, 0,
 			       		    (struct sockaddr *)&frominet, &socklen);
 			       if (l > 0) {
-				       line[l] = '\0';
-				       if(cvthname(&frominet, fromHost, fromHostFQDN) == 1) {
+				       if(cvthname(&frominet, fromHost, fromHostFQDN) == RS_RET_OK) {
 					       dbgprintf("Message from inetd socket: #%d, host: %s\n",
 						       finet[i+1], fromHost);
 					       /* Here we check if a host is permitted to send us
@@ -5577,10 +5671,10 @@ static rsRetVal processSelectAfter(int maxfds, int nfds, fd_set *pReadfds, fd_se
 						       }	
 					       }
 				       }
-			       }
-			       else if (l < 0 && errno != EINTR && errno != EAGAIN) {
+			       } else if (l < 0 && errno != EINTR && errno != EAGAIN) {
+					char errStr[1024];
 				       dbgprintf("INET socket error: %d = %s.\n",
-							errno, strerror(errno));
+							errno, strerror_r(errno, errStr, sizeof(errStr)));
 					       logerror("recvfrom inet");
 					       /* should be harmless */
 					       sleep(1);
@@ -5644,6 +5738,9 @@ finalize_it:
 }
 
 
+/* This is the main processing loop. It is called after successful initialization.
+ * When it returns, the syslogd terminates.
+ */
 static void mainloop(void)
 {
 	fd_set readfds;
@@ -5772,6 +5869,8 @@ static void mainloop(void)
 		 * TODO: I got some information: this seems to be expected signal() behaviour
 		 * we should investigate the use of sigaction() (see klogd.c for an sample).
 		 * rgerhards, 2007-06-22
+		 * rgerhards, 2007-09-11: code has been converted to sigaction() now. We need
+		 * to re-check on BSD, I think the issue is now solved.
 		 */
 		tvSelectTimeout.tv_sec = 10;
 		tvSelectTimeout.tv_usec = 0;
@@ -5904,6 +6003,7 @@ static rsRetVal loadBuildInModules(void)
 	CHKiRet(regCfSysLineHdlr((uchar *)"debugprintmodulelist", 0, eCmdHdlrBinary, NULL, &bDebugPrintModuleList));
 	CHKiRet(regCfSysLineHdlr((uchar *)"debugprintcfsyslinehandlerlist", 0, eCmdHdlrBinary,
 		 NULL, &bDebugPrintCfSysLineHandlerList));
+	CHKiRet(regCfSysLineHdlr((uchar *)"moddir", 0, eCmdHdlrGetWord, NULL, &pModDir));
 	CHKiRet(regCfSysLineHdlr((uchar *)"resetconfigvariables", 1, eCmdHdlrCustomHandler, resetConfigVariables, NULL));
 
 finalize_it:
@@ -5956,11 +6056,21 @@ static void printVersion(void)
 }
 
 
+/* This is the main entry point into rsyslogd. Over time, we should try to
+ * modularize it a bit more...
+ */
 int main(int argc, char **argv)
-{	register int i;
+{	
+	DEFiRet;
+	register int i;
 	register char *p;
 	int num_fds;
-	rsRetVal iRet;
+	int ch;
+	struct hostent *hent;
+	extern int optind;
+	extern char *optarg;
+	uchar *pTmp;
+	struct sigaction sigAct;
 
 #ifdef	MTRACE
 	mtrace(); /* this is a debug aid for leak detection - either remove
@@ -5968,12 +6078,6 @@ int main(int argc, char **argv)
 #endif
 
 	pid_t ppid = getpid();
-	int ch;
-	struct hostent *hent;
-
-	extern int optind;
-	extern char *optarg;
-	uchar *pTmp;
 
 	if(chdir ("/") != 0)
 		fprintf(stderr, "Can not do 'cd /' - still trying to run\n");
@@ -6040,9 +6144,9 @@ int main(int argc, char **argv)
 			if (LocalHosts) {
 				fprintf (stderr, "rsyslogd: Only one -l argument allowed," \
 					"the first one is taken.\n");
-				break;
+			} else {
+				LocalHosts = crunch_list(optarg);
 			}
-			LocalHosts = crunch_list(optarg);
 			break;
 		case 'm':		/* mark interval */
 			MarkInterval = atoi(optarg) * 60;
@@ -6057,25 +6161,29 @@ int main(int argc, char **argv)
 			funixn[0] = optarg;
 			break;
 		case 'r':		/* accept remote messages */
+#ifdef SYSLOG_INET
 			AcceptRemote = 1;
 			if(optarg == NULL)
 				LogPort = "0";
 			else
 				LogPort = optarg;
+#else
+			fprintf(stderr, "rsyslogd: -r not valid - not compiled with network support");
+#endif
 			break;
 		case 's':
 			if (StripDomains) {
 				fprintf (stderr, "rsyslogd: Only one -s argument allowed," \
 					"the first one is taken.\n");
-				break;
+			} else {
+				StripDomains = crunch_list(optarg);
 			}
-			StripDomains = crunch_list(optarg);
 			break;
 		case 't':		/* enable tcp logging */
 #ifdef SYSLOG_INET
 			configureTCPListen(optarg);
 #else
-			fprintf(stderr, "rsyslogd: -t not valid - not compiled for network support");
+			fprintf(stderr, "rsyslogd: -t not valid - not compiled with network support");
 #endif
 			break;
 		case 'u':		/* misc user settings */
@@ -6107,7 +6215,11 @@ int main(int argc, char **argv)
 		dbgprintf("Checking pidfile.\n");
 		if (!check_pid(PidFile))
 		{
-			signal (SIGTERM, doexit);
+			memset(&sigAct, 0, sizeof (sigAct));
+			sigemptyset(&sigAct.sa_mask);
+			sigAct.sa_handler = doexit;
+			sigaction(SIGTERM, &sigAct, NULL);
+
 			if (fork()) {
 				/*
 				 * Parent process
@@ -6145,13 +6257,13 @@ int main(int argc, char **argv)
 		{
 			if (!write_pid(PidFile))
 			{
-				dbgprintf("Can't write pid.\n");
+				fputs("Can't write pid.\n", stderr);
 				exit(1); /* exit during startup - questionable */
 			}
 		}
 		else
 		{
-			dbgprintf("Pidfile (and pid) already exist.\n");
+			fputs("Pidfile (and pid) already exist.\n", stderr);
 			exit(1); /* exit during startup - questionable */
 		}
 	} /* if ( !Debug ) */
@@ -6181,8 +6293,7 @@ int main(int argc, char **argv)
 	{
 		LocalDomain = "";
 
-		/*
-		 * It's not clearly defined whether gethostname()
+		/* It's not clearly defined whether gethostname()
 		 * should return the simple hostname or the fqdn. A
 		 * good piece of software should be aware of both and
 		 * we want to distribute good software.  Joey
@@ -6192,14 +6303,18 @@ int main(int argc, char **argv)
 		 * doesn't have LocalHostName listed, gethostbyname will
 		 * return NULL. 
 		 */
+		/* TODO: gethostbyname() is not thread-safe, but replacing it is
+		 * not urgent as we do not run on multiple threads here. rgerhards, 2007-09-25
+		 */
 		hent = gethostbyname(LocalHostName);
-		if ( hent )
+		if(hent) {
 			snprintf(LocalHostName, sizeof(LocalHostName), "%s", hent->h_name);
-			
-		if ( (p = strchr(LocalHostName, '.')) )
-		{
-			*p++ = '\0';
-			LocalDomain = p;
+				
+			if ( (p = strchr(LocalHostName, '.')) )
+			{
+				*p++ = '\0';
+				LocalDomain = p;
+			}
 		}
 	}
 
@@ -6209,14 +6324,23 @@ int main(int argc, char **argv)
 		if (isupper((int) *p))
 			*p = tolower(*p);
 
-	(void) signal(SIGTERM, doDie);
-	(void) signal(SIGINT, Debug ? doDie : SIG_IGN);
-	(void) signal(SIGQUIT, Debug ? doDie : SIG_IGN);
-	(void) signal(SIGCHLD, reapchild);
-	(void) signal(SIGALRM, domarkAlarmHdlr);
-	(void) signal(SIGUSR1, Debug ? debug_switch : SIG_IGN);
-	(void) signal(SIGPIPE, SIG_IGN);
-	(void) signal(SIGXFSZ, SIG_IGN); /* do not abort if 2gig file limit is hit */
+	memset(&sigAct, 0, sizeof (sigAct));
+	sigemptyset(&sigAct.sa_mask);
+
+	sigAct.sa_handler = doDie;
+	sigaction(SIGTERM, &sigAct, NULL);
+	sigAct.sa_handler = Debug ? doDie : SIG_IGN;
+	sigaction(SIGINT, &sigAct, NULL);
+	sigaction(SIGQUIT, &sigAct, NULL);
+	sigAct.sa_handler = reapchild;
+	sigaction(SIGCHLD, &sigAct, NULL);
+	sigAct.sa_handler = domarkAlarmHdlr;
+	sigaction(SIGALRM, &sigAct, NULL);
+	sigAct.sa_handler = Debug ? debug_switch : SIG_IGN;
+	sigaction(SIGUSR1, &sigAct, NULL);
+	sigAct.sa_handler = SIG_IGN;
+	sigaction(SIGPIPE, &sigAct, NULL);
+	sigaction(SIGXFSZ, &sigAct, NULL); /* do not abort if 2gig file limit is hit */
 	(void) alarm(TIMERINTVL);
 
 	dbgprintf("Starting.\n");
@@ -6225,8 +6349,7 @@ int main(int argc, char **argv)
 		dbgprintf("Debugging enabled, SIGUSR1 to turn off debugging.\n");
 		debugging_on = 1;
 	}
-	/*
-	 * Send a signal to the parent to it can terminate.
+	/* Send a signal to the parent so it can terminate.
 	 */
 	if (myPid != ppid)
 		kill (ppid, SIGTERM);
@@ -6238,7 +6361,8 @@ int main(int argc, char **argv)
 	 */
 
 	mainloop();
-	/* end de-init's */
+
+	/* do any de-init's that need to be done AFTER this comment */
 
 	die(bFinished);
 	return 0;

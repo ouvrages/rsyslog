@@ -79,7 +79,7 @@ static int	bCreateDirs;	/* auto-create directories for dynaFiles: 0 - no, 1 - ye
 /* end globals for default values */
 
 typedef struct _instanceData {
-	char	f_fname[MAXFNAME];/* file or template name (display only) */
+	uchar	f_fname[MAXFNAME];/* file or template name (display only) */
 	short	fd;		  /* file descriptor for (current) file */
 	enum {
 		eTypeFILE,
@@ -230,12 +230,12 @@ static rsRetVal cflineParseOutchannel(instanceData *pData, uchar* p, omodStringR
 	}
 
 	/* OK, we finally got a correct template. So let's use it... */
-	strncpy(pData->f_fname, pOch->pszFileTemplate, MAXFNAME);
+	strncpy((char*) pData->f_fname, (char*) pOch->pszFileTemplate, MAXFNAME);
 	pData->f_sizeLimit = pOch->uSizeLimit;
 	/* WARNING: It is dangerous "just" to pass the pointer. As we
 	 * never rebuild the output channel description, this is acceptable here.
 	 */
-	pData->f_sizeLimitCmd = pOch->cmdOnSizeLimit;
+	pData->f_sizeLimitCmd = (char*) pOch->cmdOnSizeLimit;
 
 	iRet = cflineParseTemplateName(&p, pOMSR, iEntry, iTplOpts, (uchar*) " TradFmt");
 
@@ -287,7 +287,7 @@ int resolveFileSizeLimit(instanceData *pData)
 
 	execProg(pCmd, 1, pParams);
 
-	pData->fd = open(pData->f_fname, O_WRONLY|O_APPEND|O_CREAT|O_NOCTTY,
+	pData->fd = open((char*) pData->f_fname, O_WRONLY|O_APPEND|O_CREAT|O_NOCTTY,
 			pData->fCreateMode);
 
 	actualFileSize = lseek(pData->fd, 0, SEEK_END);
@@ -417,7 +417,7 @@ static int prepareDynFile(instanceData *pData, uchar *newFileName, unsigned iMsg
 	 * I *hope* this will be a performance enhancement.
 	 */
 	if(   (pData->iCurrElt != -1)
-	   && !strcmp((char*) newFileName, (char*) pCache[pData->iCurrElt])) {
+	   && !strcmp((char*) newFileName, (char*) pCache[pData->iCurrElt]->pName)) {
 	   	/* great, we are all set */
 		pCache[pData->iCurrElt]->lastUsed = time(NULL); /* update timestamp for LRU */
 		return 0;
@@ -482,6 +482,7 @@ static int prepareDynFile(instanceData *pData, uchar *newFileName, unsigned iMsg
 		else
 			logerrorSz("Could not open dynamic file '%s' - discarding message", (char*)newFileName);
 		dynaFileDelCacheEntry(pCache, iFirstFree, 1);
+		pData->iCurrElt = -1;
 		return -1;
 	}
 
@@ -574,10 +575,10 @@ again:
 #else
 			&& e == EBADF) {
 #endif
-			pData->fd = open(pData->f_fname, O_WRONLY|O_APPEND|O_NOCTTY);
+			pData->fd = open((char*) pData->f_fname, O_WRONLY|O_APPEND|O_NOCTTY);
 			if (pData->fd < 0) {
 				iRet = RS_RET_DISABLE_ACTION;
-				logerror(pData->f_fname);
+				logerror((char*) pData->f_fname);
 			} else {
 				untty();
 				goto again;
@@ -585,7 +586,7 @@ again:
 		} else {
 			iRet = RS_RET_DISABLE_ACTION;
 			errno = e;
-			logerror(pData->f_fname);
+			logerror((char*) pData->f_fname);
 		}
 	} else if (pData->bSyncFile)
 		fsync(pData->fd);
@@ -676,7 +677,7 @@ CODESTARTparseSelectorAct
 			pData->bDynamicName = 0;
 			pData->fCreateMode = fCreateMode; /* preserve current setting */
 			pData->fDirCreateMode = fDirCreateMode; /* preserve current setting */
-			pData->fd = open(pData->f_fname, O_WRONLY|O_APPEND|O_CREAT|O_NOCTTY,
+			pData->fd = open((char*) pData->f_fname, O_WRONLY|O_APPEND|O_CREAT|O_NOCTTY,
 					 pData->fCreateMode);
 		}
 		break;
@@ -692,7 +693,7 @@ CODESTARTparseSelectorAct
 		/* "filename" is actually a template name, we need this as string 1. So let's add it
 		 * to the pOMSR. -- rgerhards, 2007-07-27
 		 */
-		if((iRet = OMSRsetEntry(*ppOMSR, 1, (uchar*)strdup(pData->f_fname), OMSR_NO_RQD_TPL_OPTS)) != RS_RET_OK)
+		if((iRet = OMSRsetEntry(*ppOMSR, 1, (uchar*)strdup((char*) pData->f_fname), OMSR_NO_RQD_TPL_OPTS)) != RS_RET_OK)
 			break;
 
 		pData->bDynamicName = 1;
@@ -746,7 +747,7 @@ CODESTARTparseSelectorAct
 		pData->dirGID = dirGID;
 
 		if(pData->fileType == eTypePIPE) {
-			pData->fd = open(pData->f_fname, O_RDWR|O_NONBLOCK);
+			pData->fd = open((char*) pData->f_fname, O_RDWR|O_NONBLOCK);
 	        } else {
 			prepareFile(pData, pData->f_fname);
 		}
@@ -754,7 +755,7 @@ CODESTARTparseSelectorAct
 	  	if ( pData->fd < 0 ){
 			pData->fd = -1;
 			dbgprintf("Error opening log file: %s\n", pData->f_fname);
-			logerror(pData->f_fname);
+			logerror((char*) pData->f_fname);
 			break;
 		}
 		if (isatty(pData->fd)) {

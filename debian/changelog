@@ -1,3 +1,11 @@
+rsyslog (1.19.7-1) unstable; urgency=low
+
+  * New upstream release.
+  * debian/patches/man_page_format.patch
+    - Fix a formatting glitch in the rsyslog.conf man page.
+
+ -- Michael Biebl <biebl@debian.org>  Tue, 25 Sep 2007 22:54:04 +0200
+
 rsyslog (1.19.3-1) unstable; urgency=low
 
   * New upstream release.

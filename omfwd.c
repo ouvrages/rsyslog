@@ -232,8 +232,9 @@ static int TCPSendCreateSocket(instanceData *pData, struct addrinfo *addrDest)
 					TCPSendSetStatus(pData, TCP_SEND_CONNECTING);
 					return fd;
 				} else {
+					char errStr[1024];
 					dbgprintf("create tcp connection failed, reason %s",
-						strerror(errno));
+						strerror_r(errno, errStr, sizeof(errStr)));
 				}
 
 			}
@@ -244,7 +245,8 @@ static int TCPSendCreateSocket(instanceData *pData, struct addrinfo *addrDest)
 			close(fd);
 		}
 		else {
-			dbgprintf("couldn't create send socket, reason %s", strerror(errno));
+			char errStr[1024];
+			dbgprintf("couldn't create send socket, reason %s", strerror_r(errno, errStr, sizeof(errStr)));
 		}		
 		r = r->ai_next;
 	}
@@ -569,6 +571,11 @@ static rsRetVal doTryResume(instanceData *pData)
 			iRet = RS_RET_SUSPENDED;
 		}
 		break;
+	case eDestFORW:
+		/* rgerhards, 2007-09-11: this can not happen, but I've included it to
+		 * a) make the compiler happy, b) detect any logic errors */
+		assert(0);
+		break;
 	}
 
 	return iRet;
@@ -677,8 +684,9 @@ CODESTARTdoAction
 								break;
 							} else {
 								int eno = errno;
+								char errStr[1024];
 								dbgprintf("sendto() error: %d = %s.\n",
-									eno, strerror(eno));
+									eno, strerror_r(eno, errStr, sizeof(errStr)));
 							}
 		                                }
 						if (lsent == l && !send_to_all)

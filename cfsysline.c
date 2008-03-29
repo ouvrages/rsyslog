@@ -348,6 +348,57 @@ finalize_it:
 }
 
 
+/* Parse and a word config line option. A word is a consequitive
+ * sequence of non-whitespace characters. pVal must be
+ * a pointer to a string which is to receive the option
+ * value. The returned string must be freed by the caller.
+ * rgerhards, 2007-09-07
+ */
+static rsRetVal doGetWord(uchar **pp, rsRetVal (*pSetHdlr)(void*, uchar*), void *pVal)
+{
+	DEFiRet;
+	rsCStrObj *pStrB;
+	uchar *p;
+	uchar *pNewVal;
+
+	assert(pp != NULL);
+	assert(*pp != NULL);
+
+	if((pStrB = rsCStrConstruct()) == NULL) 
+		return RS_RET_OUT_OF_MEMORY;
+
+	/* parse out the word */
+	p = *pp;
+
+	while(*p && !isspace((int) *p)) {
+		CHKiRet(rsCStrAppendChar(pStrB, *p++));
+	}
+	CHKiRet(rsCStrFinish(pStrB));
+
+	CHKiRet(rsCStrConvSzStrAndDestruct(pStrB, &pNewVal, 0));
+
+	/* we got the word, now set it */
+	if(pSetHdlr == NULL) {
+		/* we should set value directly to var */
+		*((uchar**)pVal) = pNewVal;
+	} else {
+		/* we set value via a set function */
+		CHKiRet(pSetHdlr(pVal, pNewVal));
+	}
+
+	*pp = p;
+	skipWhiteSpace(pp); /* skip over any whitespace */
+
+finalize_it:
+	if(iRet != RS_RET_OK) {
+		if(pStrB != NULL)
+			rsCStrDestruct(pStrB);
+	}
+
+	return iRet;
+}
+
+
 /* --------------- END functions for handling canned syntaxes --------------- */
 
 /* destructor for cslCmdHdlr
@@ -425,6 +476,9 @@ static rsRetVal cslchCallHdlr(cslCmdHdlr_t *pThis, uchar **ppConfLine)
 		break;
 	case eCmdHdlrGetChar:
 		pHdlr = doGetChar;
+		break;
+	case eCmdHdlrGetWord:
+		pHdlr = doGetWord;
 		break;
 	default:
 		iRet = RS_RET_NOT_IMPLEMENTED;
@@ -538,7 +592,7 @@ rsRetVal regCfSysLineHdlr(uchar *pCmdName, int bChainingPermitted, ecslCmdHdrlTy
 	uchar *pMyCmdName;
 	DEFiRet;
 
-	iRet = llFind(&llCmdList, (void *) pCmdName, (void**) &pThis);
+	iRet = llFind(&llCmdList, (void *) pCmdName, (void*) &pThis);
 	if(iRet == RS_RET_NOT_FOUND) {
 		/* new command */
 		CHKiRet(cslcConstruct(&pThis, bChainingPermitted));
@@ -594,7 +648,7 @@ rsRetVal processCfSysLineCommand(uchar *pCmdName, uchar **p)
 	int bWasOnceOK; /* was the result of an handler at least once RS_RET_OK? */
 	uchar *pOKp = NULL; /* returned conf line pointer when it was OK */
 
-	iRet = llFind(&llCmdList, (void *) pCmdName, (void**) &pCmd);
+	iRet = llFind(&llCmdList, (void *) pCmdName, (void*) &pCmd);
 
 	if(iRet == RS_RET_NOT_FOUND) {
 		logerror("invalid or yet-unknown config file command - have you forgotten to load a module?");
@@ -605,7 +659,7 @@ rsRetVal processCfSysLineCommand(uchar *pCmdName, uchar **p)
 
 	llCookieCmdHdlr = NULL;
 	bWasOnceOK = 0;
-	while((iRetLL = llGetNextElt(&pCmd->llCmdHdlrs, &llCookieCmdHdlr, (void**)&pCmdHdlr)) == RS_RET_OK) {
+	while((iRetLL = llGetNextElt(&pCmd->llCmdHdlrs, &llCookieCmdHdlr, (void*)&pCmdHdlr)) == RS_RET_OK) {
 		/* for the time being, we ignore errors during handlers. The
 		 * reason is that handlers are independent. An error in one
 		 * handler does not necessarily mean that another one will
@@ -647,11 +701,11 @@ void dbgPrintCfSysLineHandlers(void)
 
 	printf("\nSytem Line Configuration Commands:\n");
 	llCookieCmd = NULL;
-	while((iRet = llGetNextElt(&llCmdList, &llCookieCmd, (void**)&pCmd)) == RS_RET_OK) {
-		llGetKey(llCookieCmd, (void**) &pKey); /* TODO: using the cookie is NOT clean! */
+	while((iRet = llGetNextElt(&llCmdList, &llCookieCmd, (void*)&pCmd)) == RS_RET_OK) {
+		llGetKey(llCookieCmd, (void*) &pKey); /* TODO: using the cookie is NOT clean! */
 		printf("\tCommand '%s':\n", pKey);
 		llCookieCmdHdlr = NULL;
-		while((iRet = llGetNextElt(&pCmd->llCmdHdlrs, &llCookieCmdHdlr, (void**)&pCmdHdlr)) == RS_RET_OK) {
+		while((iRet = llGetNextElt(&pCmd->llCmdHdlrs, &llCookieCmdHdlr, (void*)&pCmdHdlr)) == RS_RET_OK) {
 			printf("\t\ttype : %d\n", pCmdHdlr->eType);
 			printf("\t\tpData: 0x%x\n", (unsigned) pCmdHdlr->pData);
 			printf("\t\tHdlr : 0x%x\n", (unsigned) pCmdHdlr->cslCmdHdlr);
