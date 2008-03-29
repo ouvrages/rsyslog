@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[1.19.10],[rsyslog@lists.adiscon.com.])
+AC_INIT([rsyslog],[1.19.12],[rsyslog@lists.adiscon.com.])
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([syslogd.c])
 AC_CONFIG_HEADER([config.h])
@@ -143,8 +143,10 @@ if test "x$enable_pthreads" != "xno"; then
         [pthread_create],
         [
           AC_DEFINE([USE_PTHREADS], [1], [Multithreading support enabled.])
-	  pthreads_libs="-lpthread"
-	  AC_SUBST(pthreads_libs)
+          pthreads_libs="-lpthread"
+          pthreads_cflags="-pthread"
+          AC_SUBST(pthreads_libs)
+          AC_SUBST(pthreads_cflags)
         ],
         [AC_MSG_FAILURE([pthread is missing])],
         [-lpthread]

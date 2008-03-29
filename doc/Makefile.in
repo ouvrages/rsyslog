@@ -145,6 +145,7 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+pthreads_cflags = @pthreads_cflags@
 pthreads_libs = @pthreads_libs@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
