@@ -3,7 +3,7 @@ Section: admin
 Priority: extra
 Maintainer: Michael Biebl <biebl@debian.org>
 Build-Depends: debhelper (>= 5), quilt, autotools-dev, zlib1g-dev, libmysqlclient15-dev
-Standards-Version: 3.7.2
+Standards-Version: 3.7.3
 Homepage: http://www.rsyslog.com/
 
 Package: rsyslog
@@ -11,7 +11,7 @@ Architecture: any
 Conflicts: linux-kernel-log-daemon, system-log-daemon
 Replaces: linux-kernel-log-daemon, system-log-daemon
 Provides: linux-kernel-log-daemon, system-log-daemon
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, lsb-base (>= 3.0-6)
 Recommends: logrotate
 Suggests: rsyslog-mysql
 Description: enhanced multi-threaded syslogd
