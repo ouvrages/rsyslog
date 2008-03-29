@@ -1,3 +1,39 @@
+rsyslog (1.19.2-1) unstable; urgency=low
+
+  * New upstream release.
+
+  * Enable the mysql output plugin and split it into a separate binary package
+    named rsyslog-mysql. Use the dbconfig-common framework to handle the
+    database administration. Generate a configuration file
+    /etc/rsyslog.d/mysql.conf with the values provided by dbconfig-common and
+    use ucf to manage this file.
+  * debian/control
+    - Add a build dependency on quilt and libmysqlclient15-dev.
+    - Add the binary package rsyslog-mysql.
+    - Add Suggests: rsyslog-mysql to the rsyslog package.
+  * debian/rules
+    - Include the quilt makefile and add calls to the patch/unpatch targets.
+    - Pass --enable-mysql to ./configure.
+    - Install the SQL schema file for dbconfig-common.
+  * debian/rsyslog-mysql.config
+    - Setup the default values for dbconfig-common. 
+  * debian/rsyslog-mysql.{postinst,prerm,postrm}
+    - Include the dbconfig-common scripts and call the dbc_go function.
+    - Use ucf and ucfr to manage the generated configuration file mysql.conf.
+  * debian/patches/ignore_non_conf_files.patch
+    - Let rsyslog ignore all configuration files not ending with *.conf.
+  * debian/patches/no_create_db.patch
+    - The database creation is handled by dbconfig-common so we only need the
+      createDB.sql SQL schema file for setting up the tables.
+  * debian/patches/series
+    - Added, needed by quilt. Include the two patches above.
+  * debian/rsyslog-mysql.dirs
+    - Create the install directory for the SQL schema file.
+  * debian/rsyslog-mysql.install
+    - Install the mysql output plugin ommysql.so.
+
+ -- Michael Biebl <biebl@debian.org>  Sun, 02 Sep 2007 18:39:47 +0200
+
 rsyslog (1.19.1-1) unstable; urgency=low
 
   * New upstream release.

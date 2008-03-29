@@ -1,0 +1,66 @@
+#!/bin/sh
+
+set -e
+
+# summary of how this script can be called:
+#        * <postinst> `configure' <most-recently-configured-version>
+#        * <old-postinst> `abort-upgrade' <new version>
+#        * <conflictor's-postinst> `abort-remove' `in-favour' <package>
+#          <new-version>
+#        * <postinst> `abort-remove'
+#        * <deconfigured's-postinst> `abort-deconfigure' `in-favour'
+#          <failed-install-package> <version> `removing'
+#          <conflicting-package> <version>
+# for details, see http://www.debian.org/doc/debian-policy/ or
+# the debian-policy package
+
+. /usr/share/debconf/confmodule
+. /usr/share/dbconfig-common/dpkg/postinst
+
+
+db_get rsyslog-mysql/db/dbname
+DATABASE="$RET"
+db_get rsyslog-mysql/db/app-user
+USER="$RET"
+db_get rsyslog-mysql/mysql/app-pass
+PASS="$RET"
+db_get rsyslog-mysql/remote/host
+HOST="$RET"
+[ -z "$HOST" ] && HOST="localhost"
+
+
+dbc_go rsyslog-mysql $@
+
+
+case "$1" in
+    configure)
+	tempfile=`tempfile`
+
+	cat <<-EOF > $tempfile
+	### Configuration file for rsyslog-mysql
+	### Changes are preserved 
+
+	\$ModLoad MySQL
+	*.* >$HOST,$DATABASE,$USER,$PASS
+	EOF
+
+	ucf --debconf-ok $tempfile /etc/rsyslog.d/mysql.conf
+	ucfr rsyslog-mysql /etc/rsyslog.d/mysql.conf
+	rm -f $tempfile
+
+	invoke-rc.d rsyslog reload
+    ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+    ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+
+#DEBHELPER#
+
+exit 0
