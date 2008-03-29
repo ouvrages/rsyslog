@@ -24,8 +24,6 @@
 #include "objomsr.h"
 
 #ifdef USE_NETZIP
-#include <unistd.h>
-#include <zlib.h>
 /* config param: minimum message size to try compression. The smaller
  * the message, the less likely is any compression gain. We check for
  * gain before we submit the message. But to do so we still need to
@@ -81,6 +79,7 @@ extern char **StripDomains;
 extern char *LocalDomain;
 extern int bDropMalPTRMsgs;
 extern struct AllowedSenders *pAllowedSenders_TCP;
+extern struct AllowedSenders *pAllowedSenders_GSS;
 extern char	ctty[];
 
 #endif /* #ifndef SYSLOGD_H_INCLUDED */
