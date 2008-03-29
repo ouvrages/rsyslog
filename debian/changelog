@@ -1,3 +1,14 @@
+rsyslog (1.21.0-1) unstable; urgency=low
+
+  * New upstream release.
+  * debian/patches/ignore_non_conf_files.patch
+    - Dropped. A more powerful alternative has been implemented upstream which
+      allows to include configuration files based on wildcards.
+  * debian/rsyslog.conf
+    - Include all configuration files matching /etc/rsyslog.d/*.conf.
+
+ -- Michael Biebl <biebl@debian.org>  Wed, 19 Dec 2007 09:54:18 +0100
+
 rsyslog (1.20.1-1) unstable; urgency=low
 
   * New upstream release.

@@ -178,9 +178,10 @@
 #include <netdb.h>
 #include <fnmatch.h>
 #include <dirent.h>
+#include <glob.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
-#ifndef __sun
-#endif
 #include <arpa/nameser.h>
 #include <arpa/inet.h>
 #include <resolv.h>
@@ -192,10 +193,13 @@
 #include <pthread.h>
 #endif
 
-#if	HAVE_PATHS_H
+#if HAVE_PATHS_H
 #include <paths.h>
 #endif
 
+#ifdef USE_NETZIP
+#include <zlib.h>
+#endif
 
 /* handle some defines missing on more than one platform */
 #ifndef SUN_LEN
@@ -639,6 +643,10 @@ static struct AllowedSenders *pAllowedSenders_UDP = NULL; /* the roots of the al
 struct AllowedSenders *pAllowedSenders_TCP = NULL; /* lists. If NULL, all senders are ok! */
 static struct AllowedSenders *pLastAllowedSenders_UDP = NULL; /* and now the pointers to the last */
 static struct AllowedSenders *pLastAllowedSenders_TCP = NULL; /* element in the respective list */
+#ifdef USE_GSSAPI
+struct AllowedSenders *pAllowedSenders_GSS = NULL;
+static struct AllowedSenders *pLastAllowedSenders_GSS = NULL;
+#endif
 #endif /* #ifdef SYSLOG_INET */
 
 int option_DisallowWarning = 1;	/* complain if message from disallowed sender is received */
@@ -936,12 +944,24 @@ static void PrintAllowedSenders(int iListToPrint)
 	struct AllowedSenders *pSender;
 	uchar szIP[64];
 	
-	assert((iListToPrint == 1) || (iListToPrint == 2));
+	assert((iListToPrint == 1) || (iListToPrint == 2)
+#ifdef USE_GSSAPI
+	       || (iListToPrint == 3)
+#endif
+	       );
 
 	printf("\nAllowed %s Senders:\n",
-	       (iListToPrint == 1) ? "UDP" : "TCP");
-	pSender = (iListToPrint == 1) ?
-		  pAllowedSenders_UDP : pAllowedSenders_TCP;
+	       (iListToPrint == 1) ? "UDP" :
+#ifdef USE_GSSAPI
+	       (iListToPrint == 3) ? "GSS" :
+#endif
+	       "TCP");
+
+	pSender = (iListToPrint == 1) ? pAllowedSenders_UDP :
+#ifdef USE_GSSAPI
+		(iListToPrint == 3) ? pAllowedSenders_GSS :
+#endif
+		pAllowedSenders_TCP;
 	if(pSender == NULL) {
 		printf("\tNo restrictions set.\n");
 	} else {
@@ -1064,7 +1084,6 @@ int isAllowedSender(struct AllowedSenders *pAllowRoot, struct sockaddr *pFrom, c
 		if (MaskCmp (&(pAllow->allowedSender), pAllow->SignificantBits, pFrom, pszFromHost))
 			return 1;
 	}
-	dbgprintf("%s is not an allowed sender\n", pszFromHost);
 	return 0;
 }
 #endif /* #ifdef SYSLOG_INET */
@@ -1625,7 +1644,7 @@ void getCurrTime(struct syslogTime *t)
 static int usage(void)
 {
 	fprintf(stderr, "usage: rsyslogd [-46AdhqQvw] [-l hostlist] [-m markinterval] [-n] [-p path]\n" \
-		" [-s domainlist] [-r[port]] [-tport[,max-sessions]] [-f conffile] [-i pidfile] [-x]\n");
+		" [-s domainlist] [-r[port]] [-tport[,max-sessions]] [-gport[,max-sessions]] [-f conffile] [-i pidfile] [-x]\n");
 	exit(1); /* "good" exit - done to terminate usage() */
 }
 
@@ -2212,13 +2231,6 @@ void printline(char *hname, char *msg, int bParseHost)
 
 	logmsg(pri, pMsg, SYNC_FILE);
 
-	/* rgerhards 2004-11-11:
-	 * we are done with the message object. If it still is
-	 * stored somewhere, we can call discard anyhow. This
-	 * is handled via the reference count - see description
-	 * of msg_t for details.
-	 */
-	MsgDestruct(pMsg);
 	return;
 }
 
@@ -2272,7 +2284,6 @@ logmsgInternal(int pri, char *msg, int flags)
 		 * message to the queue engine.
 		 */
 		logmsg(pri, pMsg, flags);
-		MsgDestruct(pMsg);
 	}
 #else
 	iminternalAddMsg(pri, pMsg, flags);
@@ -2816,7 +2827,7 @@ static void enqueueMsg(msg_t *pMsg)
 				goto unlock;
 			}
 		}
-		queueAdd(fifo, MsgAddRef(pMsg));
+		queueAdd(fifo, pMsg);
 	unlock:
 		/* now activate the worker thread */
 		pthread_mutex_unlock(fifo->mut);
@@ -3628,6 +3639,10 @@ static void die(int sig)
 	if(sockTCPLstn != NULL && *sockTCPLstn) {
 		deinit_tcp_listener();
 	}
+#ifdef USE_GSSAPI
+	if(bEnableTCP & ALLOWEDMETHOD_GSS)
+		TCPSessGSSDeinit();
+#endif
 #endif
 
 	/* Clean-up files. */
@@ -3718,6 +3733,11 @@ static rsRetVal addAllowedSenderLine(char* pName, uchar** ppRestOfConfLine)
 	} else if(!strcasecmp(pName, "tcp")) {
 		ppRoot = &pAllowedSenders_TCP;
 		ppLast = &pLastAllowedSenders_TCP;
+#ifdef USE_GSSAPI
+	} else if(!strcasecmp(pName, "gss")) {
+		ppRoot = &pAllowedSenders_GSS;
+		ppLast = &pLastAllowedSenders_GSS;
+#endif
 	} else {
 		logerrorSz("Invalid protocol '%s' in allowed sender "
 		           "list, line ignored", pName);
@@ -3846,23 +3866,43 @@ finalize_it:
 static rsRetVal doIncludeLine(uchar **pp, __attribute__((unused)) void* pVal)
 {
 	DEFiRet;
-	uchar cfgFile[MAXFNAME];
+	char pattern[MAXFNAME];
+	uchar *cfgFile;
+	glob_t cfgFiles;
+	size_t i = 0;
+	struct stat fileInfo;
 
 	assert(pp != NULL);
 	assert(*pp != NULL);
 
-	if(getSubString(pp, (char*) cfgFile, sizeof(cfgFile) / sizeof(uchar), ' ')  != 0) {
+	if(getSubString(pp, (char*) pattern, sizeof(pattern) / sizeof(char), ' ')  != 0) {
 		logerror("could not extract group name");
 		ABORT_FINALIZE(RS_RET_NOT_FOUND);
 	}
 
-	if(*(cfgFile+strlen((char*) cfgFile) - 1) == '/') {
-		dbgprintf("requested to include directory '%s'\n", cfgFile);
-		iRet = doIncludeDirectory(cfgFile);
-	} else {
-		dbgprintf("Requested to include config file '%s'\n", cfgFile);
-		iRet = processConfFile(cfgFile);
+	/* Use GLOB_MARK to append a trailing slash for directories.
+	 * Required by doIncludeDirectory().
+	 */
+	glob(pattern, GLOB_MARK, NULL, &cfgFiles);
+
+	for(i = 0; i < cfgFiles.gl_pathc; i++) {
+		cfgFile = (uchar*) cfgFiles.gl_pathv[i];
+
+		if(stat((char*) cfgFile, &fileInfo) != 0) 
+			continue; /* continue with the next file if we can't stat() the file */
+
+		if(S_ISREG(fileInfo.st_mode)) { /* config file */
+			dbgprintf("requested to include config file '%s'\n", cfgFile);
+			iRet = processConfFile(cfgFile);
+		} else if(S_ISDIR(fileInfo.st_mode)) { /* config directory */
+			dbgprintf("requested to include directory '%s'\n", cfgFile);
+			iRet = doIncludeDirectory(cfgFile);
+		} else { /* TODO: shall we handle symlinks or not? */
+			dbgprintf("warning: unable to process IncludeConfig directive '%s'\n", cfgFile);
+		}
 	}
+
+	globfree(&cfgFiles);
 
 finalize_it:
 	return iRet;
@@ -4201,6 +4241,9 @@ static void dbgPrintInitInfo(void)
 	/* now the allowedSender lists: */
 	PrintAllowedSenders(1); /* UDP */
 	PrintAllowedSenders(2); /* TCP */
+#ifdef USE_GSSAPI
+	PrintAllowedSenders(3); /* GSS */
+#endif
 	printf("\n");
 #endif 	/* #ifdef SYSLOG_INET */
 
@@ -4354,9 +4397,19 @@ static void init(void)
 			clearAllowedSenders (pAllowedSenders_TCP);
 			pAllowedSenders_TCP = NULL;
 		}
+#ifdef USE_GSSAPI
+		if (pAllowedSenders_GSS != NULL) {
+			clearAllowedSenders (pAllowedSenders_GSS);
+			pAllowedSenders_GSS = NULL;
+		}
+#endif
 	}
 
-	assert(pAllowedSenders_UDP == NULL && pAllowedSenders_TCP == NULL);
+	assert(pAllowedSenders_UDP == NULL && pAllowedSenders_TCP == NULL
+#ifdef USE_GSSAPI
+	       && pAllowedSenders_GSS == NULL
+#endif
+	       );
 #endif
 	/* I was told by an IPv6 expert that calling getservbyname() seems to be
 	 * still valid, at least for the use case we have. So I re-enabled that
@@ -4493,16 +4546,17 @@ static void init(void)
 			 * user-selectable option. rgerhards, 2007-06-21
 			 */
 #			ifdef USE_GSSAPI
-			if(bEnableTCP == 2) {
+			if(bEnableTCP & ALLOWEDMETHOD_GSS) {
 				if(TCPSessGSSInit()) {
 					logerror("GSS-API initialization failed\n");
-					bEnableTCP = -1;
+					bEnableTCP &= ~(ALLOWEDMETHOD_GSS);
 				}
 			}
+			if(bEnableTCP)
 #			endif
-			if((sockTCPLstn = create_tcp_socket()) != NULL) {
-				dbgprintf("Opened %d syslog TCP port(s).\n", *sockTCPLstn);
-			}
+				if((sockTCPLstn = create_tcp_socket()) != NULL) {
+					dbgprintf("Opened %d syslog TCP port(s).\n", *sockTCPLstn);
+				}
 		}
 	}
 #endif
@@ -5538,7 +5592,6 @@ static void processImInternal(void)
 
 	while(iminternalRemoveMsg(&iPri, &pMsg, &iFlags) == RS_RET_OK) {
 		logmsg(iPri, pMsg, iFlags);
-		MsgDestruct(pMsg);
 	}
 }
 
@@ -5713,6 +5766,7 @@ static rsRetVal processSelectAfter(int maxfds, int nfds, fd_set *pReadfds, fd_se
 						  (struct sockaddr *)&frominet, (char*)fromHostFQDN)) {
 						       printchopped((char*)fromHost, line, l,  finet[i+1], 1);
 					       } else {
+						       dbgprintf("%s is not an allowed sender\n", (char*)fromHostFQDN);
 						       if(option_DisallowWarning) {
 							       logerrorSz("UDP message from disallowed sender %s discarded",
 									  (char*)fromHost);
@@ -5737,7 +5791,7 @@ static rsRetVal processSelectAfter(int maxfds, int nfds, fd_set *pReadfds, fd_se
 			if (FD_ISSET(sockTCPLstn[i+1], pReadfds)) {
 				dbgprintf("New connect on TCP inetd socket: #%d\n", sockTCPLstn[i+1]);
 #				ifdef USE_GSSAPI
-				if(bEnableTCP == 2)
+				if(bEnableTCP & ALLOWEDMETHOD_GSS)
 					TCPSessGSSAccept(sockTCPLstn[i+1]);
 				else
 #				endif
@@ -5758,14 +5812,15 @@ static rsRetVal processSelectAfter(int maxfds, int nfds, fd_set *pReadfds, fd_se
 
 				/* Receive message */
 #				ifdef USE_GSSAPI
-				if(bEnableTCP == 2)
+				int allowedMethods = pTCPSessions[iTCPSess].allowedMethods;
+				if(allowedMethods & ALLOWEDMETHOD_GSS)
 					state = TCPSessGSSRecv(iTCPSess, buf, sizeof(buf));
 				else
 #				endif
 					state = recv(fdSess, buf, sizeof(buf), 0);
 				if(state == 0) {
 #					ifdef USE_GSSAPI
-					if(bEnableTCP == 2)
+					if(allowedMethods & ALLOWEDMETHOD_GSS)
 						TCPSessGSSClose(iTCPSess);
 					else {
 #					endif
@@ -5780,7 +5835,7 @@ static rsRetVal processSelectAfter(int maxfds, int nfds, fd_set *pReadfds, fd_se
 					logerrorInt("TCP session %d will be closed, error ignored\n",
 						    fdSess);
 #					ifdef USE_GSSAPI
-					if(bEnableTCP == 2)
+					if(allowedMethods & ALLOWEDMETHOD_GSS)
 						TCPSessGSSClose(iTCPSess);
 					else
 #					endif
@@ -5795,7 +5850,7 @@ static rsRetVal processSelectAfter(int maxfds, int nfds, fd_set *pReadfds, fd_se
 							    "previous messages for reason(s)\n",
 							    iTCPSess);
 #						ifdef USE_GSSAPI
-						if(bEnableTCP == 2)
+						if(allowedMethods & ALLOWEDMETHOD_GSS)
 							TCPSessGSSClose(iTCPSess);
 						else
 #						endif
@@ -6121,6 +6176,11 @@ static void printVersion(void)
 #else
 	printf("\tSYSLOG_INET (Internet/remote support):\tNo\n");
 #endif
+#if defined(SYSLOG_INET) && defined(USE_GSSAPI)
+	printf("\tFEATURE_GSSAPI (GSSAPI Kerberos 5 support):\tYes\n");
+#else
+	printf("\tFEATURE_GSSAPI (GSSAPI Kerberos 5 support):\tNo\n");
+#endif
 #ifndef	NDEBUG
 	printf("\tFEATURE_DEBUG (debug build, slow code):\tYes\n");
 #else
@@ -6267,8 +6327,9 @@ int main(int argc, char **argv)
 			break;
 		case 'g':		/* enable tcp gssapi logging */
 #if defined(SYSLOG_INET) && defined(USE_GSSAPI)
-			configureTCPListen(optarg);
-			bEnableTCP = 2;
+			if (!bEnableTCP)
+				configureTCPListen(optarg);
+			bEnableTCP |= ALLOWEDMETHOD_GSS;
 #else
 			fprintf(stderr, "rsyslogd: -g not valid - not compiled with gssapi support");
 #endif
@@ -6326,7 +6387,9 @@ int main(int argc, char **argv)
 			break;
 		case 't':		/* enable tcp logging */
 #ifdef SYSLOG_INET
-			configureTCPListen(optarg);
+			if (!bEnableTCP)
+				configureTCPListen(optarg);
+			bEnableTCP |= ALLOWEDMETHOD_TCP;
 #else
 			fprintf(stderr, "rsyslogd: -t not valid - not compiled with network support");
 #endif

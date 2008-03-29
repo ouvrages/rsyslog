@@ -2,10 +2,12 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[1.20.1],[rsyslog@lists.adiscon.com.])
+AC_INIT([rsyslog],[1.21.0],[rsyslog@lists.adiscon.com.])
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([syslogd.c])
-AC_CONFIG_HEADER([config.h])
+AC_CONFIG_HEADERS([config.h])
+
+AC_GNU_SOURCE
 
 # Checks for programs.
 AC_PROG_CC
@@ -145,7 +147,6 @@ AC_ARG_ENABLE(gssapi_krb5,
 if test $want_gssapi_krb5 = yes; then
 	AC_CHECK_LIB(gssapi_krb5, gss_acquire_cred, [
 		AC_CHECK_HEADER(gssapi/gssapi.h, [
-			AC_MSG_ERROR(GSS-API not ready for primt time yet -- wait for next release);
 			AC_DEFINE(USE_GSSAPI,,
 				  Define if you want to use GSSAPI)
 			gss_libs="-lgssapi_krb5"
