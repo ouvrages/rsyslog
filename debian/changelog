@@ -1,3 +1,19 @@
+rsyslog (2.0.2-2) unstable; urgency=low
+
+  * debian/rsyslog-doc.doc-base
+    - Update the Section: field to comply with the new doc-base Manual.
+  * debian/rules
+    - Don't install rfc3195d and its man page. The rfc3195d binary is
+      currently only a dummy.
+  * debian/rsyslog.conf
+    - Fix the path to the rsyslog documentation which is now in rsyslog-doc.
+    - Set the default permissions of new log files to 0640 and make them
+      readable by group adm.
+    - Include external config files at the beginning. This allows to drop log
+      messages before they end up in the standard log files.
+
+ -- Michael Biebl <biebl@debian.org>  Thu, 06 Mar 2008 02:49:17 +0100
+
 rsyslog (2.0.2-1) unstable; urgency=low
 
   * New upstream release.
