@@ -4,6 +4,8 @@ Priority: extra
 Maintainer: Michael Biebl <biebl@debian.org>
 Build-Depends: debhelper (>= 5), quilt, autotools-dev, zlib1g-dev, libmysqlclient15-dev, libpq-dev
 Standards-Version: 3.7.3
+Vcs-Git: git://git.debian.org/git/users/biebl/rsyslog.git
+Vcs-Browser: http://git.debian.org/?p=users/biebl/rsyslog.git;a=summary
 Homepage: http://www.rsyslog.com/
 
 Package: rsyslog
