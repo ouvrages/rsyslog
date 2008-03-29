@@ -1,0 +1,48 @@
+--- net.c	2007/09/24 13:32:25	1.9
++++ net.c	2007/09/26 12:28:56	1.10
+@@ -190,8 +190,11 @@
+         }
+ 
+ finalize_it:
++dbgprintf("hname() iRet: %d\n", iRet);
+ 	return iRet;
+ }
++
++
+ /* Return a printable representation of a host address.
+  * Now (2007-07-16) also returns the full host name (if it could be obtained)
+  * in the second param [thanks to mildew@gmail.com for the patch].
+@@ -242,7 +245,6 @@
+ 	if ((p = (uchar*) strchr((char*)pszHost, '.'))) { /* find start of domain name "machine.example.com" */
+ 		if(strcmp((char*) (p + 1), LocalDomain) == 0) {
+ 			*p = '\0'; /* simply terminate the string */
+-			return 1;
+ 		} else {
+ 			/* now check if we belong to any of the domain names that were specified
+ 			 * in the -s command line option. If so, remove and we are done.
+@@ -252,7 +254,7 @@
+ 				while (StripDomains[count]) {
+ 					if (strcmp((char*)(p + 1), StripDomains[count]) == 0) {
+ 						*p = '\0';
+-						return 1;
++						FINALIZE; /* we are done */
+ 					}
+ 					count++;
+ 				}
+@@ -270,7 +272,7 @@
+ 				while (LocalHosts[count]) {
+ 					if (!strcmp((char*)pszHost, LocalHosts[count])) {
+ 						*p = '\0';
+-						return 1;
++						break; /* we are done */
+ 					}
+ 					count++;
+ 				}
+@@ -279,6 +281,7 @@
+ 	}
+ 
+ finalize_it:
++dbgprintf("cvthname() iRet: %d\n", iRet);
+ 	return iRet;
+ }
+ 

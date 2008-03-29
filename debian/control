@@ -4,6 +4,7 @@ Priority: extra
 Maintainer: Michael Biebl <biebl@debian.org>
 Build-Depends: debhelper (>= 5), quilt, autotools-dev, zlib1g-dev, libmysqlclient15-dev
 Standards-Version: 3.7.2
+Homepage: http://www.rsyslog.com/
 
 Package: rsyslog
 Architecture: any
@@ -27,8 +28,6 @@ Description: enhanced multi-threaded syslogd
  replacement. Its advanced features make it suitable for enterprise-class,
  encryption protected syslog relay chains while at the same time being very
  easy to setup for the novice user.
- .
-  Homepage: http://www.rsyslog.com/
 
 Package: rsyslog-mysql
 Architecture: any
@@ -36,5 +35,3 @@ Depends: ${shlibs:Depends}, ${misc:Depends}, rsyslog (= ${binary:Version}), dbco
 Recommends: mysql-server
 Description: MySQL output plugin for rsyslog
  This plugin allows rsyslog to write the syslog messages into a MySQL database.
- .
-  Homepage: http://www.rsyslog.com/
