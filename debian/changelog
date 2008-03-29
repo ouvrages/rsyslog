@@ -1,0 +1,6 @@
+rsyslog (1.18.2-1) unstable; urgency=low
+
+  * Initial release. Closes: #435884
+
+ -- Michael Biebl <biebl@debian.org>  Mon, 13 Aug 2007 19:20:48 +0200
+

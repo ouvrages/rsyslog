@@ -1,0 +1,30 @@
+Source: rsyslog
+Section: admin
+Priority: extra
+Maintainer: Michael Biebl <biebl@debian.org>
+Build-Depends: debhelper (>= 5), autotools-dev, zlib1g-dev
+Standards-Version: 3.7.2
+
+Package: rsyslog
+Architecture: any
+Conflicts: linux-kernel-log-daemon, system-log-daemon
+Replaces: linux-kernel-log-daemon, system-log-daemon
+Provides: linux-kernel-log-daemon, system-log-daemon
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Recommends: logrotate
+Description: enhanced multi-threaded syslogd
+ Rsyslog is an enhanced multi-threaded syslogd supporting, amongst others:
+  * reliable syslog over TCP and RFC 3195
+  * writing to MySQL databases
+  * permitted sender lists
+  * filtering on any part of the syslog message
+  * on-the-wire message compression
+  * fine grained output format control
+  * backup log destinations
+ .
+ It is quite compatible to stock sysklogd and can be used as a drop-in
+ replacement. Its advanced features make it suitable for enterprise-class,
+ encryption protected syslog relay chains while at the same time being very
+ easy to setup for the novice user.
+ .
+  Homepage: http://www.rsyslog.com/

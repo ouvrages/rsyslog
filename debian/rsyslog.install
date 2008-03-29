@@ -1,0 +1,2 @@
+doc/* /usr/share/doc/rsyslog/html/
+debian/rsyslog.conf /etc/

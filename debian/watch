@@ -1,0 +1,2 @@
+version=3
+http://freshmeat.net/projects/rsyslog/ .*rsyslog-(.*)\.tar\.gz

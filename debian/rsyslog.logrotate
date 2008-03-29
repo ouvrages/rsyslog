@@ -1,0 +1,27 @@
+/var/log/daemon.log /var/log/syslog /var/log/kern.log {
+	rotate 7
+	missingok
+	notifempty
+	daily
+	compress
+	postrotate
+		invoke-rc.d rsyslog reload > /dev/null
+	endscript
+}
+
+/var/log/mail.err /var/log/mail.info /var/log/mail.log /var/log/mail.warn {
+	rotate 4
+	notifempty
+	compress
+	weekly
+}
+
+/var/log/auth.log /var/log/user.log /var/log/messages /var/log/debug /var/log/lpr.log {
+	rotate 4
+	notifempty
+	compress
+	weekly
+	postrotate
+		invoke-rc.d rsyslog reload > /dev/null
+	endscript
+}
