@@ -1,7 +1,10 @@
-/* omusrmsg.c
- * These are the definitions for the build-in MySQL output module.
+/* expr.c - an expression class.
+ * This module contains all code needed to represent expressions. Most
+ * importantly, that means code to parse and execute them. Expressions
+ * heavily depend on (loadable) functions, so it works in conjunction
+ * with the function manager.
  *
- * File begun on 2007-07-13 by RGerhards (extracted from syslogd.c)
+ * Module begun 2007-11-30 by Rainer Gerhards
  *
  * Copyright 2007 Rainer Gerhards and Adiscon GmbH.
  *
@@ -21,10 +24,17 @@
  *
  * A copy of the GPL can be found in the file "COPYING" in this distribution.
  */
-#ifndef	OMMYSQL_H_INCLUDED
-#define	OMMYSQL_H_INCLUDED 1
 
-#endif /* #ifndef OMMYSQL_H_INCLUDED */
-/*
- * vi:set ai:
+/* This is the syntax of an expression. I keep it as inline documentation
+ * as this enhances the chance that it is updates should there be a change.
+ *
+ * expr = (simple-string / template-string / function / property) [* expr ]
+ * simple-string = "'" chars "'"
+ * template-string =  '"' template-as--1.19.11-and-below '"'
+ *                   ; string as used in previous $template directive
+ * function = function-name "(" expr ")"
+ * property = [list of property names]
+ */
+
+/* vi:set ai:
  */

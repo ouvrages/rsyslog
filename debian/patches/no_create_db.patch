@@ -1,7 +1,7 @@
-Index: rsyslog/plugins/ommysql/createDB.sql
+Index: plugins/ommysql/createDB.sql
 ===================================================================
---- rsyslog.orig/plugins/ommysql/createDB.sql	2007-08-30 01:05:00.000000000 +0200
-+++ rsyslog/plugins/ommysql/createDB.sql	2007-08-30 01:07:50.000000000 +0200
+--- plugins/ommysql/createDB.sql	(Revision 994)
++++ plugins/ommysql/createDB.sql	(Arbeitskopie)
 @@ -1,6 +1,4 @@
 -CREATE DATABASE Syslog;
 -USE Syslog;
@@ -19,3 +19,13 @@ Index: rsyslog/plugins/ommysql/createDB.sql
  (
          ID int unsigned not null auto_increment primary key,
          SystemEventID int NULL ,
+Index: plugins/ompgsql/createDB.sql
+===================================================================
+--- plugins/ompgsql/createDB.sql	(Revision 994)
++++ plugins/ompgsql/createDB.sql	(Arbeitskopie)
+@@ -1,5 +1,3 @@
+-CREATE DATABASE "Syslog";
+-\c Syslog;
+ CREATE TABLE SystemEvents
+ (
+         ID serial not null primary key,

@@ -1,7 +1,7 @@
-/* omusrmsg.c
- * These are the definitions for the build-in MySQL output module.
+/* ompgsql.h
+ * These are the definitions for the build-in PgSQL output module.
  *
- * File begun on 2007-07-13 by RGerhards (extracted from syslogd.c)
+ * File begun on 2007-10-18 by sur5r (converted from ompgsql.h)
  *
  * Copyright 2007 Rainer Gerhards and Adiscon GmbH.
  *
@@ -21,10 +21,10 @@
  *
  * A copy of the GPL can be found in the file "COPYING" in this distribution.
  */
-#ifndef	OMMYSQL_H_INCLUDED
-#define	OMMYSQL_H_INCLUDED 1
+#ifndef	OMPGSQL_H_INCLUDED
+#define	OMPGSQL_H_INCLUDED 1
 
-#endif /* #ifndef OMMYSQL_H_INCLUDED */
+#endif /* #ifndef OMPGSQL_H_INCLUDED */
 /*
  * vi:set ai:
  */

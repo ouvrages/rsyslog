@@ -1,3 +1,26 @@
+---------------------------------------------------------------------------
+Version 1.20.1 (rgerhards), 2007-12-12
+- corrected a debug setting that survived release. Caused TCP connections
+  to be retried unnecessarily often.
+- When a hostname ACL was provided and DNS resolution for that name failed,
+  ACL processing was stopped at that point. Thanks to mildew for the patch.
+  Fedora Bugzilla: http://bugzilla.redhat.com/show_bug.cgi?id=395911
+- fixed a potential race condition, see link for details:
+  http://rgerhards.blogspot.com/2007/12/rsyslog-race-condition.html
+  Note that the probability of problems from this bug was very remote
+- fixed a memory leak that happend when PostgreSQL date formats were
+  used
+---------------------------------------------------------------------------
+Version 1.20.0 (rgerhards), 2007-12-07
+- an output module for postgres databases has been added. Thanks to
+  sur5r for contributing this code
+- unloading dynamic modules has been cleaned up, we now have a
+  real implementation and not just a dummy "good enough for the time
+  being".
+- enhanced platform independence - thanks to Bartosz Kuzma and Michael
+  Biebl for their very useful contributions
+- some general code cleanup (including warnings on 64 platforms, only)
+---------------------------------------------------------------------------
 Version 1.19.12 (rgerhards), 2007-12-03
 - cleaned up the build system (thanks to Michael Biebl for the patch)
 - fixed a bug where ommysql was still not compiled with -pthread option

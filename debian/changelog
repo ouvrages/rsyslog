@@ -1,3 +1,32 @@
+rsyslog (1.20.1-1) unstable; urgency=low
+
+  * New upstream release.
+  * debian/rules
+    - Enable the PostgreSQL database support.
+    - Use "install -D" to install the SQL schema file for MySQL and
+      PostgreSQL.
+  * debian/control
+    - Add a Build-Depends on libpq-dev for the PostgreSQL support.
+    - Add the binary package rsyslog-pgsql.
+  * debian/patches/no_create_db.patch
+    - Updated. Only setup the tables. Leave the database creation to
+      dbconfig-common.
+  * debian/rsyslog-pgsql.install
+    - Install the ompgsql.so plugin.
+  * debian/rsyslog-pgsql.config
+    - Preseed the default values for dbconfig-common, database name is
+      "Syslog", database user "rsyslog".
+  * debian/rsyslog-pgsql.{postinst,prerm,postrm}
+    - Use dbconfig-common to setup the PostgreSQL database.
+    - Generate a configuration file /etc/rsyslog.d/pgsql.conf with the values
+      provided by dbconfig-common and use ucf and ucfr to manage this file.
+  * debian/rsyslog-mysql.postinst
+    - Use the new ":ommysql:" output selector instead of ">".
+  * debian/rsyslog-mysql.install
+    - Only install the ommysql.so plugin.
+
+ -- Michael Biebl <biebl@debian.org>  Wed, 12 Dec 2007 20:54:41 +0100
+
 rsyslog (1.19.12-1) unstable; urgency=low
 
   * New upstream release.

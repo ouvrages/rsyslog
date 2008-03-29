@@ -40,6 +40,50 @@
 #include "template.h"
 #include "msg.h"
 
+static syslogCODE rs_prioritynames[] =
+  {
+    { "alert", LOG_ALERT },
+    { "crit", LOG_CRIT },
+    { "debug", LOG_DEBUG },
+    { "emerg", LOG_EMERG },
+    { "err", LOG_ERR },
+    { "error", LOG_ERR },               /* DEPRECATED */
+    { "info", LOG_INFO },
+    { "none", INTERNAL_NOPRI },         /* INTERNAL */
+    { "notice", LOG_NOTICE },
+    { "panic", LOG_EMERG },             /* DEPRECATED */
+    { "warn", LOG_WARNING },            /* DEPRECATED */
+    { "warning", LOG_WARNING },
+    { NULL, -1 }
+  };
+
+static syslogCODE rs_facilitynames[] =
+  {
+    { "auth", LOG_AUTH },
+    { "authpriv", LOG_AUTHPRIV },
+    { "cron", LOG_CRON },
+    { "daemon", LOG_DAEMON },
+    { "ftp", LOG_FTP },
+    { "kern", LOG_KERN },
+    { "lpr", LOG_LPR },
+    { "mail", LOG_MAIL },
+    { "mark", INTERNAL_MARK },          /* INTERNAL */
+    { "news", LOG_NEWS },
+    { "security", LOG_AUTH },           /* DEPRECATED */
+    { "syslog", LOG_SYSLOG },
+    { "user", LOG_USER },
+    { "uucp", LOG_UUCP },
+    { "local0", LOG_LOCAL0 },
+    { "local1", LOG_LOCAL1 },
+    { "local2", LOG_LOCAL2 },
+    { "local3", LOG_LOCAL3 },
+    { "local4", LOG_LOCAL4 },
+    { "local5", LOG_LOCAL5 },
+    { "local6", LOG_LOCAL6 },
+    { "local7", LOG_LOCAL7 },
+    { NULL, -1 }
+  };
+
 /* The following functions will support advanced output module
  * multithreading, once this is implemented. Currently, we
  * include them as hooks only. The idea is that we need to guard
@@ -117,12 +161,16 @@ void MsgDestruct(msg_t * pM)
 			free(pM->pszRcvdAt3339);
 		if(pM->pszRcvdAt_MySQL != NULL)
 			free(pM->pszRcvdAt_MySQL);
+		if(pM->pszRcvdAt_PgSQL != NULL)
+			free(pM->pszRcvdAt_PgSQL);
 		if(pM->pszTIMESTAMP3164 != NULL)
 			free(pM->pszTIMESTAMP3164);
 		if(pM->pszTIMESTAMP3339 != NULL)
 			free(pM->pszTIMESTAMP3339);
 		if(pM->pszTIMESTAMP_MySQL != NULL)
 			free(pM->pszTIMESTAMP_MySQL);
+		if(pM->pszTIMESTAMP_PgSQL != NULL)
+			free(pM->pszTIMESTAMP_PgSQL);
 		if(pM->pszPRI != NULL)
 			free(pM->pszPRI);
 		if(pM->pCSProgName != NULL)
@@ -492,6 +540,18 @@ char *getTimeReported(msg_t *pM, enum tplFormatTypes eFmt)
 		}
 		MsgUnlock();
 		return(pM->pszTIMESTAMP_MySQL);
+        case tplFmtPgSQLDate:
+                MsgLock();
+                if(pM->pszTIMESTAMP_PgSQL == NULL) {
+                        if((pM->pszTIMESTAMP_PgSQL = malloc(21)) == NULL) {
+                                glblHadMemShortage = 1;
+                                MsgUnlock();
+                                return "";
+                        }
+                        formatTimestampToPgSQL(&pM->tTIMESTAMP, pM->pszTIMESTAMP_PgSQL, 21);
+                }
+                MsgUnlock();
+                return(pM->pszTIMESTAMP_PgSQL);
 	case tplFmtRFC3164Date:
 		MsgLock();
 		if(pM->pszTIMESTAMP3164 == NULL) {
@@ -510,7 +570,7 @@ char *getTimeReported(msg_t *pM, enum tplFormatTypes eFmt)
 			if((pM->pszTIMESTAMP3339 = malloc(33)) == NULL) {
 				glblHadMemShortage = 1;
 				MsgUnlock();
-				return "";
+				return ""; /* TODO: check this: can it cause a free() of constant memory?) */
 			}
 			formatTimestamp3339(&pM->tTIMESTAMP, pM->pszTIMESTAMP3339, 33);
 		}
@@ -550,6 +610,18 @@ char *getTimeGenerated(msg_t *pM, enum tplFormatTypes eFmt)
 		}
 		MsgUnlock();
 		return(pM->pszRcvdAt_MySQL);
+        case tplFmtPgSQLDate:
+                MsgLock();
+                if(pM->pszRcvdAt_PgSQL == NULL) {
+                        if((pM->pszRcvdAt_PgSQL = malloc(21)) == NULL) {
+                                glblHadMemShortage = 1;
+                                MsgUnlock();
+                                return "";
+                        }
+                        formatTimestampToPgSQL(&pM->tRcvdAt, pM->pszRcvdAt_PgSQL, 21);
+                }
+                MsgUnlock();
+                return(pM->pszRcvdAt_PgSQL);
 	case tplFmtRFC3164Date:
 		MsgLock();
 		if(pM->pszRcvdAt3164 == NULL) {
@@ -1118,7 +1190,7 @@ void MsgSetMSG(msg_t *pMsg, char* pszMSG)
 		free(pMsg->pszMSG);
 
 	pMsg->iLenMSG = strlen(pszMSG);
-	if((pMsg->pszMSG = malloc(pMsg->iLenMSG + 1)) != NULL)
+	if((pMsg->pszMSG = (uchar*) malloc(pMsg->iLenMSG + 1)) != NULL)
 		memcpy(pMsg->pszMSG, pszMSG, pMsg->iLenMSG + 1);
 	else
 		dbgprintf("MsgSetMSG could not allocate memory for pszMSG buffer.");
@@ -1133,7 +1205,7 @@ void MsgSetRawMsg(msg_t *pMsg, char* pszRawMsg)
 		free(pMsg->pszRawMsg);
 
 	pMsg->iLenRawMsg = strlen(pszRawMsg);
-	if((pMsg->pszRawMsg = malloc(pMsg->iLenRawMsg + 1)) != NULL)
+	if((pMsg->pszRawMsg = (uchar*) malloc(pMsg->iLenRawMsg + 1)) != NULL)
 		memcpy(pMsg->pszRawMsg, pszRawMsg, pMsg->iLenRawMsg + 1);
 	else
 		dbgprintf("Could not allocate memory for pszRawMsg buffer.");
@@ -1537,7 +1609,7 @@ char *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			pSrc = pRes;
 			while(*pSrc) {
 				*pB++ = (pTpe->data.field.eCaseConv == tplCaseConvUpper) ?
-					toupper(*pSrc) : tolower(*pSrc);
+					(char)toupper((int)*pSrc) : (char)tolower((int)*pSrc);
 				/* currently only these two exist */
 				++pSrc;
 			}

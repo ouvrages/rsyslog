@@ -1,2 +1,2 @@
 ignore_non_conf_files.patch -p0
-no_create_db.patch
+no_create_db.patch -p0

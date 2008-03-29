@@ -30,10 +30,13 @@ rsyslogd_SOURCES = \
 	template.h \
 	outchannel.h \
 	liblogging-stub.h \
+	sync.c \
+	sync.h \
 	net.c \
 	net.h \
 	msg.c \
 	msg.h \
+	expr.c \
 	omshell.c \
 	omshell.h \
 	omusrmsg.c \
@@ -58,10 +61,12 @@ rsyslogd_SOURCES = \
 	iminternal.c \
 	iminternal.h \
 	action.c \
-	action.h
+	action.h \
+	gss-misc.c \
+	gss-misc.h
 
 rsyslogd_CPPFLAGS = -D_PATH_MODDIR=\"$(pkglibdir)/\" $(pthreads_cflags)
-rsyslogd_LDADD = $(zlib_libs) $(pthreads_libs) -ldl
+rsyslogd_LDADD = $(zlib_libs) $(pthreads_libs) $(gss_libs) $(dl_libs) $(rt_libs)
 rsyslogd_LDFLAGS = -export-dynamic
 
 man_MANS = rfc3195d.8 rklogd.8 rsyslogd.8 rsyslog.conf.5 
@@ -80,4 +85,8 @@ SUBDIRS = doc
 
 if ENABLE_MYSQL
 SUBDIRS += plugins/ommysql
+endif
+
+if ENABLE_PGSQL
+SUBDIRS += plugins/ompgsql
 endif

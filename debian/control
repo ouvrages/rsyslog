@@ -2,7 +2,7 @@ Source: rsyslog
 Section: admin
 Priority: extra
 Maintainer: Michael Biebl <biebl@debian.org>
-Build-Depends: debhelper (>= 5), quilt, autotools-dev, zlib1g-dev, libmysqlclient15-dev
+Build-Depends: debhelper (>= 5), quilt, autotools-dev, zlib1g-dev, libmysqlclient15-dev, libpq-dev
 Standards-Version: 3.7.3
 Homepage: http://www.rsyslog.com/
 
@@ -13,7 +13,7 @@ Replaces: linux-kernel-log-daemon, system-log-daemon
 Provides: linux-kernel-log-daemon, system-log-daemon
 Depends: ${shlibs:Depends}, ${misc:Depends}, lsb-base (>= 3.0-6)
 Recommends: logrotate
-Suggests: rsyslog-mysql
+Suggests: rsyslog-mysql | rsyslog-pgsql
 Description: enhanced multi-threaded syslogd
  Rsyslog is an enhanced syslogd supporting, amongst others:
   * reliable syslog over TCP and RFC 3195
@@ -35,3 +35,11 @@ Depends: ${shlibs:Depends}, ${misc:Depends}, rsyslog (= ${binary:Version}), dbco
 Recommends: mysql-server
 Description: MySQL output plugin for rsyslog
  This plugin allows rsyslog to write the syslog messages into a MySQL database.
+
+Package: rsyslog-pgsql
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, rsyslog (= ${binary:Version}), dbconfig-common, ucf
+Recommends: postgresql
+Description: PostgreSQL output plugin for rsyslog
+ This plugin allows rsyslog to write the syslog messages into a PostgresSQL 
+ database.

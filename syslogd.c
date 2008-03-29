@@ -146,6 +146,7 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <ctype.h>
+#include <limits.h>
 #define GNU_SOURCE
 #include <string.h>
 #include <stdarg.h>
@@ -165,9 +166,11 @@
 #include <sys/file.h>
 #include <sys/un.h>
 #include <sys/time.h>
-#ifdef BSD
+
+#if HAVE_SYS_TIMESPEC_H
 # include <sys/timespec.h>
 #endif
+
 #include <sys/resource.h>
 #include <signal.h>
 
@@ -207,6 +210,7 @@
 #include "outchannel.h"
 #include "syslogd.h"
 #include "net.h" /* struct NetAddr */
+#include "sync.h" /* struct NetAddr */
 
 #include "parse.h"
 #include "msg.h"
@@ -237,50 +241,6 @@
 #define INTERNAL_NOPRI  0x10    /* the "no priority" priority */
 #define LOG_FTP         (11<<3) /* ftp daemon */
 #define INTERNAL_MARK   LOG_MAKEPRI((LOG_NFACILITIES<<3), 0)
-
-syslogCODE rs_prioritynames[] =
-  {
-    { "alert", LOG_ALERT },
-    { "crit", LOG_CRIT },
-    { "debug", LOG_DEBUG },
-    { "emerg", LOG_EMERG },
-    { "err", LOG_ERR },
-    { "error", LOG_ERR },               /* DEPRECATED */
-    { "info", LOG_INFO },
-    { "none", INTERNAL_NOPRI },         /* INTERNAL */
-    { "notice", LOG_NOTICE },
-    { "panic", LOG_EMERG },             /* DEPRECATED */
-    { "warn", LOG_WARNING },            /* DEPRECATED */
-    { "warning", LOG_WARNING },
-    { NULL, -1 }
-  };
-
-syslogCODE rs_facilitynames[] =
-  {
-    { "auth", LOG_AUTH },
-    { "authpriv", LOG_AUTHPRIV },
-    { "cron", LOG_CRON },
-    { "daemon", LOG_DAEMON },
-    { "ftp", LOG_FTP },
-    { "kern", LOG_KERN },
-    { "lpr", LOG_LPR },
-    { "mail", LOG_MAIL },
-    { "mark", INTERNAL_MARK },          /* INTERNAL */
-    { "news", LOG_NEWS },
-    { "security", LOG_AUTH },           /* DEPRECATED */
-    { "syslog", LOG_SYSLOG },
-    { "user", LOG_USER },
-    { "uucp", LOG_UUCP },
-    { "local0", LOG_LOCAL0 },
-    { "local1", LOG_LOCAL1 },
-    { "local2", LOG_LOCAL2 },
-    { "local3", LOG_LOCAL3 },
-    { "local4", LOG_LOCAL4 },
-    { "local5", LOG_LOCAL5 },
-    { "local6", LOG_LOCAL6 },
-    { "local7", LOG_LOCAL7 },
-    { NULL, -1 }
-  };
 
 
 #ifndef UTMP_FILE
@@ -363,7 +323,7 @@ syslogCODE rs_facilitynames[] =
 static uchar	*ConfFile = (uchar*) _PATH_LOGCONF; /* read-only after startup */
 static char	*PidFile = _PATH_LOGPID; /* read-only after startup */
 static uchar	*pModDir = NULL; /* read-only after startup */
-char	ctty[] = _PATH_CONSOLE;	/* this is read-only */
+char	ctty[] = _PATH_CONSOLE;	/* this is read-only; used by omfile -- TODO: remove that dependency */
 
 static pid_t myPid;	/* our pid for use in self-generated messages, e.g. on startup */
 /* mypid is read-only after the initial fork() */
@@ -542,6 +502,8 @@ int      send_to_all = 0;        /* send message to all IPv4/IPv6 addresses */
 static int	MarkSeq = 0;	/* mark sequence number - modified in domark() only */
 static int	NoFork = 0; 	/* don't fork - don't run in daemon mode - read-only after startup */
 static int	AcceptRemote = 0;/* receive messages that come via UDP - read-only after startup */
+int     ACLAddHostnameOnFail = 0; /* add hostname to acl when DNS resolving has failed */
+int     ACLDontResolve = 0;       /* add hostname to acl instead of resolving it to IP(s) */
 int	DisableDNS = 0; /* don't look up IP addresses of remote messages */
 char	**StripDomains = NULL;/* these domains may be stripped before writing logs  - r/o after s.u., never touched by init */
 char	**LocalHosts = NULL;/* these hosts are logged with their hostname  - read-only after startup, never touched by init */
@@ -655,6 +617,12 @@ static rsRetVal resetConfigVariables(uchar __attribute__((unused)) *pp, void __a
 #ifdef USE_PTHREADS
 	iMainMsgQueueSize = 10000;
 #endif
+#if defined(SYSLOG_INET) && defined(USE_GSSAPI)
+	if (gss_listen_service_name != NULL) {
+		free(gss_listen_service_name);
+		gss_listen_service_name = NULL;
+	}
+#endif
 
 	return RS_RET_OK;
 }
@@ -682,6 +650,7 @@ static uchar template_WallFmt[] = "\"\r\n\7Message from syslogd@%HOSTNAME% at %t
 static uchar template_StdFwdFmt[] = "\"<%PRI%>%TIMESTAMP% %HOSTNAME% %syslogtag%%msg%\"";
 static uchar template_StdUsrMsgFmt[] = "\" %syslogtag%%msg%\n\r\"";
 static uchar template_StdDBFmt[] = "\"insert into SystemEvents (Message, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values ('%msg%', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-mysql%', '%timegenerated:::date-mysql%', %iut%, '%syslogtag%')\",SQL";
+static uchar template_StdPgSQLFmt[] = "\"insert into SystemEvents (Message, Facility, FromHost, Priority, DeviceReportedTime, ReceivedAt, InfoUnitID, SysLogTag) values ('%msg%', %syslogfacility%, '%HOSTNAME%', %syslogpriority%, '%timereported:::date-pgsql%', '%timegenerated:::date-pgsql%', %iut%, '%syslogtag%')\",STDSQL";
 /* end template */
 
 
@@ -857,7 +826,8 @@ static rsRetVal AddAllowedSender(struct AllowedSenders **ppRoot, struct AllowedS
 		}
 		
 		if (!strchr (iAllow->addr.HostWildcard, '*') &&
-		    !strchr (iAllow->addr.HostWildcard, '?')) {
+		    !strchr (iAllow->addr.HostWildcard, '?') &&
+		    ACLDontResolve == 0) {
 			/* single host - in this case, we pull its IP addresses from DNS
 			* and add IP-based ACLs.
 			*/
@@ -866,15 +836,21 @@ static rsRetVal AddAllowedSender(struct AllowedSenders **ppRoot, struct AllowedS
 			
 			memset (&hints, 0, sizeof (struct addrinfo));
 			hints.ai_family = AF_UNSPEC;
-			hints.ai_flags  = AI_ADDRCONFIG;
 			hints.ai_socktype = SOCK_DGRAM;
+#			ifdef AI_ADDRCONFIG /* seems not to be present on all systems */
+				hints.ai_flags  = AI_ADDRCONFIG;
+#			endif
 
 			if (getaddrinfo (iAllow->addr.HostWildcard, NULL, &hints, &res) != 0) {
-				logerrorSz("DNS error: Can't resolve \"%s\", not added as allowed sender", iAllow->addr.HostWildcard);
-				/* We could use the text name in this case - maybe this could become
-				 * a user-defined option at some stage.
-				 */
-				return RS_RET_ERR;
+			        logerrorSz("DNS error: Can't resolve \"%s\"", iAllow->addr.HostWildcard);
+				
+				if (ACLAddHostnameOnFail) {
+				        logerrorSz("Adding hostname \"%s\" to ACL as a wildcard entry.", iAllow->addr.HostWildcard);
+				        return AddAllowedSenderEntry(ppRoot, ppLast, iAllow, iSignificantBits);
+				} else {
+				        logerrorSz("Hostname \"%s\" WON\'T be added to ACL.", iAllow->addr.HostWildcard);
+				        return RS_RET_NOENTRY;
+				}
 			}
 			
 			for (restmp = res ; res != NULL ; res = res->ai_next) {
@@ -1478,6 +1454,19 @@ int formatTimestampToMySQL(struct syslogTime *ts, char* pDst, size_t iLenDst)
 
 }
 
+int formatTimestampToPgSQL(struct syslogTime *ts, char *pDst, size_t iLenDst)
+{
+       /* see note in formatTimestampToMySQL, applies here as well */
+       assert(ts != NULL);
+       assert(pDst != NULL);
+
+       if (iLenDst < 21) /* we need 20 bytes + '\n' */
+               return(0);
+
+       return(snprintf(pDst, iLenDst, "%4.4d-%2.2d-%2.2d %2.2d:%2.2d:%2.2d",
+                               ts->year, ts->month, ts->day, ts->hour, ts->minute, ts->second));
+}
+
 /**
  * Format a syslogTimestamp to a RFC3339 timestamp string (as
  * specified in syslog-protocol).
@@ -1635,7 +1624,7 @@ void getCurrTime(struct syslogTime *t)
 
 static int usage(void)
 {
-	fprintf(stderr, "usage: rsyslogd [-46Adhvw] [-l hostlist] [-m markinterval] [-n] [-p path]\n" \
+	fprintf(stderr, "usage: rsyslogd [-46AdhqQvw] [-l hostlist] [-m markinterval] [-n] [-p path]\n" \
 		" [-s domainlist] [-r[port]] [-tport[,max-sessions]] [-f conffile] [-i pidfile] [-x]\n");
 	exit(1); /* "good" exit - done to terminate usage() */
 }
@@ -2233,8 +2222,6 @@ void printline(char *hname, char *msg, int bParseHost)
 	return;
 }
 
-time_t	now;
-
 /* rgerhards 2004-11-09: the following is a function that can be used
  * to log a message orginating from the syslogd itself. In sysklogd code,
  * this is done by simply calling logmsg(). However, logmsg() is changed in
@@ -2244,7 +2231,8 @@ time_t	now;
  * function here probably is only an interim solution and that we need to
  * think on the best way to do this.
  */
-static void logmsgInternal(int pri, char *msg, int flags)
+static void
+logmsgInternal(int pri, char *msg, int flags)
 {
 	msg_t *pMsg;
 
@@ -2364,8 +2352,7 @@ int shouldProcessThisMessage(selector_t *f, msg_t *pMsg)
 			iRet = 1;
 	} else {
 		assert(f->f_filter_type == FILTER_PROP); /* assert() just in case... */
-		pszPropVal = MsgGetProp(pMsg, NULL,
-			        f->f_filterData.prop.pCSPropName, &pbMustBeFreed);
+		pszPropVal = MsgGetProp(pMsg, NULL, f->f_filterData.prop.pCSPropName, &pbMustBeFreed);
 
 		/* Now do the compares (short list currently ;)) */
 		switch(f->f_filterData.prop.operation ) {
@@ -2447,6 +2434,13 @@ static rsRetVal callAction(msg_t *pMsg, action_t *pAction)
 	assert(pMsg != NULL);
 	assert(pAction != NULL);
 
+	/* Make sure nodbody else modifies/uses this action object. Right now, this
+         * is important because of "message repeated n times" processing, later it will
+         * become important when we (possibly) have multiple worker threads.
+ 	 * rgerhards, 2007-12-11
+ 	 */
+	LockObj(pAction);
+
 	/* first, we need to check if this is a disabled
 	 * entry. If so, we must not further process it.
 	 * rgerhards 2005-09-26
@@ -2466,7 +2460,7 @@ static rsRetVal callAction(msg_t *pMsg, action_t *pAction)
 	}
 
 	/* don't output marks to recently written files */
-	if ((pMsg->msgFlags & MARK) && (now - pAction->f_time) < MarkInterval / 2) {
+	if ((pMsg->msgFlags & MARK) && (time(NULL) - pAction->f_time) < MarkInterval / 2) {
 		ABORT_FINALIZE(RS_RET_OK);
 	}
 
@@ -2480,14 +2474,15 @@ static rsRetVal callAction(msg_t *pMsg, action_t *pAction)
 	    !strcmp(getAPPNAME(pMsg), getAPPNAME(pAction->f_pMsg))) {
 		pAction->f_prevcount++;
 		dbgprintf("msg repeated %d times, %ld sec of %d.\n",
-		    pAction->f_prevcount, now - pAction->f_time,
+		    pAction->f_prevcount, time(NULL) - pAction->f_time,
 		    repeatinterval[pAction->f_repeatcount]);
+		/* use current message, so we have the new timestamp (means we need to discard previous one) */
 		MsgDestruct(pAction->f_pMsg);
 		pAction->f_pMsg = MsgAddRef(pMsg);
 		/* If domark would have logged this by now, flush it now (so we don't hold
 		 * isolated messages), but back off so we'll flush less often in the future.
 		 */
-		if (now > REPEATTIME(pAction)) {
+		if(time(NULL) > REPEATTIME(pAction)) {
 			iRet = fprintlog(pAction);
 			BACKOFF(pAction);
 		}
@@ -2510,6 +2505,7 @@ static rsRetVal callAction(msg_t *pMsg, action_t *pAction)
 	}
 
 finalize_it:
+	UnlockObj(pAction);
 	return iRet;
 }
 
@@ -2678,7 +2674,7 @@ static msgQueue *queueInit (void)
 static void queueDelete (msgQueue *q)
 {
 	pthread_mutex_destroy (q->mut);
-	free (q->mut);	
+	free (q->mut);
 	pthread_cond_destroy (q->notFull);
 	free (q->notFull);
 	pthread_cond_destroy (q->notEmpty);
@@ -3064,8 +3060,7 @@ static int parseLegacySyslogMsg(msg_t *pMsg, int flags)
 	 * MSG part of the message (as of RFC 3164).
 	 * rgerhards 2004-12-03
 	 */
-	(void) time(&now);
-	if (flags & ADDDATE) {
+	if(flags & ADDDATE) {
 		getCurrTime(&(pMsg->tTIMESTAMP)); /* use the current time! */
 	}
 
@@ -3222,7 +3217,8 @@ static int parseLegacySyslogMsg(msg_t *pMsg, int flags)
  * potential for misinterpretation, which we simply can not solve under the
  * circumstances given.
  */
-void logmsg(int pri, msg_t *pMsg, int flags)
+void
+logmsg(int pri, msg_t *pMsg, int flags)
 {
 	char *msg;
 	char PRItext[20];
@@ -3302,15 +3298,20 @@ void logmsg(int pri, msg_t *pMsg, int flags)
  * when a message was already repeated but also when a new message
  * arrived.
  * rgerhards 2007-08-01: interface changed to use action_t
+ * rgerhards, 2007-12-11: please note: THIS METHOD MUST ONLY BE
+ * CALLED AFTER THE CALLER HAS LOCKED THE pAction OBJECT! We do
+ * not do this here. Failing to do so results in all kinds of
+ * "interesting" problems!
  */
-rsRetVal fprintlog(action_t *pAction)
+rsRetVal
+fprintlog(action_t *pAction)
 {
 	msg_t *pMsgSave;	/* to save current message pointer, necessary to restore
 				   it in case it needs to be updated (e.g. repeated msgs) */
-	pMsgSave = NULL;	/* indicate message poiner not saved */
 	DEFiRet;
 	int i;
 
+	pMsgSave = NULL;	/* indicate message poiner not saved */
 	/* first check if this is a regular message or the repeation of
 	 * a previous message. If so, we need to change the message text
 	 * to "last message repeated n times" and then go ahead and write
@@ -3349,7 +3350,7 @@ rsRetVal fprintlog(action_t *pAction)
 
 	dbgprintf("Called fprintlog, logging to %s", modGetStateName(pAction->pMod));
 
-	pAction->f_time = now; /* we need this for message repeation processing TODO: why must "now" be global? */
+	time(&pAction->f_time); /* we need this for message repeation processing */
 
 	/* When we reach this point, we have a valid, non-disabled action.
 	 * So let's execute it. -- rgerhards, 2007-07-24
@@ -3373,7 +3374,7 @@ rsRetVal fprintlog(action_t *pAction)
 	}
 
 	if(iRet == RS_RET_OK)
-		pAction->f_prevcount = 0; /* message process, so we start a new cycle */
+		pAction->f_prevcount = 0; /* message processed, so we start a new cycle */
 
 finalize_it:
 	/* cleanup */
@@ -3387,12 +3388,12 @@ finalize_it:
 	if(pMsgSave != NULL) {
 		/* we had saved the original message pointer. That was
 		 * done because we needed to create a temporary one
-		 * (most often for "message repeated n time" handling. If so,
+		 * (most often for "message repeated n time" handling). If so,
 		 * we need to restore the original one now, so that procesing
 		 * can continue as normal. We also need to discard the temporary
 		 * one, as we do not like memory leaks ;) Please note that the original
 		 * message object will be discarded by our callers, so this is nothing
-		 * of our buisiness. rgerhards, 2007-07-10
+		 * of our business. rgerhards, 2007-07-10
 		 */
 		MsgDestruct(pAction->f_pMsg);
 		pAction->f_pMsg = pMsgSave;	/* restore it */
@@ -3402,7 +3403,8 @@ finalize_it:
 }
 
 
-static void reapchild()
+static void
+reapchild()
 {
 	int saved_errno = errno;
 	struct sigaction sigAct;
@@ -3425,14 +3427,16 @@ DEFFUNC_llExecFunc(domarkActions)
 	action_t *pAction = (action_t*) pData;
 
 	assert(pAction != NULL);
-
-	if (pAction->f_prevcount && now >= REPEATTIME(pAction)) {
+	
+	LockObj(pAction);
+	if (pAction->f_prevcount && time(NULL) >= REPEATTIME(pAction)) {
 		dbgprintf("flush %s: repeated %d times, %d sec.\n",
 		    modGetStateName(pAction->pMod), pAction->f_prevcount,
 		    repeatinterval[pAction->f_repeatcount]);
 		fprintlog(pAction);
 		BACKOFF(pAction);
 	}
+	UnlockObj(pAction);
 
 	return RS_RET_OK; /* we ignore errors, we can not do anything either way */
 }
@@ -3449,22 +3453,27 @@ DEFFUNC_llExecFunc(domarkActions)
  * main thread itself, which is the only thing to make sure rsyslogd will not do
  * strange things. The way it originally was seemed to work because mark occurs very
  * seldom. However, the code called was anything else but reentrant, so it was like
- * russian roulette.
- * rgerhards, 2005-10-20
+ * russian roulette. - rgerhards, 2005-10-20
+ * rgerhards, 2007-12-11: ... and it still is, if running multithreaded. Because in this
+ * case we run concurrently to the actions... I have now fixed that by using synchronization
+ * macros.
  */
-static void domark(void)
+static void
+domark(void)
 {
 	register selector_t *f;
 
 	if (MarkInterval > 0) {
-		now = time(NULL);
 		MarkSeq += TIMERINTVL;
 		if (MarkSeq >= MarkInterval) {
 			logmsgInternal(LOG_INFO, "-- MARK --", ADDDATE|MARK);
 			MarkSeq = 0;
 		}
 
-		/* see if we need to flush any "message repeated n times"... */
+		/* see if we need to flush any "message repeated n times"... 
+		 * Note that this interferes with objects running on another thread.
+		 * We are using appropriate locking inside the function to handle that.
+		 */
 		for (f = Files; f != NULL ; f = f->f_next) {
 			llExecFunc(&f->llActList, domarkActions, NULL);
 		}
@@ -3476,7 +3485,8 @@ static void domark(void)
  * domark request. See domark() comments for further details.
  * rgerhards, 2005-10-20
  */
-static void domarkAlarmHdlr()
+static void
+domarkAlarmHdlr()
 {
 	struct sigaction sigAct;
 
@@ -3548,8 +3558,10 @@ void logerror(char *type)
 
 	if (errno == 0)
 		snprintf(buf, sizeof(buf), "%s", type);
-	else
-		snprintf(buf, sizeof(buf), "%s: %s", type, strerror_r(errno, errStr, sizeof(errStr)));
+	else {
+		strerror_r(errno, errStr, sizeof(errStr));
+		snprintf(buf, sizeof(buf), "%s: %s", type, errStr);
+	}
 	buf[sizeof(buf)/sizeof(char) - 1] = '\0'; /* just to be on the safe side... */
 	errno = 0;
 	logmsgInternal(LOG_SYSLOG|LOG_ERR, buf, ADDDATE);
@@ -3638,8 +3650,6 @@ static void die(int sig)
 	/* de-init some modules */
 	modExitIminternal();
 
-	unregCfSysLineHdlrs();
-
 	/* TODO: this would also be the right place to de-init the builtin output modules. We
 	 * do not currently do that, because the module interface does not allow for
 	 * it. This will come some time later (it's essential with loadable modules).
@@ -3651,6 +3661,12 @@ static void die(int sig)
 	 * into freeSelectors() - but that needs to be seen. -- rgerhards, 2007-08-09
 	 */
 	modUnloadAndDestructAll();
+
+	/* the following line cleans up CfSysLineHandlers that were not based on loadable
+	 * modules. As such, they are not yet cleared.
+	 */
+	unregCfSysLineHdlrs();
+
 
 	/* clean up auxiliary data */
 	if(pModDir != NULL)
@@ -3730,10 +3746,15 @@ static rsRetVal addAllowedSenderLine(char* pName, uchar** ppRestOfConfLine)
 		}
 		if((iRet = AddAllowedSender(ppRoot, ppLast, uIP, iBits))
 			!= RS_RET_OK) {
-			logerrorInt("Error %d adding allowed sender entry "
-				    "- ignoring.", iRet);
-			rsParsDestruct(pPars);
-			return(iRet);
+		        if (iRet == RS_RET_NOENTRY) {
+			        logerrorInt("Error %d adding allowed sender entry "
+					    "- ignoring.", iRet);
+		        } else {
+			        logerrorInt("Error %d adding allowed sender entry "
+					    "- terminating, nothing more will be added.", iRet);
+				rsParsDestruct(pPars);
+				return(iRet);
+		        }
 		}
 		free (uIP); /* copy stored in AllowedSenders list */ 
 	}
@@ -3788,7 +3809,9 @@ static rsRetVal doIncludeDirectory(uchar *pDirName)
 			continue; /* these files we are also not interested in */
 		++iEntriesDone;
 		/* construct filename */
-		iFileNameLen = strnlen(res->d_name, NAME_MAX);
+		iFileNameLen = strlen(res->d_name);
+		if (iFileNameLen > NAME_MAX)
+			iFileNameLen = NAME_MAX;
 		memcpy(szFullFileName + iDirNameLen, res->d_name, iFileNameLen);
 		*(szFullFileName + iDirNameLen + iFileNameLen) = '\0';
 		dbgprintf("including file '%s'\n", szFullFileName);
@@ -4041,6 +4064,9 @@ finalize_it:
 
 /* helper to freeSelectors(), used with llExecFunc() to flush 
  * pending output.  -- rgerhards, 2007-08-02
+ * We do not need to lock the action object here as the processing
+ * queue is already empty and no other threads are running when
+ * we call this function. -- rgerhards, 2007-12-12
  */
 DEFFUNC_llExecFunc(freeSelectorsActions)
 {
@@ -4073,17 +4099,22 @@ static void freeSelectors(void)
 		 */
 		processImInternal();
 
-		/* we need first to flush, then wait for all messages to be processed
-		 * (stopWoker() does that), then we can free the structures.
+		/* we first wait until all messages are processed (stopWorker() does
+		 * that. Then, we go one last time over all actions and flush any
+		 * pending "message repeated n times" messages. We must use this sequence
+		 * because otherwise we would flush at whatever message is currently being
+		 * processed without draining the queue. That would lead to invalid
+		 * results. -- rgerhards, 2007-12-12
 		 */
-		for(f = Files ; f != NULL ; f = f->f_next) {
-			llExecFunc(&f->llActList, freeSelectorsActions, NULL);
-		}
-
 #		ifdef USE_PTHREADS
 		stopWorker();
 #		endif
 
+		for(f = Files ; f != NULL ; f = f->f_next) {
+			llExecFunc(&f->llActList, freeSelectorsActions, NULL);
+		}
+
+		/* actions flushed and ready for destruction - so do that... */
 		f = Files;
 		while (f != NULL) {
 			fPrev = f;
@@ -4281,8 +4312,10 @@ finalize_it:
 		char errStr[1024];
 		if(fCurr != NULL)
 			selectorDestruct(fCurr);
+
+		strerror_r(errno, errStr, sizeof(errStr));
 		dbgprintf("error %d processing config file '%s'; os error (if any): %s\n",
-			iRet, pConfFile, strerror_r(errno, errStr, sizeof(errStr)));
+			iRet, pConfFile, errStr);
 	}
 	return iRet;
 }
@@ -4323,8 +4356,7 @@ static void init(void)
 		}
 	}
 
-	assert (pAllowedSenders_UDP == NULL &&
-		pAllowedSenders_TCP == NULL );
+	assert(pAllowedSenders_UDP == NULL && pAllowedSenders_TCP == NULL);
 #endif
 	/* I was told by an IPv6 expert that calling getservbyname() seems to be
 	 * still valid, at least for the use case we have. So I re-enabled that
@@ -4360,7 +4392,9 @@ static void init(void)
 	dbgprintf("rsyslog %s.\n", VERSION);
 	dbgprintf("Called init.\n");
 
-	/*  Close all open log files and free log descriptor array. */
+	/*  Close all open log files and free log descriptor array. This also frees
+	 *  all output-modules instance data.
+	 */
 	freeSelectors();
 
 	/* Unload all non-static modules */
@@ -4397,7 +4431,7 @@ static void init(void)
 		 * We ignore any errors while doing this - we would be lost anyhow...
 		 */
 		selector_t *f = NULL;
-		char szTTYNameBuf[TTY_NAME_MAX+1]; /* +1 for NULL character */
+		char szTTYNameBuf[_POSIX_TTY_NAME_MAX+1]; /* +1 for NULL character */
 		dbgprintf("primary config file could not be opened - using emergency definitions.\n");
 		cfline((uchar*)"*.ERR\t" _PATH_CONSOLE, &f);
 		cfline((uchar*)"*.PANIC\t*", &f);
@@ -4458,6 +4492,14 @@ static void init(void)
 			 * need to do that, I recommend controlling that via a
 			 * user-selectable option. rgerhards, 2007-06-21
 			 */
+#			ifdef USE_GSSAPI
+			if(bEnableTCP == 2) {
+				if(TCPSessGSSInit()) {
+					logerror("GSS-API initialization failed\n");
+					bEnableTCP = -1;
+				}
+			}
+#			endif
 			if((sockTCPLstn = create_tcp_socket()) != NULL) {
 				dbgprintf("Opened %d syslog TCP port(s).\n", *sockTCPLstn);
 			}
@@ -5639,8 +5681,9 @@ static rsRetVal processSelectAfter(int maxfds, int nfds, fd_set *pReadfds, fd_se
 				printchopped(LocalHostName, line, iRcvd,  fd, funixParseHost[i]);
 			} else if (iRcvd < 0 && errno != EINTR) {
 				char errStr[1024];
+				strerror_r(errno, errStr, sizeof(errStr));
 				dbgprintf("UNIX socket error: %d = %s.\n", \
-					errno, strerror_r(errno, errStr, sizeof(errStr)));
+					errno, errStr);
 				logerror("recvfrom UNIX");
 			}
 		FDPROCESSED();
@@ -5678,8 +5721,8 @@ static rsRetVal processSelectAfter(int maxfds, int nfds, fd_set *pReadfds, fd_se
 				       }
 			       } else if (l < 0 && errno != EINTR && errno != EAGAIN) {
 					char errStr[1024];
-				       dbgprintf("INET socket error: %d = %s.\n",
-							errno, strerror_r(errno, errStr, sizeof(errStr)));
+					strerror_r(errno, errStr, sizeof(errStr));
+					dbgprintf("INET socket error: %d = %s.\n", errno, errStr);
 					       logerror("recvfrom inet");
 					       /* should be harmless */
 					       sleep(1);
@@ -5693,7 +5736,12 @@ static rsRetVal processSelectAfter(int maxfds, int nfds, fd_set *pReadfds, fd_se
 		for (i = 0; i < *sockTCPLstn; i++) {
 			if (FD_ISSET(sockTCPLstn[i+1], pReadfds)) {
 				dbgprintf("New connect on TCP inetd socket: #%d\n", sockTCPLstn[i+1]);
-				TCPSessAccept(sockTCPLstn[i+1]);
+#				ifdef USE_GSSAPI
+				if(bEnableTCP == 2)
+					TCPSessGSSAccept(sockTCPLstn[i+1]);
+				else
+#				endif
+					TCPSessAccept(sockTCPLstn[i+1]);
 				FDPROCESSED();
 			}
 		}
@@ -5709,16 +5757,34 @@ static rsRetVal processSelectAfter(int maxfds, int nfds, fd_set *pReadfds, fd_se
 				dbgprintf("tcp session socket with new data: #%d\n", fdSess);
 
 				/* Receive message */
-				state = recv(fdSess, buf, sizeof(buf), 0);
+#				ifdef USE_GSSAPI
+				if(bEnableTCP == 2)
+					state = TCPSessGSSRecv(iTCPSess, buf, sizeof(buf));
+				else
+#				endif
+					state = recv(fdSess, buf, sizeof(buf), 0);
 				if(state == 0) {
-					/* process any incomplete frames left over */
-					TCPSessPrepareClose(iTCPSess);
-					/* Session closed */
-					TCPSessClose(iTCPSess);
+#					ifdef USE_GSSAPI
+					if(bEnableTCP == 2)
+						TCPSessGSSClose(iTCPSess);
+					else {
+#					endif
+						/* process any incomplete frames left over */
+						TCPSessPrepareClose(iTCPSess);
+						/* Session closed */
+						TCPSessClose(iTCPSess);
+#					ifdef USE_GSSAPI
+					}
+#					endif
 				} else if(state == -1) {
 					logerrorInt("TCP session %d will be closed, error ignored\n",
 						    fdSess);
-					TCPSessClose(iTCPSess);
+#					ifdef USE_GSSAPI
+					if(bEnableTCP == 2)
+						TCPSessGSSClose(iTCPSess);
+					else
+#					endif
+						TCPSessClose(iTCPSess);
 				} else {
 					/* valid data received, process it! */
 					if(TCPSessDataRcvd(iTCPSess, buf, state) == 0) {
@@ -5728,7 +5794,12 @@ static rsRetVal processSelectAfter(int maxfds, int nfds, fd_set *pReadfds, fd_se
 						logerrorInt("Tearing down TCP Session %d - see "
 							    "previous messages for reason(s)\n",
 							    iTCPSess);
-						TCPSessClose(iTCPSess);
+#						ifdef USE_GSSAPI
+						if(bEnableTCP == 2)
+							TCPSessGSSClose(iTCPSess);
+						else
+#						endif
+							TCPSessClose(iTCPSess);
 					}
 				}
 				FDPROCESSED();
@@ -5989,27 +6060,30 @@ static rsRetVal loadBuildInModules(void)
 	 * This, I think, is the right thing to do. -- rgerhards, 2007-07-31
 	 */
 #ifdef	USE_PTHREADS
-	CHKiRet(regCfSysLineHdlr((uchar *)"mainmsgqueuesize", 0, eCmdHdlrInt, NULL, &iMainMsgQueueSize));
+	CHKiRet(regCfSysLineHdlr((uchar *)"mainmsgqueuesize", 0, eCmdHdlrInt, NULL, &iMainMsgQueueSize, NULL));
 #endif
-	CHKiRet(regCfSysLineHdlr((uchar *)"repeatedmsgreduction", 0, eCmdHdlrBinary, NULL, &bReduceRepeatMsgs));
-	CHKiRet(regCfSysLineHdlr((uchar *)"actionexeconlywhenpreviousissuspended", 0, eCmdHdlrBinary, NULL, &bActExecWhenPrevSusp));
-	CHKiRet(regCfSysLineHdlr((uchar *)"actionresumeinterval", 0, eCmdHdlrInt, setActionResumeInterval, NULL));
-	CHKiRet(regCfSysLineHdlr((uchar *)"controlcharacterescapeprefix", 0, eCmdHdlrGetChar, NULL, &cCCEscapeChar));
-	CHKiRet(regCfSysLineHdlr((uchar *)"escapecontrolcharactersonreceive", 0, eCmdHdlrBinary, NULL, &bEscapeCCOnRcv));
-	CHKiRet(regCfSysLineHdlr((uchar *)"dropmsgswithmaliciousdnsptrrecords", 0, eCmdHdlrBinary, NULL, &bDropMalPTRMsgs));
-	CHKiRet(regCfSysLineHdlr((uchar *)"droptrailinglfonreception", 0, eCmdHdlrBinary, NULL, &bDropTrailingLF));
-	CHKiRet(regCfSysLineHdlr((uchar *)"template", 0, eCmdHdlrCustomHandler, doNameLine, (void*)DIR_TEMPLATE));
-	CHKiRet(regCfSysLineHdlr((uchar *)"outchannel", 0, eCmdHdlrCustomHandler, doNameLine, (void*)DIR_OUTCHANNEL));
-	CHKiRet(regCfSysLineHdlr((uchar *)"allowedsender", 0, eCmdHdlrCustomHandler, doNameLine, (void*)DIR_ALLOWEDSENDER));
-	CHKiRet(regCfSysLineHdlr((uchar *)"modload", 0, eCmdHdlrCustomHandler, doModLoad, NULL));
-	CHKiRet(regCfSysLineHdlr((uchar *)"includeconfig", 0, eCmdHdlrCustomHandler, doIncludeLine, NULL));
-	CHKiRet(regCfSysLineHdlr((uchar *)"umask", 0, eCmdHdlrFileCreateMode, setUmask, NULL));
-	CHKiRet(regCfSysLineHdlr((uchar *)"debugprinttemplatelist", 0, eCmdHdlrBinary, NULL, &bDebugPrintTemplateList));
-	CHKiRet(regCfSysLineHdlr((uchar *)"debugprintmodulelist", 0, eCmdHdlrBinary, NULL, &bDebugPrintModuleList));
+	CHKiRet(regCfSysLineHdlr((uchar *)"repeatedmsgreduction", 0, eCmdHdlrBinary, NULL, &bReduceRepeatMsgs, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"actionexeconlywhenpreviousissuspended", 0, eCmdHdlrBinary, NULL, &bActExecWhenPrevSusp, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"actionresumeinterval", 0, eCmdHdlrInt, setActionResumeInterval, NULL, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"controlcharacterescapeprefix", 0, eCmdHdlrGetChar, NULL, &cCCEscapeChar, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"escapecontrolcharactersonreceive", 0, eCmdHdlrBinary, NULL, &bEscapeCCOnRcv, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"dropmsgswithmaliciousdnsptrrecords", 0, eCmdHdlrBinary, NULL, &bDropMalPTRMsgs, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"droptrailinglfonreception", 0, eCmdHdlrBinary, NULL, &bDropTrailingLF, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"template", 0, eCmdHdlrCustomHandler, doNameLine, (void*)DIR_TEMPLATE, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"outchannel", 0, eCmdHdlrCustomHandler, doNameLine, (void*)DIR_OUTCHANNEL, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"allowedsender", 0, eCmdHdlrCustomHandler, doNameLine, (void*)DIR_ALLOWEDSENDER, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"modload", 0, eCmdHdlrCustomHandler, doModLoad, NULL, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"includeconfig", 0, eCmdHdlrCustomHandler, doIncludeLine, NULL, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"umask", 0, eCmdHdlrFileCreateMode, setUmask, NULL, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"debugprinttemplatelist", 0, eCmdHdlrBinary, NULL, &bDebugPrintTemplateList, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"debugprintmodulelist", 0, eCmdHdlrBinary, NULL, &bDebugPrintModuleList, NULL));
 	CHKiRet(regCfSysLineHdlr((uchar *)"debugprintcfsyslinehandlerlist", 0, eCmdHdlrBinary,
-		 NULL, &bDebugPrintCfSysLineHandlerList));
-	CHKiRet(regCfSysLineHdlr((uchar *)"moddir", 0, eCmdHdlrGetWord, NULL, &pModDir));
-	CHKiRet(regCfSysLineHdlr((uchar *)"resetconfigvariables", 1, eCmdHdlrCustomHandler, resetConfigVariables, NULL));
+		 NULL, &bDebugPrintCfSysLineHandlerList, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"moddir", 0, eCmdHdlrGetWord, NULL, &pModDir, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"resetconfigvariables", 1, eCmdHdlrCustomHandler, resetConfigVariables, NULL, NULL));
+#if defined(SYSLOG_INET) && defined(USE_GSSAPI)
+	CHKiRet(regCfSysLineHdlr((uchar *)"gsslistenservicename", 0, eCmdHdlrGetWord, NULL, &gss_listen_service_name, NULL));
+#endif
 
 finalize_it:
 	return iRet;
@@ -6096,6 +6170,8 @@ static void mainThread()
 	tplAddLine(" StdUsrMsgFmt", &pTmp);
 	pTmp = template_StdDBFmt;
 	tplLastStaticInit(tplAddLine(" StdDBFmt", &pTmp));
+        pTmp = template_StdPgSQLFmt;
+        tplLastStaticInit(tplAddLine(" StdPgSQLFmt", &pTmp));
 
 	dbgprintf("Starting.\n");
 	init();
@@ -6156,7 +6232,7 @@ int main(int argc, char **argv)
 
 	/* END core initializations */
 
-	while ((ch = getopt(argc, argv, "46Aa:dehi:f:l:m:nop:r::s:t:u:vwx")) != EOF) {
+	while ((ch = getopt(argc, argv, "46Aa:dehi:f:g:l:m:nop:qQr::s:t:u:vwx")) != EOF) {
 		switch((char)ch) {
                 case '4':
 	                family = PF_INET;
@@ -6189,6 +6265,14 @@ int main(int argc, char **argv)
 		case 'f':		/* configuration file */
 			ConfFile = (uchar*) optarg;
 			break;
+		case 'g':		/* enable tcp gssapi logging */
+#if defined(SYSLOG_INET) && defined(USE_GSSAPI)
+			configureTCPListen(optarg);
+			bEnableTCP = 2;
+#else
+			fprintf(stderr, "rsyslogd: -g not valid - not compiled with gssapi support");
+#endif
+			break;
 		case 'h':
 			NoHops = 0;
 			break;
@@ -6215,6 +6299,12 @@ int main(int argc, char **argv)
 		case 'p':		/* path to regular log socket */
 			funixn[0] = optarg;
 			break;
+		case 'q':               /* add hostname if DNS resolving has failed */
+		        ACLAddHostnameOnFail = 1;
+		        break;
+		case 'Q':               /* dont resolve hostnames in ACL to IPs */
+		        ACLDontResolve = 1;
+		        break;
 		case 'r':		/* accept remote messages */
 #ifdef SYSLOG_INET
 			AcceptRemote = 1;
@@ -6363,7 +6453,7 @@ int main(int argc, char **argv)
 	 */
 	for (p = (char *)LocalDomain; *p ; p++)
 		if (isupper((int) *p))
-			*p = tolower(*p);
+			*p = (char)tolower((int)*p);
 
 	memset(&sigAct, 0, sizeof (sigAct));
 	sigemptyset(&sigAct.sa_mask);
