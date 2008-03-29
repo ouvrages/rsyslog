@@ -1,3 +1,9 @@
+rsyslog (1.19.1-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Michael Biebl <biebl@debian.org>  Mon, 27 Aug 2007 19:17:14 +0200
+
 rsyslog (1.18.2-1) unstable; urgency=low
 
   * Initial release. Closes: #435884

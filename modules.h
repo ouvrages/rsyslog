@@ -84,15 +84,17 @@ typedef struct moduleInfo {
 			rsRetVal (*parseSelectorAct)(uchar**, void**,omodStringRequest_t**);
 		} om;
 	} mod;
+	void *pModHdlr; /* handler to the dynamic library holding the module */
 } modInfo_t;
 
 /* prototypes */
-rsRetVal doModInit(rsRetVal (*modInit)(), uchar *name);
+rsRetVal doModInit(rsRetVal (*modInit)(), uchar *name, void *pModHdlr);
 modInfo_t *omodGetNxt(modInfo_t *pThis);
 uchar *modGetName(modInfo_t *pThis);
 uchar *modGetStateName(modInfo_t *pThis);
 void modPrintList(void);
 rsRetVal modUnloadAndDestructAll(void);
+rsRetVal modUnloadAndDestructDynamic(void);
 
 #endif /* #ifndef MODULES_H_INCLUDED */
 /*

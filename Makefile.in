@@ -14,6 +14,7 @@
 
 @SET_MAKE@
 
+
 VPATH = @srcdir@
 pkgdatadir = $(datadir)/@PACKAGE@
 pkglibdir = $(libdir)/@PACKAGE@
@@ -37,7 +38,8 @@ subdir = .
 DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
 	$(top_srcdir)/configure AUTHORS COPYING ChangeLog INSTALL NEWS \
-	compile config.guess config.sub depcomp install-sh missing
+	compile config.guess config.sub depcomp install-sh ltmain.sh \
+	missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
@@ -47,8 +49,23 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = config.h
 CONFIG_CLEAN_FILES =
-am__installdirs = "$(DESTDIR)$(sbindir)" "$(DESTDIR)$(man5dir)" \
-	"$(DESTDIR)$(man8dir)"
+am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
+am__vpath_adj = case $$p in \
+    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
+    *) f=$$p;; \
+  esac;
+am__strip_dir = `echo $$p | sed -e 's|^.*/||'`;
+am__installdirs = "$(DESTDIR)$(pkglibdir)" "$(DESTDIR)$(sbindir)" \
+	"$(DESTDIR)$(man5dir)" "$(DESTDIR)$(man8dir)"
+pkglibLTLIBRARIES_INSTALL = $(INSTALL)
+LTLIBRARIES = $(pkglib_LTLIBRARIES)
+am__DEPENDENCIES_1 =
+ommysql_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
+am_ommysql_la_OBJECTS = ommysql_la-ommysql.lo
+ommysql_la_OBJECTS = $(am_ommysql_la_OBJECTS)
+ommysql_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(ommysql_la_LDFLAGS) $(LDFLAGS) -o $@
 sbinPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(sbin_PROGRAMS)
 am_rfc3195d_OBJECTS = rfc3195d.$(OBJEXT)
@@ -64,26 +81,32 @@ am_rsyslogd_OBJECTS = rsyslogd-syslogd.$(OBJEXT) \
 	rsyslogd-srUtils.$(OBJEXT) rsyslogd-parse.$(OBJEXT) \
 	rsyslogd-net.$(OBJEXT) rsyslogd-msg.$(OBJEXT) \
 	rsyslogd-omshell.$(OBJEXT) rsyslogd-omusrmsg.$(OBJEXT) \
-	rsyslogd-ommysql.$(OBJEXT) rsyslogd-omfwd.$(OBJEXT) \
-	rsyslogd-tcpsyslog.$(OBJEXT) rsyslogd-omfile.$(OBJEXT) \
-	rsyslogd-omdiscard.$(OBJEXT) rsyslogd-modules.$(OBJEXT) \
-	rsyslogd-objomsr.$(OBJEXT) rsyslogd-cfsysline.$(OBJEXT) \
-	rsyslogd-linkedlist.$(OBJEXT) rsyslogd-iminternal.$(OBJEXT) \
-	rsyslogd-action.$(OBJEXT)
+	rsyslogd-omfwd.$(OBJEXT) rsyslogd-tcpsyslog.$(OBJEXT) \
+	rsyslogd-omfile.$(OBJEXT) rsyslogd-omdiscard.$(OBJEXT) \
+	rsyslogd-modules.$(OBJEXT) rsyslogd-objomsr.$(OBJEXT) \
+	rsyslogd-cfsysline.$(OBJEXT) rsyslogd-linkedlist.$(OBJEXT) \
+	rsyslogd-iminternal.$(OBJEXT) rsyslogd-action.$(OBJEXT)
 rsyslogd_OBJECTS = $(am_rsyslogd_OBJECTS)
-am__DEPENDENCIES_1 =
-rsyslogd_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+rsyslogd_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+rsyslogd_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
+	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(rsyslogd_LDFLAGS) \
+	$(LDFLAGS) -o $@
 DEFAULT_INCLUDES = -I.@am__isrc@
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+LTCOMPILE = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
+	--mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
+	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 CCLD = $(CC)
-LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = $(rfc3195d_SOURCES) $(rklogd_SOURCES) $(rsyslogd_SOURCES)
-DIST_SOURCES = $(rfc3195d_SOURCES) $(rklogd_SOURCES) \
+LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
+	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
+	$(LDFLAGS) -o $@
+SOURCES = $(ommysql_la_SOURCES) $(rfc3195d_SOURCES) $(rklogd_SOURCES) \
 	$(rsyslogd_SOURCES)
+DIST_SOURCES = $(ommysql_la_SOURCES) $(rfc3195d_SOURCES) \
+	$(rklogd_SOURCES) $(rsyslogd_SOURCES)
 man5dir = $(mandir)/man5
 man8dir = $(mandir)/man8
 NROFF = nroff
@@ -103,6 +126,7 @@ distuninstallcheck_listfiles = find . -type f -print
 distcleancheck_listfiles = find . -type f -print
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
+AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
@@ -112,14 +136,21 @@ CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
+CXX = @CXX@
+CXXCPP = @CXXCPP@
+CXXDEPMODE = @CXXDEPMODE@
+CXXFLAGS = @CXXFLAGS@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
+ECHO = @ECHO@
 ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
+F77 = @F77@
+FFLAGS = @FFLAGS@
 GREP = @GREP@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
@@ -129,6 +160,8 @@ INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LDFLAGS = @LDFLAGS@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
+LIBTOOL = @LIBTOOL@
+LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
@@ -140,6 +173,8 @@ PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
+RANLIB = @RANLIB@
+SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
@@ -149,6 +184,8 @@ abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
 ac_ct_CC = @ac_ct_CC@
+ac_ct_CXX = @ac_ct_CXX@
+ac_ct_F77 = @ac_ct_F77@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
 am__quote = @am__quote@
@@ -197,12 +234,18 @@ target_alias = @target_alias@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 zlib_libs = @zlib_libs@
+pkglib_LTLIBRARIES = ommysql.la
 rklogd_SOURCES = klogd.c syslog.c pidfile.c ksym.c ksym_mod.c klogd.h ksyms.h pidfile.h module.h
 rfc3195d_SOURCES = rfc3195d.c rsyslog.h
 man_MANS = rfc3195d.8 rklogd.8 rsyslogd.8 rsyslog.conf.5 
-rsyslogd_SOURCES = syslogd.c pidfile.c template.c outchannel.c stringbuf.c srUtils.c parse.c syslogd-types.h template.h outchannel.h syslogd.h stringbuf.h parse.h srUtils.h liblogging-stub.h net.c net.h msg.c msg.h omshell.c omshell.h omusrmsg.c omusrmsg.h ommysql.c ommysql.h omfwd.c omfwd.h tcpsyslog.c tcpsyslog.h omfile.h omfile.c omdiscard.c omdiscard.h modules.c modules.h module-template.h objomsr.c objomsr.h cfsysline.c cfsysline.h linkedlist.c linkedlist.h iminternal.c iminternal.h action.c action.h
-rsyslogd_CPPFLAGS = $(mysql_includes)
-rsyslogd_LDADD = $(mysql_libs) $(zlib_libs) $(pthreads_libs)
+rsyslogd_SOURCES = syslogd.c pidfile.c template.c outchannel.c stringbuf.c srUtils.c parse.c syslogd-types.h template.h outchannel.h syslogd.h stringbuf.h parse.h srUtils.h liblogging-stub.h net.c net.h msg.c msg.h omshell.c omshell.h omusrmsg.c omusrmsg.h ommysql.h omfwd.c omfwd.h tcpsyslog.c tcpsyslog.h omfile.h omfile.c omdiscard.c omdiscard.h modules.c modules.h module-template.h objomsr.c objomsr.h cfsysline.c cfsysline.h linkedlist.c linkedlist.h iminternal.c iminternal.h action.c action.h
+rsyslogd_CPPFLAGS = -D_PATH_MODDIR=\"$(pkglibdir)/\"
+rsyslogd_LDADD = $(zlib_libs) $(pthreads_libs) -ldl
+rsyslogd_LDFLAGS = -export-dynamic
+ommysql_la_SOURCES = ommysql.c ommysql.h
+ommysql_la_CPPFLAGS = $(mysql_includes)
+ommysql_la_LDFLAGS = -module -avoid-version
+ommysql_la_LIBADD = $(mysql_libs)
 EXTRA_DIST = doc/bugs.html doc/features.html doc/generic_design.html \
 	doc/history.html doc/how2help.html doc/install.html \
 	doc/ipv6.html doc/manual.html doc/property_replacer.html \
@@ -234,12 +277,13 @@ EXTRA_DIST = doc/bugs.html doc/features.html doc/generic_design.html \
 	doc/rsconf1_fileowner.html doc/rsconf1_includeconfig.html \
 	doc/rsconf1_mainmsgqueuesize.html doc/rsconf1_modload.html \
 	doc/rsconf1_repeatedmsgreduction.html \
-	doc/rsconf1_resetconfigvariables.html doc/rsconf1_umask.html
+	doc/rsconf1_resetconfigvariables.html doc/rsconf1_umask.html \
+	createDB.sql
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
 .SUFFIXES:
-.SUFFIXES: .c .o .obj
+.SUFFIXES: .c .lo .o .obj
 am--refresh:
 	@:
 $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
@@ -290,16 +334,46 @@ $(srcdir)/config.h.in:  $(am__configure_deps)
 
 distclean-hdr:
 	-rm -f config.h stamp-h1
+install-pkglibLTLIBRARIES: $(pkglib_LTLIBRARIES)
+	@$(NORMAL_INSTALL)
+	test -z "$(pkglibdir)" || $(MKDIR_P) "$(DESTDIR)$(pkglibdir)"
+	@list='$(pkglib_LTLIBRARIES)'; for p in $$list; do \
+	  if test -f $$p; then \
+	    f=$(am__strip_dir) \
+	    echo " $(LIBTOOL) --mode=install $(pkglibLTLIBRARIES_INSTALL) $(INSTALL_STRIP_FLAG) '$$p' '$(DESTDIR)$(pkglibdir)/$$f'"; \
+	    $(LIBTOOL) --mode=install $(pkglibLTLIBRARIES_INSTALL) $(INSTALL_STRIP_FLAG) "$$p" "$(DESTDIR)$(pkglibdir)/$$f"; \
+	  else :; fi; \
+	done
+
+uninstall-pkglibLTLIBRARIES:
+	@$(NORMAL_UNINSTALL)
+	@list='$(pkglib_LTLIBRARIES)'; for p in $$list; do \
+	  p=$(am__strip_dir) \
+	  echo " $(LIBTOOL) --mode=uninstall rm -f '$(DESTDIR)$(pkglibdir)/$$p'"; \
+	  $(LIBTOOL) --mode=uninstall rm -f "$(DESTDIR)$(pkglibdir)/$$p"; \
+	done
+
+clean-pkglibLTLIBRARIES:
+	-test -z "$(pkglib_LTLIBRARIES)" || rm -f $(pkglib_LTLIBRARIES)
+	@list='$(pkglib_LTLIBRARIES)'; for p in $$list; do \
+	  dir="`echo $$p | sed -e 's|/[^/]*$$||'`"; \
+	  test "$$dir" != "$$p" || dir=.; \
+	  echo "rm -f \"$${dir}/so_locations\""; \
+	  rm -f "$${dir}/so_locations"; \
+	done
+ommysql.la: $(ommysql_la_OBJECTS) $(ommysql_la_DEPENDENCIES) 
+	$(ommysql_la_LINK) -rpath $(pkglibdir) $(ommysql_la_OBJECTS) $(ommysql_la_LIBADD) $(LIBS)
 install-sbinPROGRAMS: $(sbin_PROGRAMS)
 	@$(NORMAL_INSTALL)
 	test -z "$(sbindir)" || $(MKDIR_P) "$(DESTDIR)$(sbindir)"
 	@list='$(sbin_PROGRAMS)'; for p in $$list; do \
 	  p1=`echo $$p|sed 's/$(EXEEXT)$$//'`; \
 	  if test -f $$p \
+	     || test -f $$p1 \
 	  ; then \
 	    f=`echo "$$p1" | sed 's,^.*/,,;$(transform);s/$$/$(EXEEXT)/'`; \
-	   echo " $(INSTALL_PROGRAM_ENV) $(sbinPROGRAMS_INSTALL) '$$p' '$(DESTDIR)$(sbindir)/$$f'"; \
-	   $(INSTALL_PROGRAM_ENV) $(sbinPROGRAMS_INSTALL) "$$p" "$(DESTDIR)$(sbindir)/$$f" || exit 1; \
+	   echo " $(INSTALL_PROGRAM_ENV) $(LIBTOOL) --mode=install $(sbinPROGRAMS_INSTALL) '$$p' '$(DESTDIR)$(sbindir)/$$f'"; \
+	   $(INSTALL_PROGRAM_ENV) $(LIBTOOL) --mode=install $(sbinPROGRAMS_INSTALL) "$$p" "$(DESTDIR)$(sbindir)/$$f" || exit 1; \
 	  else :; fi; \
 	done
 
@@ -312,7 +386,11 @@ uninstall-sbinPROGRAMS:
 	done
 
 clean-sbinPROGRAMS:
-	-test -z "$(sbin_PROGRAMS)" || rm -f $(sbin_PROGRAMS)
+	@list='$(sbin_PROGRAMS)'; for p in $$list; do \
+	  f=`echo $$p|sed 's/$(EXEEXT)$$//'`; \
+	  echo " rm -f $$p $$f"; \
+	  rm -f $$p $$f ; \
+	done
 rfc3195d$(EXEEXT): $(rfc3195d_OBJECTS) $(rfc3195d_DEPENDENCIES) 
 	@rm -f rfc3195d$(EXEEXT)
 	$(LINK) $(rfc3195d_OBJECTS) $(rfc3195d_LDADD) $(LIBS)
@@ -321,7 +399,7 @@ rklogd$(EXEEXT): $(rklogd_OBJECTS) $(rklogd_DEPENDENCIES)
 	$(LINK) $(rklogd_OBJECTS) $(rklogd_LDADD) $(LIBS)
 rsyslogd$(EXEEXT): $(rsyslogd_OBJECTS) $(rsyslogd_DEPENDENCIES) 
 	@rm -f rsyslogd$(EXEEXT)
-	$(LINK) $(rsyslogd_OBJECTS) $(rsyslogd_LDADD) $(LIBS)
+	$(rsyslogd_LINK) $(rsyslogd_OBJECTS) $(rsyslogd_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -332,6 +410,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/klogd.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ksym.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ksym_mod.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ommysql_la-ommysql.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pidfile.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rfc3195d.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-action.Po@am__quote@
@@ -345,7 +424,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-omdiscard.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-omfile.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-omfwd.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-ommysql.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-omshell.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-omusrmsg.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-outchannel.Po@am__quote@
@@ -371,6 +449,20 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(COMPILE) -c `$(CYGPATH_W) '$<'`
+
+.c.lo:
+@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LTCOMPILE) -c -o $@ $<
+
+ommysql_la-ommysql.lo: ommysql.c
+@am__fastdepCC_TRUE@	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(ommysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ommysql_la-ommysql.lo -MD -MP -MF $(DEPDIR)/ommysql_la-ommysql.Tpo -c -o ommysql_la-ommysql.lo `test -f 'ommysql.c' || echo '$(srcdir)/'`ommysql.c
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/ommysql_la-ommysql.Tpo $(DEPDIR)/ommysql_la-ommysql.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='ommysql.c' object='ommysql_la-ommysql.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(ommysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ommysql_la-ommysql.lo `test -f 'ommysql.c' || echo '$(srcdir)/'`ommysql.c
 
 rsyslogd-syslogd.o: syslogd.c
 @am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rsyslogd-syslogd.o -MD -MP -MF $(DEPDIR)/rsyslogd-syslogd.Tpo -c -o rsyslogd-syslogd.o `test -f 'syslogd.c' || echo '$(srcdir)/'`syslogd.c
@@ -526,20 +618,6 @@ rsyslogd-omusrmsg.obj: omusrmsg.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rsyslogd-omusrmsg.obj `if test -f 'omusrmsg.c'; then $(CYGPATH_W) 'omusrmsg.c'; else $(CYGPATH_W) '$(srcdir)/omusrmsg.c'; fi`
 
-rsyslogd-ommysql.o: ommysql.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rsyslogd-ommysql.o -MD -MP -MF $(DEPDIR)/rsyslogd-ommysql.Tpo -c -o rsyslogd-ommysql.o `test -f 'ommysql.c' || echo '$(srcdir)/'`ommysql.c
-@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/rsyslogd-ommysql.Tpo $(DEPDIR)/rsyslogd-ommysql.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='ommysql.c' object='rsyslogd-ommysql.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rsyslogd-ommysql.o `test -f 'ommysql.c' || echo '$(srcdir)/'`ommysql.c
-
-rsyslogd-ommysql.obj: ommysql.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rsyslogd-ommysql.obj -MD -MP -MF $(DEPDIR)/rsyslogd-ommysql.Tpo -c -o rsyslogd-ommysql.obj `if test -f 'ommysql.c'; then $(CYGPATH_W) 'ommysql.c'; else $(CYGPATH_W) '$(srcdir)/ommysql.c'; fi`
-@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/rsyslogd-ommysql.Tpo $(DEPDIR)/rsyslogd-ommysql.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='ommysql.c' object='rsyslogd-ommysql.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rsyslogd-ommysql.obj `if test -f 'ommysql.c'; then $(CYGPATH_W) 'ommysql.c'; else $(CYGPATH_W) '$(srcdir)/ommysql.c'; fi`
-
 rsyslogd-omfwd.o: omfwd.c
 @am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rsyslogd-omfwd.o -MD -MP -MF $(DEPDIR)/rsyslogd-omfwd.Tpo -c -o rsyslogd-omfwd.o `test -f 'omfwd.c' || echo '$(srcdir)/'`omfwd.c
 @am__fastdepCC_TRUE@	mv -f $(DEPDIR)/rsyslogd-omfwd.Tpo $(DEPDIR)/rsyslogd-omfwd.Po
@@ -679,6 +757,15 @@ rsyslogd-action.obj: action.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='action.c' object='rsyslogd-action.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rsyslogd-action.obj `if test -f 'action.c'; then $(CYGPATH_W) 'action.c'; else $(CYGPATH_W) '$(srcdir)/action.c'; fi`
+
+mostlyclean-libtool:
+	-rm -f *.lo
+
+clean-libtool:
+	-rm -rf .libs _libs
+
+distclean-libtool:
+	-rm -f libtool
 install-man5: $(man5_MANS) $(man_MANS)
 	@$(NORMAL_INSTALL)
 	test -z "$(man5dir)" || $(MKDIR_P) "$(DESTDIR)$(man5dir)"
@@ -945,9 +1032,9 @@ distcleancheck: distclean
 	       exit 1; } >&2
 check-am: all-am
 check: check-am
-all-am: Makefile $(PROGRAMS) $(MANS) config.h
+all-am: Makefile $(LTLIBRARIES) $(PROGRAMS) $(MANS) config.h
 installdirs:
-	for dir in "$(DESTDIR)$(sbindir)" "$(DESTDIR)$(man5dir)" "$(DESTDIR)$(man8dir)"; do \
+	for dir in "$(DESTDIR)$(pkglibdir)" "$(DESTDIR)$(sbindir)" "$(DESTDIR)$(man5dir)" "$(DESTDIR)$(man8dir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -976,14 +1063,15 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-generic clean-sbinPROGRAMS mostlyclean-am
+clean-am: clean-generic clean-libtool clean-pkglibLTLIBRARIES \
+	clean-sbinPROGRAMS mostlyclean-am
 
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
-	distclean-hdr distclean-tags
+	distclean-hdr distclean-libtool distclean-tags
 
 dvi: dvi-am
 
@@ -999,7 +1087,7 @@ install-data-am: install-man
 
 install-dvi: install-dvi-am
 
-install-exec-am: install-sbinPROGRAMS
+install-exec-am: install-pkglibLTLIBRARIES install-sbinPROGRAMS
 
 install-html: install-html-am
 
@@ -1022,7 +1110,8 @@ maintainer-clean-am: distclean-am maintainer-clean-generic
 
 mostlyclean: mostlyclean-am
 
-mostlyclean-am: mostlyclean-compile mostlyclean-generic
+mostlyclean-am: mostlyclean-compile mostlyclean-generic \
+	mostlyclean-libtool
 
 pdf: pdf-am
 
@@ -1032,27 +1121,31 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-man uninstall-sbinPROGRAMS
+uninstall-am: uninstall-man uninstall-pkglibLTLIBRARIES \
+	uninstall-sbinPROGRAMS
 
 uninstall-man: uninstall-man5 uninstall-man8
 
 .MAKE: install-am install-strip
 
 .PHONY: CTAGS GTAGS all all-am am--refresh check check-am clean \
-	clean-generic clean-sbinPROGRAMS ctags dist dist-all \
-	dist-bzip2 dist-gzip dist-shar dist-tarZ dist-zip distcheck \
-	distclean distclean-compile distclean-generic distclean-hdr \
-	distclean-tags distcleancheck distdir distuninstallcheck dvi \
-	dvi-am html html-am info info-am install install-am \
-	install-data install-data-am install-dvi install-dvi-am \
-	install-exec install-exec-am install-html install-html-am \
-	install-info install-info-am install-man install-man5 \
-	install-man8 install-pdf install-pdf-am install-ps \
-	install-ps-am install-sbinPROGRAMS install-strip installcheck \
+	clean-generic clean-libtool clean-pkglibLTLIBRARIES \
+	clean-sbinPROGRAMS ctags dist dist-all dist-bzip2 dist-gzip \
+	dist-shar dist-tarZ dist-zip distcheck distclean \
+	distclean-compile distclean-generic distclean-hdr \
+	distclean-libtool distclean-tags distcleancheck distdir \
+	distuninstallcheck dvi dvi-am html html-am info info-am \
+	install install-am install-data install-data-am install-dvi \
+	install-dvi-am install-exec install-exec-am install-html \
+	install-html-am install-info install-info-am install-man \
+	install-man5 install-man8 install-pdf install-pdf-am \
+	install-pkglibLTLIBRARIES install-ps install-ps-am \
+	install-sbinPROGRAMS install-strip installcheck \
 	installcheck-am installdirs maintainer-clean \
 	maintainer-clean-generic mostlyclean mostlyclean-compile \
-	mostlyclean-generic pdf pdf-am ps ps-am tags uninstall \
-	uninstall-am uninstall-man uninstall-man5 uninstall-man8 \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags uninstall uninstall-am uninstall-man uninstall-man5 \
+	uninstall-man8 uninstall-pkglibLTLIBRARIES \
 	uninstall-sbinPROGRAMS
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.

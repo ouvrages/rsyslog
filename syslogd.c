@@ -150,6 +150,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <time.h>
+#include <dlfcn.h>
 
 #include <sys/syslog.h>
 #include <sys/param.h>
@@ -299,6 +300,10 @@ syslogCODE rs_facilitynames[] =
 #define _PATH_LOGCONF	"/etc/rsyslog.conf"
 #endif
 
+#ifndef _PATH_MODDIR
+#define _PATH_MODDIR	"/lib/rsyslog/"
+#endif
+
 #if defined(SYSLOGD_PIDNAME)
 #undef _PATH_LOGPID
 #if defined(FSSTND)
@@ -358,9 +363,9 @@ syslogCODE rs_facilitynames[] =
 
 static uchar	*ConfFile = (uchar*) _PATH_LOGCONF; /* read-only after startup */
 static char	*PidFile = _PATH_LOGPID; /* read-only after startup */
+static char	*ModDir = _PATH_MODDIR; /* read-only after startup */
 char	ctty[] = _PATH_CONSOLE;	/* this is read-only */
 
-int bModMySQLLoaded = 0; /* was a $ModLoad MySQL done? */
 static pid_t myPid;	/* our pid for use in self-generated messages, e.g. on startup */
 /* mypid is read-only after the initial fork() */
 static int debugging_on = 0; /* read-only, except on sig USR1 */
@@ -3547,7 +3552,7 @@ static void die(int sig)
 	/* de-init some modules */
 	modExitIminternal();
 
-	/*TODO: the module config command handlers must also be freed! */
+	unregCfSysLineHdlrs();
 
 	/* TODO: this would also be the right place to de-init the builtin output modules. We
 	 * do not currently do that, because the module interface does not allow for
@@ -3755,28 +3760,56 @@ finalize_it:
  * As of now, it is a dummy, that will later evolve into the
  * loader for plug-ins.
  * rgerhards, 2007-07-21
+ * varmojfekoj added support for dynamically loadable modules on 2007-08-13
  */
 static rsRetVal doModLoad(uchar **pp, __attribute__((unused)) void* pVal)
 {
 	DEFiRet;
 	uchar szName[512];
+        uchar szPath[512];
+        uchar errMsg[1024];
+	uchar *pModName;
+        void *pModHdlr, *pModInit;
 
 	assert(pp != NULL);
 	assert(*pp != NULL);
 
 	if(getSubString(pp, (char*) szName, sizeof(szName) / sizeof(uchar), ' ')  != 0) {
-		logerror("could not extract group name");
+		logerror("could not extract module name");
 		ABORT_FINALIZE(RS_RET_NOT_FOUND);
 	}
 
+	/* this below is a quick and dirty hack to provide compatibility with the
+	 * $ModLoad MySQL forward compatibility statement. TODO: clean this up
+	 * For the time being, it is clean enough, it just needs to be done
+	 * differently when we have a full design for loadable plug-ins. For the
+	 * time being, we just mangle the names a bit.
+	 * rgerhards, 2007-08-14
+	 */
+	if(!strcmp((char*) szName, "MySQL"))
+		pModName = (uchar*) "ommysql.so";
+	else
+		pModName = szName;
+
 	dbgprintf("Requested to load module '%s'\n", szName);
 
-	if(!strcmp((char*)szName, "MySQL")) {
-		bModMySQLLoaded = 1;
-	} else {
-		logerrorSz("$ModLoad with invalid module name '%s' - currently 'MySQL' only supported",
-			   (char*) szName);
+	strncpy((char *) szPath, ModDir, sizeof(szPath));
+	strncat((char *) szPath, (char *) pModName, sizeof(szPath) - strlen(szPath) - 1);
+	if(!(pModHdlr = dlopen((char *) szPath, RTLD_NOW))) {
+		snprintf((char *) errMsg, sizeof(errMsg), "could not load module '%s', dlopen: %s\n", szPath, dlerror());
+		errMsg[sizeof(errMsg)/sizeof(uchar) - 1] = '\0';
+		logerror((char *) errMsg);
+		ABORT_FINALIZE(RS_RET_ERR);
 	}
+	if(!(pModInit = dlsym(pModHdlr, "modInit"))) {
+		snprintf((char *) errMsg, sizeof(errMsg), "could not load module '%s', dlsym: %s\n", szPath, dlerror());
+		errMsg[sizeof(errMsg)/sizeof(uchar) - 1] = '\0';
+		logerror((char *) errMsg);
+		dlclose(pModHdlr);
+		ABORT_FINALIZE(RS_RET_ERR);
+	}
+	if((iRet = doModInit(pModInit, (uchar*) pModName, pModHdlr)) != RS_RET_OK)
+		return iRet;
 
 	skipWhiteSpace(pp); /* skip over any whitespace */
 
@@ -4225,6 +4258,10 @@ static void init(void)
 
 	/*  Close all open log files and free log descriptor array. */
 	freeSelectors();
+
+	/* Unload all non-static modules */
+	dbgprintf("Unloading non-static modules.\n");
+	modUnloadAndDestructDynamic();
 
 	dbgprintf("Clearing templates.\n");
 	tplDeleteNew();
@@ -5613,11 +5650,11 @@ static void mainloop(void)
 #endif
 #endif
 
-	errno = 0;
-	FD_ZERO(&readfds);
-	maxfds = 0;
-
 	while(!bFinished){
+	        errno  = 0;
+	        maxfds = 0;
+	        FD_ZERO (&readfds);
+
 		/* first check if we have any internal messages queued and spit them out */
 		processImInternal();
 
@@ -5805,19 +5842,15 @@ static rsRetVal loadBuildInModules(void)
 {
 	DEFiRet;
 
-	if((iRet = doModInit(modInitFile, (uchar*) "builtin-file")) != RS_RET_OK)
+	if((iRet = doModInit(modInitFile, (uchar*) "builtin-file", NULL)) != RS_RET_OK)
 		return iRet;
 #ifdef SYSLOG_INET
-	if((iRet = doModInit(modInitFwd, (uchar*) "builtin-fwd")) != RS_RET_OK)
+	if((iRet = doModInit(modInitFwd, (uchar*) "builtin-fwd", NULL)) != RS_RET_OK)
 		return iRet;
 #endif
-	if((iRet = doModInit(modInitShell, (uchar*) "builtin-shell")) != RS_RET_OK)
+	if((iRet = doModInit(modInitShell, (uchar*) "builtin-shell", NULL)) != RS_RET_OK)
 		return iRet;
-#	ifdef WITH_DB
-	if((iRet = doModInit(modInitMySQL, (uchar*) "builtin-mysql")) != RS_RET_OK)
-		return iRet;
-#	endif
-	if((iRet = doModInit(modInitDiscard, (uchar*) "builtin-discard")) != RS_RET_OK)
+	if((iRet = doModInit(modInitDiscard, (uchar*) "builtin-discard", NULL)) != RS_RET_OK)
 		return iRet;
 
 	/* dirty, but this must be for the time being: the usrmsg module must always be
@@ -5826,8 +5859,10 @@ static rsRetVal loadBuildInModules(void)
 	 * working with the config file. We may change that implementation so that a user name
 	 * must start with an alnum, that would definitely help (but would it break backwards
 	 * compatibility?). * rgerhards, 2007-07-23
+	 * User names now must begin with:
+	 *   [a-zA-Z0-9_.]
 	 */
-	if((iRet = doModInit(modInitUsrMsg, (uchar*) "builtin-usrmsg")) != RS_RET_OK)
+	if((iRet = doModInit(modInitUsrMsg, (uchar*) "builtin-usrmsg", NULL)) != RS_RET_OK)
 		return iRet;
 
 	/* ok, initialization of the command handler probably does not 100% belong right in
