@@ -2,8 +2,8 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[1.19.7],[rsyslog@lists.adiscon.com.])
-AM_INIT_AUTOMAKE(rsyslog, 1.19.7)
+AC_INIT([rsyslog],[1.19.9],[rsyslog@lists.adiscon.com.])
+AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([syslogd.c])
 AC_CONFIG_HEADER([config.h])
 
@@ -13,6 +13,7 @@ AM_PROG_CC_C_O
 if test "$GCC" = "yes"
 then CFLAGS="$CFLAGS -W -Wall -Wformat-security -Wshadow -Wcast-align -Wpointer-arith -Wmissing-format-attribute -g"
 fi
+AC_DISABLE_STATIC
 AC_PROG_LIBTOOL
 AC_CANONICAL_HOST
 
@@ -30,12 +31,13 @@ esac
 
 # Checks for libraries.
 AC_CHECK_LIB(rt,clock_gettime,,,)
+AC_CHECK_LIB(dl,dlopen,,,)
 
 # Checks for header files.
 AC_HEADER_RESOLV
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS([arpa/inet.h fcntl.h locale.h netdb.h netinet/in.h paths.h stdio_ext.h stdlib.h string.h sys/file.h sys/ioctl.h sys/param.h sys/socket.h sys/time.h syslog.h unistd.h utmp.h])
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h locale.h netdb.h netinet/in.h paths.h stddef.h stdlib.h string.h sys/file.h sys/ioctl.h sys/param.h sys/socket.h sys/time.h syslog.h unistd.h utmp.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -44,6 +46,9 @@ AC_TYPE_OFF_T
 AC_TYPE_PID_T
 AC_TYPE_SIZE_T
 AC_TYPE_SSIZE_T
+AC_TYPE_MODE_T
+AC_TYPE_UID_T
+AC_TYPE_UINT8_T
 AC_HEADER_TIME
 AC_STRUCT_TM
 AC_C_VOLATILE
@@ -57,6 +62,7 @@ $ac_includes_default
 AC_CHECK_MEMBERS([struct sockaddr.sa_len],,,[$sa_includes])
 
 # Checks for library functions.
+AC_FUNC_CHOWN
 AC_FUNC_FORK
 AC_PROG_GCC_TRADITIONAL
 AC_FUNC_MALLOC
@@ -66,7 +72,7 @@ AC_TYPE_SIGNAL
 AC_FUNC_STAT
 AC_FUNC_VPRINTF
 AC_FUNC_WAIT3
-AC_CHECK_FUNCS([setsid alarm gethostbyname gethostname gettimeofday memset regcomp select socket strcasecmp strchr strerror strerror_r strndup strnlen strrchr strstr strtol strtoul uname ttyname_r])
+AC_CHECK_FUNCS([alarm clock_gettime gethostbyname gethostname gettimeofday localtime_r memset mkdir regcomp select setid socket strcasecmp strchr strdup strerror strerror_r strndup strnlen strrchr strstr strtol strtoul uname ttyname_r])
 
 
 # Large file support
@@ -82,40 +88,6 @@ AC_ARG_ENABLE(largefile,
 if test "$enable_largefile" = "no"; then
         AC_DEFINE(NOLARGEFILE, 1, [Defined when large file support is disabled.])
 fi
-
-# SQL support
-AC_ARG_ENABLE(mysql,
-        [AS_HELP_STRING([--enable-mysql],[Enable MySql database support @<:@default=no@:>@])],
-        [case "${enableval}" in
-         yes) enable_mysql="yes" ;;
-          no) enable_mysql="no" ;;
-           *) AC_MSG_ERROR(bad value ${enableval} for --enable-mysql) ;;
-         esac],
-        [enable_mysql=yes]
-)
-AS_IF([test "x$enable_mysql" != "xno"],
-  [AC_CHECK_HEADERS(
-    [mysql/mysql.h],
-    [
-#TODO: re-enable
-#      AC_CHECK_LIB(
-#        [mysqlclient],
-#        [mysql_init],
-#        [
-	  AC_DEFINE([WITH_DB], [1], [MySql database support enabled])
-	  mysql_includes=`mysql_config --cflags`
-	  mysql_libs=`mysql_config --libs`
-#        ],
-#        [AC_MSG_FAILURE([MySQL is missing])],
-#        [-lmysqlclient]
-#      )
-    ],
-    [AC_MSG_FAILURE([MySQL is missing])]
-  )]
-)
-AM_CONDITIONAL(enable_mysql, test x$enable_mysql = xyes)
-AC_SUBST(mysql_includes)
-AC_SUBST(mysql_libs)
 
 # Regular expressions
 AC_ARG_ENABLE(regexp,
@@ -161,8 +133,9 @@ AC_ARG_ENABLE(pthreads,
          esac],
         [enable_pthreads=yes]
 )
-AS_IF([test "x$enable_pthreads" != "xno"],
-  [AC_CHECK_HEADERS(
+
+if test "x$enable_pthreads" != "xno"; then
+  AC_CHECK_HEADERS(
     [pthread.h],
     [
       AC_CHECK_LIB(
@@ -178,8 +151,8 @@ AS_IF([test "x$enable_pthreads" != "xno"],
       )
     ],
     [AC_MSG_FAILURE([pthread is missing])]
-  )]
-)
+  )
+fi
 
 # klogd
 AC_ARG_ENABLE(klogd,
@@ -200,7 +173,7 @@ fi
 #
 AC_MSG_CHECKING(for SYSLOG_UNIXAF support)
 AC_ARG_ENABLE([unix],
-  [AS_HELP_STRING([--disable-unix], [disable support for unix])],
+  [AS_HELP_STRING([--disable-unix], [Disable support for unix])],
   [
     if test "x${enableval}" = "xyes"; then
       AC_MSG_RESULT([yes])
@@ -235,7 +208,7 @@ fi
 #
 AC_MSG_CHECKING(for FSSTND support)
 AC_ARG_ENABLE([fsstnd],
-  [AS_HELP_STRING([--disable-fsstnd], [disable support for FSSTND])],
+  [AS_HELP_STRING([--disable-fsstnd], [Disable support for FSSTND])],
   [
     if test "x${enableval}" = "xyes"; then
       AC_MSG_RESULT([yes])
@@ -264,7 +237,49 @@ if test "$enable_debug" = "no"; then
         AC_DEFINE(NDEBUG, 1, [Defined if debug mode is disabled.])
 fi
 
-AC_CONFIG_FILES([Makefile])
+
+
+# SQL support
+AC_ARG_ENABLE(mysql,
+        [AS_HELP_STRING([--enable-mysql],[Enable MySql database support @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_mysql="yes" ;;
+          no) enable_mysql="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-mysql) ;;
+         esac],
+        [enable_mysql=no]
+)
+if test "x$enable_mysql" = "xyes"; then
+  AC_CHECK_HEADERS(
+    [mysql/mysql.h],,
+    [AC_MSG_FAILURE([MySQL is missing])]
+  )
+  AC_CHECK_PROG(
+    [HAVE_MYSQL_CONFIG],
+    [mysql_config],
+    [yes],,,
+  )
+  if test "x${HAVE_MYSQL_CONFIG}" != "xyes"; then
+    AC_MSG_FAILURE([mysql_config not found in PATH])
+  fi
+  AC_CHECK_LIB(
+    [mysqlclient],
+    [mysql_init],
+    [mysql_cflags=`mysql_config --cflags`
+     mysql_libs=`mysql_config --libs`
+    ],
+    [AC_MSG_FAILURE([MySQL library is missing])],
+    [`mysql_config --libs`]
+  )
+fi
+AM_CONDITIONAL(ENABLE_MYSQL, test x$enable_mysql = xyes)
+AC_SUBST(mysql_cflags)
+AC_SUBST(mysql_libs)
+
+
+
+
+AC_CONFIG_FILES([Makefile doc/Makefile plugins/ommysql/Makefile])
 AC_OUTPUT
 
 echo "****************************************************"

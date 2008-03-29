@@ -1,3 +1,13 @@
+rsyslog (1.19.9-1) unstable; urgency=low
+
+  * New upstream release.
+  * debian/patches/udp_msg_reception.patch
+    - Deleted, merged upstream.
+  * The mysql output plugin is now in a separate subdirectory. Change the
+    path to the createDB.sql script accordingly.
+
+ -- Michael Biebl <biebl@debian.org>  Sun, 14 Oct 2007 11:55:12 +0200
+
 rsyslog (1.19.7-2) unstable; urgency=low
 
   * debian/patches/udp_msg_reception.patch

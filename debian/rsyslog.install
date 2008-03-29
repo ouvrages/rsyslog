@@ -1,4 +1,4 @@
-doc/* /usr/share/doc/rsyslog/html/
+doc/*.html /usr/share/doc/rsyslog/html/
 debian/rsyslog.conf /etc/
 debian/tmp/usr/sbin/
 debian/tmp/usr/share/man/

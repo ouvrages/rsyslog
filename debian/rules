@@ -70,7 +70,7 @@ install: build
 	# Add here commands to install the package into debian/rsyslog.
 	$(MAKE) DESTDIR=$(CURDIR)/debian/tmp install
 
-	cp createDB.sql debian/rsyslog-mysql/usr/share/dbconfig-common/data/rsyslog-mysql/install/mysql
+	cp plugins/ommysql/createDB.sql debian/rsyslog-mysql/usr/share/dbconfig-common/data/rsyslog-mysql/install/mysql
 
 # Build architecture-independent files here.
 binary-indep: build install
