@@ -1,3 +1,17 @@
+rsyslog (2.0.1-2) unstable; urgency=low
+
+  * debian/control
+    - Drop Replaces: system-log-daemon, linux-kernel-log-daemon. There are no
+      conflicting files with other syslog packages so this line is not needed.
+    - Add new package rsyslog-doc.
+    - Add Suggests: rsyslog-doc to rsyslog.
+  * debian/rsyslog.install, debian/rsyslog-doc.install
+    - Move the html files from rsyslog to rsyslog-doc.
+  * debian/rsyslog-doc.doc-base
+    - Integrate the documentation with doc-base.
+
+ -- Michael Biebl <biebl@debian.org>  Sat, 02 Feb 2008 17:00:49 +0100
+
 rsyslog (2.0.1-1) unstable; urgency=low
 
   * New upstream bug fix release.

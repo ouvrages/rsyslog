@@ -8,16 +8,15 @@ Homepage: http://www.rsyslog.com/
 
 Package: rsyslog
 Architecture: any
-Conflicts: linux-kernel-log-daemon, system-log-daemon
-Replaces: linux-kernel-log-daemon, system-log-daemon
-Provides: linux-kernel-log-daemon, system-log-daemon
+Conflicts: system-log-daemon, linux-kernel-log-daemon
+Provides: system-log-daemon, linux-kernel-log-daemon
 Depends: ${shlibs:Depends}, ${misc:Depends}, lsb-base (>= 3.0-6)
 Recommends: logrotate
-Suggests: rsyslog-mysql | rsyslog-pgsql
+Suggests: rsyslog-mysql | rsyslog-pgsql, rsyslog-doc
 Description: enhanced multi-threaded syslogd
  Rsyslog is an enhanced syslogd supporting, amongst others:
   * reliable syslog over TCP and RFC 3195
-  * writing to MySQL databases (via a separate output plugin)
+  * writing to MySQL or PostgreSQL databases (via separate output plugins)
   * permitted sender lists
   * filtering on any part of the syslog message
   * on-the-wire message compression
@@ -28,6 +27,19 @@ Description: enhanced multi-threaded syslogd
  replacement. Its advanced features make it suitable for enterprise-class,
  encryption protected syslog relay chains while at the same time being very
  easy to setup for the novice user.
+
+Package: rsyslog-doc
+Section: doc
+Architecture: all
+Conflicts: rsyslog (<< 2.0.1-2)
+Replaces: rsyslog (<< 2.0.1-2)
+Suggests: doc-base
+Description: documentation for rsyslog
+ This package contains detailed HTML documentation of rsyslog.
+ .
+ It describes the general configuration file syntax, like filters, actions and
+ templates and has detailed information for all available configuration 
+ directives.
 
 Package: rsyslog-mysql
 Architecture: any
