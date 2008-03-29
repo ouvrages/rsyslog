@@ -1,8 +1,8 @@
 #! /bin/sh
 ### BEGIN INIT INFO
 # Provides:          syslog
-# Required-Start:    $local_fs $time
-# Required-Stop:     $local_fs $time
+# Required-Start:    $remote_fs $time
+# Required-Stop:     $remote_fs $time
 # Should-Start:      $network
 # Should-Stop:       $network
 # Default-Start:     2 3 4 5
