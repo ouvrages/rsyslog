@@ -81,7 +81,6 @@ do_stop()
 	#   other if a failure occurred
 	start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile $PIDFILE --name $NAME
 	RETVAL="$?"
-	#rm -f $PIDFILE
 	return "$RETVAL"
 }
 
@@ -109,7 +108,6 @@ case "$1" in
 	create_xconsole
 	do_start "$RSYSLOGD_BIN" "$RSYSLOGD_OPTIONS" "$RSYSLOGD_PIDFILE"
 	case "$?" in
-#		0|1) log_end_msg 0 ;;
 		2) log_end_msg 1 ;;
 	esac
 
@@ -124,7 +122,6 @@ case "$1" in
 	log_daemon_msg "Stopping $DESC" "$RKLOGD"
 	do_stop "$RKLOGD" "$RKLOGD_PIDFILE"
 	case "$?" in
-#		0|1) log_end_msg 0 ;;
 		2) log_end_msg 1 ;;
 	esac
 	log_progress_msg "$RSYSLOGD"
