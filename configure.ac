@@ -2,8 +2,8 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[1.19.3],[rsyslog@lists.adiscon.com.])
-AM_INIT_AUTOMAKE(rsyslog, 1.19.3)
+AC_INIT([rsyslog],[1.19.7],[rsyslog@lists.adiscon.com.])
+AM_INIT_AUTOMAKE(rsyslog, 1.19.7)
 AC_CONFIG_SRCDIR([syslogd.c])
 AC_CONFIG_HEADER([config.h])
 
@@ -66,7 +66,7 @@ AC_TYPE_SIGNAL
 AC_FUNC_STAT
 AC_FUNC_VPRINTF
 AC_FUNC_WAIT3
-AC_CHECK_FUNCS([setsid alarm gethostbyname gethostname gettimeofday memset regcomp select socket strcasecmp strchr strerror strndup strnlen strrchr strstr strtol strtoul uname])
+AC_CHECK_FUNCS([setsid alarm gethostbyname gethostname gettimeofday memset regcomp select socket strcasecmp strchr strerror strerror_r strndup strnlen strrchr strstr strtol strtoul uname ttyname_r])
 
 
 # Large file support
@@ -268,7 +268,7 @@ AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
 
 echo "****************************************************"
-echo "rsyslog will be compiled with the followig settings:"
+echo "rsyslog will be compiled with the following settings:"
 echo
 echo "Multithreading support enabled:		$enable_pthreads"
 echo "Klogd functionality enabled:		$enable_klogd"

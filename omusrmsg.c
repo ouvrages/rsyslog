@@ -158,6 +158,7 @@ static rsRetVal wallmsg(uchar* pMsg, instanceData *pData)
 	static int reenter = 0;
 	struct utmp ut;
 	struct utmp *uptr;
+	struct sigaction sigAct;
 
 	assert(pMsg != NULL);
 
@@ -172,12 +173,18 @@ static rsRetVal wallmsg(uchar* pMsg, instanceData *pData)
 	 * and doing notty().
 	 */
 	if (fork() == 0) {
-		signal(SIGTERM, SIG_DFL);
+		memset(&sigAct, 0, sizeof(sigAct));
+		sigemptyset(&sigAct.sa_mask);
+		sigAct.sa_handler = SIG_DFL;
+		sigaction(SIGTERM, &sigAct, NULL);
 		alarm(0);
+
 #		ifdef		SIGTTOU
-		signal(SIGTTOU, SIG_IGN);
+		sigAct.sa_handler = SIG_DFL;
+		sigaction(SIGTERM, &sigAct, NULL);
 #		endif
-		sigsetmask(0);
+		/* It is save to call sigprocmask here, as we are now executing the child (no threads) */
+		sigprocmask(SIG_SETMASK, &sigAct.sa_mask, NULL);
 	/* TODO: find a way to limit the max size of the message. hint: this
 	 * should go into the template!
 	 */
@@ -219,7 +226,8 @@ static rsRetVal wallmsg(uchar* pMsg, instanceData *pData)
 			strncat(p, ut.ut_line, UNAMESZ);
 
 			if (setjmp(ttybuf) == 0) {
-				(void) signal(SIGALRM, endtty);
+				sigAct.sa_handler = endtty;
+				sigaction(SIGALRM, &sigAct, NULL);
 				(void) alarm(15);
 				/* open the terminal */
 				ttyf = open(p, O_WRONLY|O_NOCTTY);
@@ -262,10 +270,6 @@ BEGINparseSelectorAct
 CODESTARTparseSelectorAct
 CODE_STD_STRING_REQUESTparseSelectorAct(1)
 
-#if 0 /* TODO: think about it and activate later - see comments in else below */
-	if(**pp != '*')
-		return RS_RET_CONFLINE_UNPROCESSED;
-#endif
        /* User names must begin with a gnu e-regex:
         *   [a-zA-Z0-9_.]
 	* plus '*' for wall

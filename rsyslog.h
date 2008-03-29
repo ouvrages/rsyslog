@@ -70,6 +70,9 @@ enum rsRetVal_				/** return value. All methods return this if not specified oth
 	RS_RET_INVALID_PARAMS = -2016,/**< supplied parameters are invalid */
 	RS_RET_EMPTY_LIST = -2017, /**< linked list is empty */
 	RS_RET_FINISHED = -2018, /**< some opertion is finished, not an error state */
+	RS_RET_INVALID_SOURCE = -2019, /**< source (address) invalid for some reason */
+	RS_RET_ADDRESS_UNKNOWN = -2020, /**< an address is unknown - not necessarily an error */
+	RS_RET_MALICIOUS_ENTITY = -2021, /**< there is an malicious entity involved */
 	RS_RET_OK = 0			/**< operation successful */
 };
 typedef enum rsRetVal_ rsRetVal; /**< friendly type for global return value */
@@ -81,6 +84,8 @@ typedef enum rsRetVal_ rsRetVal; /**< friendly type for global return value */
 #define CHKiRet(code) if((iRet = code) != RS_RET_OK) goto finalize_it
 /* macro below is to be used if we need our own handling, eg for cleanup */
 #define CHKiRet_Hdlr(code) if((iRet = code) != RS_RET_OK)
+/* macro below is used in conjunction with CHKiRet_Hdlr, else use ABORT_FINALIZE */
+#define FINALIZE goto finalize_it;
 #define DEFiRet rsRetVal iRet = RS_RET_OK
 #define ABORT_FINALIZE(errCode)			\
 	do {					\
