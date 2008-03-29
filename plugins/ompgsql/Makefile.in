@@ -32,7 +32,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-subdir = plugins/ommysql
+subdir = plugins/ompgsql
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -51,12 +51,12 @@ am__installdirs = "$(DESTDIR)$(pkglibdir)"
 pkglibLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(pkglib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
-ommysql_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
-am_ommysql_la_OBJECTS = ommysql_la-ommysql.lo
-ommysql_la_OBJECTS = $(am_ommysql_la_OBJECTS)
-ommysql_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
+ompgsql_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
+am_ompgsql_la_OBJECTS = ompgsql_la-ompgsql.lo
+ompgsql_la_OBJECTS = $(am_ompgsql_la_OBJECTS)
+ompgsql_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
-	$(ommysql_la_LDFLAGS) $(LDFLAGS) -o $@
+	$(ompgsql_la_LDFLAGS) $(LDFLAGS) -o $@
 DEFAULT_INCLUDES = -I. -I$(top_builddir)@am__isrc@
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -69,8 +69,8 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-SOURCES = $(ommysql_la_SOURCES)
-DIST_SOURCES = $(ommysql_la_SOURCES)
+SOURCES = $(ompgsql_la_SOURCES)
+DIST_SOURCES = $(ompgsql_la_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -192,12 +192,12 @@ target_alias = @target_alias@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 zlib_libs = @zlib_libs@
-pkglib_LTLIBRARIES = ommysql.la
-ommysql_la_SOURCES = ommysql.c ommysql.h ../../module-template.h
-ommysql_la_CPPFLAGS = $(mysql_cflags) -I$(srcdir)/../.. $(pthreads_cflags)
-ommysql_la_LDFLAGS = -module -avoid-version
-ommysql_la_LIBADD = $(mysql_libs)
-EXTRA_DIST = createDB.sql contrib/delete_mysql 
+pkglib_LTLIBRARIES = ompgsql.la
+ompgsql_la_SOURCES = ompgsql.c ompgsql.h ../../module-template.h
+ompgsql_la_CPPFLAGS = $(pgsql_cflags) -I$(srcdir)/../..
+ompgsql_la_LDFLAGS = -module -avoid-version
+ompgsql_la_LIBADD = $(pgsql_libs)
+EXTRA_DIST = createDB.sql
 all: all-am
 
 .SUFFIXES:
@@ -211,9 +211,9 @@ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu  plugins/ommysql/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu  plugins/ompgsql/Makefile'; \
 	cd $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu  plugins/ommysql/Makefile
+	  $(AUTOMAKE) --gnu  plugins/ompgsql/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -258,8 +258,8 @@ clean-pkglibLTLIBRARIES:
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
-ommysql.la: $(ommysql_la_OBJECTS) $(ommysql_la_DEPENDENCIES) 
-	$(ommysql_la_LINK) -rpath $(pkglibdir) $(ommysql_la_OBJECTS) $(ommysql_la_LIBADD) $(LIBS)
+ompgsql.la: $(ompgsql_la_OBJECTS) $(ompgsql_la_DEPENDENCIES) 
+	$(ompgsql_la_LINK) -rpath $(pkglibdir) $(ompgsql_la_OBJECTS) $(ompgsql_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -267,7 +267,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ommysql_la-ommysql.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ompgsql_la-ompgsql.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -290,12 +290,12 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LTCOMPILE) -c -o $@ $<
 
-ommysql_la-ommysql.lo: ommysql.c
-@am__fastdepCC_TRUE@	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(ommysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ommysql_la-ommysql.lo -MD -MP -MF $(DEPDIR)/ommysql_la-ommysql.Tpo -c -o ommysql_la-ommysql.lo `test -f 'ommysql.c' || echo '$(srcdir)/'`ommysql.c
-@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/ommysql_la-ommysql.Tpo $(DEPDIR)/ommysql_la-ommysql.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='ommysql.c' object='ommysql_la-ommysql.lo' libtool=yes @AMDEPBACKSLASH@
+ompgsql_la-ompgsql.lo: ompgsql.c
+@am__fastdepCC_TRUE@	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(ompgsql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ompgsql_la-ompgsql.lo -MD -MP -MF $(DEPDIR)/ompgsql_la-ompgsql.Tpo -c -o ompgsql_la-ompgsql.lo `test -f 'ompgsql.c' || echo '$(srcdir)/'`ompgsql.c
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/ompgsql_la-ompgsql.Tpo $(DEPDIR)/ompgsql_la-ompgsql.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='ompgsql.c' object='ompgsql_la-ompgsql.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(ommysql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ommysql_la-ommysql.lo `test -f 'ommysql.c' || echo '$(srcdir)/'`ommysql.c
+@am__fastdepCC_FALSE@	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(ompgsql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ompgsql_la-ompgsql.lo `test -f 'ompgsql.c' || echo '$(srcdir)/'`ompgsql.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

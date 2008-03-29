@@ -48,6 +48,9 @@
 #else
 #include <sys/msgbuf.h>
 #endif
+#if HAVE_PATHS_H
+#include <paths.h>
+#endif
 #include "srUtils.h"
 #include "stringbuf.h"
 #include "syslogd-types.h"
@@ -327,6 +330,11 @@ ENDonSelectReadyWrite
 BEGINgetWriteFDForSelect
 CODESTARTgetWriteFDForSelect
 ENDgetWriteFDForSelect
+
+
+BEGINmodExit
+CODESTARTmodExit
+ENDmodExit
 
 
 BEGINqueryEtryPt

@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[1.19.12],[rsyslog@lists.adiscon.com.])
+AC_INIT([rsyslog],[1.20.1],[rsyslog@lists.adiscon.com.])
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([syslogd.c])
 AC_CONFIG_HEADER([config.h])
@@ -30,8 +30,17 @@ case "${host}" in
 esac
 
 # Checks for libraries.
-AC_CHECK_LIB(rt,clock_gettime,,,)
-AC_CHECK_LIB(dl,dlopen,,,)
+save_LIBS=$LIBS
+LIBS=
+AC_SEARCH_LIBS(clock_gettime, rt)
+rt_libs=$LIBS
+LIBS=
+AC_SEARCH_LIBS(dlopen, dl)
+dl_libs=$LIBS
+LIBS=$save_LIBS
+
+AC_SUBST(rt_libs)
+AC_SUBST(dl_libs)
 
 # Checks for header files.
 AC_HEADER_RESOLV
@@ -121,6 +130,28 @@ if test "$enable_zlib" = "yes"; then
                          zlib_libs="-lz"
                          AC_SUBST(zlib_libs)], enable_zlib="false")
 	fi
+fi
+
+#gssapi
+AC_ARG_ENABLE(gssapi_krb5,
+	[AS_HELP_STRING([--enable-gssapi-krb5],[Enable GSSAPI Kerberos 5 support @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) want_gssapi_krb5="yes" ;;
+          no) want_gssapi_krb5="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-gssapi-krb5) ;;
+         esac],
+	[want_gssapi_krb5=no]
+)
+if test $want_gssapi_krb5 = yes; then
+	AC_CHECK_LIB(gssapi_krb5, gss_acquire_cred, [
+		AC_CHECK_HEADER(gssapi/gssapi.h, [
+			AC_MSG_ERROR(GSS-API not ready for primt time yet -- wait for next release);
+			AC_DEFINE(USE_GSSAPI,,
+				  Define if you want to use GSSAPI)
+			gss_libs="-lgssapi_krb5"
+			AC_SUBST(gss_libs)
+		])
+	])
 fi
 
 # multithreading via pthreads
@@ -241,7 +272,7 @@ fi
 
 
 
-# SQL support
+# MySQL support
 AC_ARG_ENABLE(mysql,
         [AS_HELP_STRING([--enable-mysql],[Enable MySql database support @<:@default=no@:>@])],
         [case "${enableval}" in
@@ -278,21 +309,55 @@ AM_CONDITIONAL(ENABLE_MYSQL, test x$enable_mysql = xyes)
 AC_SUBST(mysql_cflags)
 AC_SUBST(mysql_libs)
 
+# PostgreSQL support
+AC_ARG_ENABLE(pgsql,
+        [AS_HELP_STRING([--enable-pgsql],[Enable PostgreSQL database support @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_pgsql="yes" ;;
+          no) enable_pgsql="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-pgsql) ;;
+         esac],
+        [enable_pgsql=no]
+)
+if test "x$enable_pgsql" = "xyes"; then
+  AC_CHECK_PROG(
+    [HAVE_PGSQL_CONFIG],
+    [pg_config],
+    [yes],,,
+  )
+  if test "x${HAVE_PGSQL_CONFIG}" != "xyes"; then
+    AC_MSG_FAILURE([pg_config not found in PATH])
+  fi
+  AC_CHECK_LIB(
+    [pq],
+    [PQconnectdb],
+    [pgsql_cflags="-I`pg_config --includedir`"
+     pgsql_libs="`pg_config --libdir` -lpq"
+    ],
+    [AC_MSG_FAILURE([PgSQL library is missing])],
+    [-L`pg_config --libdir`]
+  )
+fi
+AM_CONDITIONAL(ENABLE_PGSQL, test x$enable_pgsql = xyes)
+AC_SUBST(pgsql_cflags)
+AC_SUBST(pgsql_libs)
 
 
 
-AC_CONFIG_FILES([Makefile doc/Makefile plugins/ommysql/Makefile])
+AC_CONFIG_FILES([Makefile doc/Makefile plugins/ommysql/Makefile plugins/ompgsql/Makefile])
 AC_OUTPUT
 
 echo "****************************************************"
 echo "rsyslog will be compiled with the following settings:"
 echo
-echo "Multithreading support enabled:		$enable_pthreads"
-echo "Klogd functionality enabled:		$enable_klogd"
-echo "Regular expressions support enabled:	$enable_regexp"
-echo "Zlib compression support enabled:	$enable_zlib"
-echo "MySql support enabled:			$enable_mysql"
-echo "Large file support enabled:		$enable_largefile"
-echo "Networking support enabled:		$enable_inet"
-echo "Debug mode enabled:			$enable_debug"
+echo "Multithreading support enabled:           $enable_pthreads"
+echo "Klogd functionality enabled:              $enable_klogd"
+echo "Regular expressions support enabled:      $enable_regexp"
+echo "Zlib compression support enabled:         $enable_zlib"
+echo "MySql support enabled:                    $enable_mysql"
+echo "PostgreSQL support enabled:               $enable_pgsql"
+echo "Large file support enabled:               $enable_largefile"
+echo "Networking support enabled:               $enable_inet"
+echo "Enable GSSAPI Kerberos 5 support:         $want_gssapi_krb5"
+echo "Debug mode enabled:                       $enable_debug"
 

@@ -376,6 +376,7 @@ static rsRetVal doGetWord(uchar **pp, rsRetVal (*pSetHdlr)(void*, uchar*), void 
 	CHKiRet(rsCStrFinish(pStrB));
 
 	CHKiRet(rsCStrConvSzStrAndDestruct(pStrB, &pNewVal, 0));
+	pStrB = NULL;
 
 	/* we got the word, now set it */
 	if(pSetHdlr == NULL) {
@@ -430,6 +431,33 @@ finalize_it:
 	*ppThis = pThis;
 	return iRet;
 }
+
+/* destructor for linked list keys. As we do not use any dynamic memory,
+ * we simply return. However, this entry point must be defined for the 
+ * linkedList class to make sure we have not forgotten a destructor.
+ * rgerhards, 2007-11-21
+ */
+static rsRetVal cslchKeyDestruct(void __attribute__((unused)) *pData)
+{
+	return RS_RET_OK;
+}
+
+
+/* Key compare operation for linked list class. This compares two
+ * owner cookies (void *).
+ * rgerhards, 2007-11-21
+ */
+static int cslchKeyCompare(void *pKey1, void *pKey2)
+{
+	if(pKey1 == pKey2)
+		return 0;
+	else
+		if(pKey1 < pKey2)
+			return -1;
+		else
+			return 1;
+}
+
 
 /* set data members for this object
  */
@@ -535,7 +563,7 @@ static rsRetVal cslcConstruct(cslCmd_t **ppThis, int bChainingPermitted)
 
 	pThis->bChainingPermitted = bChainingPermitted;
 
-	CHKiRet(llInit(&pThis->llCmdHdlrs, cslchDestruct, NULL, NULL));
+	CHKiRet(llInit(&pThis->llCmdHdlrs, cslchDestruct, cslchKeyDestruct, cslchKeyCompare));
 
 finalize_it:
 	*ppThis = pThis;
@@ -545,7 +573,7 @@ finalize_it:
 
 /* add a handler entry to a known command
  */
-static rsRetVal cslcAddHdlr(cslCmd_t *pThis, ecslCmdHdrlType eType, rsRetVal (*pHdlr)(), void *pData)
+static rsRetVal cslcAddHdlr(cslCmd_t *pThis, ecslCmdHdrlType eType, rsRetVal (*pHdlr)(), void *pData, void *pOwnerCookie)
 {
 	DEFiRet;
 	cslCmdHdlr_t *pCmdHdlr = NULL;
@@ -554,7 +582,7 @@ static rsRetVal cslcAddHdlr(cslCmd_t *pThis, ecslCmdHdrlType eType, rsRetVal (*p
 
 	CHKiRet(cslchConstruct(&pCmdHdlr));
 	CHKiRet(cslchSetEntry(pCmdHdlr, eType, pHdlr, pData));
-	CHKiRet(llAppend(&pThis->llCmdHdlrs, NULL, pCmdHdlr));
+	CHKiRet(llAppend(&pThis->llCmdHdlrs, pOwnerCookie, pCmdHdlr));
 
 finalize_it:
 	if(iRet != RS_RET_OK) {
@@ -586,7 +614,8 @@ finalize_it:
  * caller does not need to take care of that. The caller must, however,
  * free pCmdName if he allocated it dynamically! -- rgerhards, 2007-08-09
  */
-rsRetVal regCfSysLineHdlr(uchar *pCmdName, int bChainingPermitted, ecslCmdHdrlType eType, rsRetVal (*pHdlr)(), void *pData)
+rsRetVal regCfSysLineHdlr(uchar *pCmdName, int bChainingPermitted, ecslCmdHdrlType eType, rsRetVal (*pHdlr)(), void *pData,
+			  void *pOwnerCookie)
 {
 	cslCmd_t *pThis;
 	uchar *pMyCmdName;
@@ -596,7 +625,7 @@ rsRetVal regCfSysLineHdlr(uchar *pCmdName, int bChainingPermitted, ecslCmdHdrlTy
 	if(iRet == RS_RET_NOT_FOUND) {
 		/* new command */
 		CHKiRet(cslcConstruct(&pThis, bChainingPermitted));
-		CHKiRet_Hdlr(cslcAddHdlr(pThis, eType, pHdlr, pData)) {
+		CHKiRet_Hdlr(cslcAddHdlr(pThis, eType, pHdlr, pData, pOwnerCookie)) {
 			cslcDestruct(pThis);
 			goto finalize_it;
 		}
@@ -616,7 +645,7 @@ rsRetVal regCfSysLineHdlr(uchar *pCmdName, int bChainingPermitted, ecslCmdHdrlTy
 		if(pThis->bChainingPermitted == 0 || bChainingPermitted == 0) {
 			ABORT_FINALIZE(RS_RET_CHAIN_NOT_PERMITTED);
 		}
-		CHKiRet_Hdlr(cslcAddHdlr(pThis, eType, pHdlr, pData)) {
+		CHKiRet_Hdlr(cslcAddHdlr(pThis, eType, pHdlr, pData, pOwnerCookie)) {
 			cslcDestruct(pThis);
 			goto finalize_it;
 		}
@@ -630,6 +659,50 @@ finalize_it:
 rsRetVal unregCfSysLineHdlrs(void)
 {
 	return llDestroy(&llCmdList);
+}
+
+
+/* helper function for unregCfSysLineHdlrs4Owner(). This is used to see if there is
+ * a handler of this owner inside the element and, if so, remove it. Please note that
+ * it keeps track of a pointer to the last linked list entry, as this is needed to
+ * remove an entry from the list.
+ * rgerhards, 2007-11-21
+ */
+DEFFUNC_llExecFunc(unregHdlrsHeadExec)
+{
+	DEFiRet;
+	cslCmd_t *pListHdr = (cslCmd_t*) pData;
+	int iNumElts;
+
+	/* first find element */
+	iRet = llFindAndDelete(&(pListHdr->llCmdHdlrs), pParam);
+
+	/* now go back and check how many elements are left */
+	CHKiRet(llGetNumElts(&(pListHdr->llCmdHdlrs), &iNumElts));
+
+	if(iNumElts == 0) {
+		/* nothing left in header, so request to delete it */
+		iRet = RS_RET_OK_DELETE_LISTENTRY;
+	}
+
+finalize_it:
+	return iRet;
+}
+/* unregister and destroy cfSysLineHandlers for a specific owner. This method is
+ * most importantly used before unloading a loadable module providing some handlers.
+ * The full list of handlers is searched. If the to-be removed handler was the only
+ * handler for a directive name, the directive header, too, is deleted.
+ * rgerhards, 2007-11-21
+ */
+rsRetVal unregCfSysLineHdlrs4Owner(void *pOwnerCookie)
+{
+	DEFiRet;
+	/* we need to walk through all directive names, as the linked list
+	 * class does not provide a way to just search the lower-level handlers.
+	 */
+	iRet = llExecFunc(&llCmdList, unregHdlrsHeadExec, pOwnerCookie);
+
+	return iRet;
 }
 
 
@@ -707,8 +780,9 @@ void dbgPrintCfSysLineHandlers(void)
 		llCookieCmdHdlr = NULL;
 		while((iRet = llGetNextElt(&pCmd->llCmdHdlrs, &llCookieCmdHdlr, (void*)&pCmdHdlr)) == RS_RET_OK) {
 			printf("\t\ttype : %d\n", pCmdHdlr->eType);
-			printf("\t\tpData: 0x%x\n", (unsigned) pCmdHdlr->pData);
-			printf("\t\tHdlr : 0x%x\n", (unsigned) pCmdHdlr->cslCmdHdlr);
+			printf("\t\tpData: 0x%lx\n", (unsigned long) pCmdHdlr->pData);
+			printf("\t\tHdlr : 0x%lx\n", (unsigned long) pCmdHdlr->cslCmdHdlr);
+			printf("\t\tOwner: 0x%lx\n", (unsigned long) llCookieCmdHdlr->pKey);
 			printf("\n");
 		}
 	}

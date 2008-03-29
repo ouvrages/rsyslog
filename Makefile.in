@@ -34,6 +34,7 @@ build_triplet = @build@
 host_triplet = @host@
 sbin_PROGRAMS = rklogd$(EXEEXT) rfc3195d$(EXEEXT) rsyslogd$(EXEEXT)
 @ENABLE_MYSQL_TRUE@am__append_1 = plugins/ommysql
+@ENABLE_PGSQL_TRUE@am__append_2 = plugins/ompgsql
 subdir = .
 DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
@@ -64,16 +65,20 @@ am_rsyslogd_OBJECTS = rsyslogd-syslogd.$(OBJEXT) \
 	rsyslogd-pidfile.$(OBJEXT) rsyslogd-template.$(OBJEXT) \
 	rsyslogd-outchannel.$(OBJEXT) rsyslogd-stringbuf.$(OBJEXT) \
 	rsyslogd-srUtils.$(OBJEXT) rsyslogd-parse.$(OBJEXT) \
-	rsyslogd-net.$(OBJEXT) rsyslogd-msg.$(OBJEXT) \
+	rsyslogd-sync.$(OBJEXT) rsyslogd-net.$(OBJEXT) \
+	rsyslogd-msg.$(OBJEXT) rsyslogd-expr.$(OBJEXT) \
 	rsyslogd-omshell.$(OBJEXT) rsyslogd-omusrmsg.$(OBJEXT) \
 	rsyslogd-omfwd.$(OBJEXT) rsyslogd-tcpsyslog.$(OBJEXT) \
 	rsyslogd-omfile.$(OBJEXT) rsyslogd-omdiscard.$(OBJEXT) \
 	rsyslogd-modules.$(OBJEXT) rsyslogd-objomsr.$(OBJEXT) \
 	rsyslogd-cfsysline.$(OBJEXT) rsyslogd-linkedlist.$(OBJEXT) \
-	rsyslogd-iminternal.$(OBJEXT) rsyslogd-action.$(OBJEXT)
+	rsyslogd-iminternal.$(OBJEXT) rsyslogd-action.$(OBJEXT) \
+	rsyslogd-gss-misc.$(OBJEXT)
 rsyslogd_OBJECTS = $(am_rsyslogd_OBJECTS)
 am__DEPENDENCIES_1 =
-rsyslogd_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+rsyslogd_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 rsyslogd_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(rsyslogd_LDFLAGS) \
 	$(LDFLAGS) -o $@
@@ -107,7 +112,7 @@ RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
 ETAGS = etags
 CTAGS = ctags
-DIST_SUBDIRS = doc plugins/ommysql
+DIST_SUBDIRS = doc plugins/ommysql plugins/ompgsql
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)
@@ -148,6 +153,7 @@ F77 = @F77@
 FFLAGS = @FFLAGS@
 GREP = @GREP@
 HAVE_MYSQL_CONFIG = @HAVE_MYSQL_CONFIG@
+HAVE_PGSQL_CONFIG = @HAVE_PGSQL_CONFIG@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -196,9 +202,11 @@ build_vendor = @build_vendor@
 builddir = @builddir@
 datadir = @datadir@
 datarootdir = @datarootdir@
+dl_libs = @dl_libs@
 docdir = @docdir@
 dvidir = @dvidir@
 exec_prefix = @exec_prefix@
+gss_libs = @gss_libs@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@
@@ -218,11 +226,14 @@ mysql_cflags = @mysql_cflags@
 mysql_libs = @mysql_libs@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
+pgsql_cflags = @pgsql_cflags@
+pgsql_libs = @pgsql_libs@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
 pthreads_cflags = @pthreads_cflags@
 pthreads_libs = @pthreads_libs@
+rt_libs = @rt_libs@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -260,10 +271,13 @@ rsyslogd_SOURCES = \
 	template.h \
 	outchannel.h \
 	liblogging-stub.h \
+	sync.c \
+	sync.h \
 	net.c \
 	net.h \
 	msg.c \
 	msg.h \
+	expr.c \
 	omshell.c \
 	omshell.h \
 	omusrmsg.c \
@@ -288,10 +302,12 @@ rsyslogd_SOURCES = \
 	iminternal.c \
 	iminternal.h \
 	action.c \
-	action.h
+	action.h \
+	gss-misc.c \
+	gss-misc.h
 
 rsyslogd_CPPFLAGS = -D_PATH_MODDIR=\"$(pkglibdir)/\" $(pthreads_cflags)
-rsyslogd_LDADD = $(zlib_libs) $(pthreads_libs) -ldl
+rsyslogd_LDADD = $(zlib_libs) $(pthreads_libs) $(gss_libs) $(dl_libs) $(rt_libs)
 rsyslogd_LDFLAGS = -export-dynamic
 man_MANS = rfc3195d.8 rklogd.8 rsyslogd.8 rsyslog.conf.5 
 EXTRA_DIST = \
@@ -304,7 +320,7 @@ EXTRA_DIST = \
 	contrib/README \
 	$(man_MANS)
 
-SUBDIRS = doc $(am__append_1)
+SUBDIRS = doc $(am__append_1) $(am__append_2)
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
@@ -411,6 +427,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rfc3195d.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-action.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-cfsysline.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-expr.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-gss-misc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-iminternal.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-linkedlist.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-modules.Po@am__quote@
@@ -427,6 +445,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-pidfile.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-srUtils.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-stringbuf.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-sync.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-syslogd.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-tcpsyslog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-template.Po@am__quote@
@@ -551,6 +570,20 @@ rsyslogd-parse.obj: parse.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rsyslogd-parse.obj `if test -f 'parse.c'; then $(CYGPATH_W) 'parse.c'; else $(CYGPATH_W) '$(srcdir)/parse.c'; fi`
 
+rsyslogd-sync.o: sync.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rsyslogd-sync.o -MD -MP -MF $(DEPDIR)/rsyslogd-sync.Tpo -c -o rsyslogd-sync.o `test -f 'sync.c' || echo '$(srcdir)/'`sync.c
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/rsyslogd-sync.Tpo $(DEPDIR)/rsyslogd-sync.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='sync.c' object='rsyslogd-sync.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rsyslogd-sync.o `test -f 'sync.c' || echo '$(srcdir)/'`sync.c
+
+rsyslogd-sync.obj: sync.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rsyslogd-sync.obj -MD -MP -MF $(DEPDIR)/rsyslogd-sync.Tpo -c -o rsyslogd-sync.obj `if test -f 'sync.c'; then $(CYGPATH_W) 'sync.c'; else $(CYGPATH_W) '$(srcdir)/sync.c'; fi`
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/rsyslogd-sync.Tpo $(DEPDIR)/rsyslogd-sync.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='sync.c' object='rsyslogd-sync.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rsyslogd-sync.obj `if test -f 'sync.c'; then $(CYGPATH_W) 'sync.c'; else $(CYGPATH_W) '$(srcdir)/sync.c'; fi`
+
 rsyslogd-net.o: net.c
 @am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rsyslogd-net.o -MD -MP -MF $(DEPDIR)/rsyslogd-net.Tpo -c -o rsyslogd-net.o `test -f 'net.c' || echo '$(srcdir)/'`net.c
 @am__fastdepCC_TRUE@	mv -f $(DEPDIR)/rsyslogd-net.Tpo $(DEPDIR)/rsyslogd-net.Po
@@ -578,6 +611,20 @@ rsyslogd-msg.obj: msg.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='msg.c' object='rsyslogd-msg.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rsyslogd-msg.obj `if test -f 'msg.c'; then $(CYGPATH_W) 'msg.c'; else $(CYGPATH_W) '$(srcdir)/msg.c'; fi`
+
+rsyslogd-expr.o: expr.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rsyslogd-expr.o -MD -MP -MF $(DEPDIR)/rsyslogd-expr.Tpo -c -o rsyslogd-expr.o `test -f 'expr.c' || echo '$(srcdir)/'`expr.c
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/rsyslogd-expr.Tpo $(DEPDIR)/rsyslogd-expr.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='expr.c' object='rsyslogd-expr.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rsyslogd-expr.o `test -f 'expr.c' || echo '$(srcdir)/'`expr.c
+
+rsyslogd-expr.obj: expr.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rsyslogd-expr.obj -MD -MP -MF $(DEPDIR)/rsyslogd-expr.Tpo -c -o rsyslogd-expr.obj `if test -f 'expr.c'; then $(CYGPATH_W) 'expr.c'; else $(CYGPATH_W) '$(srcdir)/expr.c'; fi`
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/rsyslogd-expr.Tpo $(DEPDIR)/rsyslogd-expr.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='expr.c' object='rsyslogd-expr.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rsyslogd-expr.obj `if test -f 'expr.c'; then $(CYGPATH_W) 'expr.c'; else $(CYGPATH_W) '$(srcdir)/expr.c'; fi`
 
 rsyslogd-omshell.o: omshell.c
 @am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rsyslogd-omshell.o -MD -MP -MF $(DEPDIR)/rsyslogd-omshell.Tpo -c -o rsyslogd-omshell.o `test -f 'omshell.c' || echo '$(srcdir)/'`omshell.c
@@ -746,6 +793,20 @@ rsyslogd-action.obj: action.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='action.c' object='rsyslogd-action.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rsyslogd-action.obj `if test -f 'action.c'; then $(CYGPATH_W) 'action.c'; else $(CYGPATH_W) '$(srcdir)/action.c'; fi`
+
+rsyslogd-gss-misc.o: gss-misc.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rsyslogd-gss-misc.o -MD -MP -MF $(DEPDIR)/rsyslogd-gss-misc.Tpo -c -o rsyslogd-gss-misc.o `test -f 'gss-misc.c' || echo '$(srcdir)/'`gss-misc.c
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/rsyslogd-gss-misc.Tpo $(DEPDIR)/rsyslogd-gss-misc.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='gss-misc.c' object='rsyslogd-gss-misc.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rsyslogd-gss-misc.o `test -f 'gss-misc.c' || echo '$(srcdir)/'`gss-misc.c
+
+rsyslogd-gss-misc.obj: gss-misc.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rsyslogd-gss-misc.obj -MD -MP -MF $(DEPDIR)/rsyslogd-gss-misc.Tpo -c -o rsyslogd-gss-misc.obj `if test -f 'gss-misc.c'; then $(CYGPATH_W) 'gss-misc.c'; else $(CYGPATH_W) '$(srcdir)/gss-misc.c'; fi`
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/rsyslogd-gss-misc.Tpo $(DEPDIR)/rsyslogd-gss-misc.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='gss-misc.c' object='rsyslogd-gss-misc.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rsyslogd-gss-misc.obj `if test -f 'gss-misc.c'; then $(CYGPATH_W) 'gss-misc.c'; else $(CYGPATH_W) '$(srcdir)/gss-misc.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo

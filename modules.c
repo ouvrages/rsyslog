@@ -42,7 +42,7 @@
 #include "modules.h"
 
 static modInfo_t *pLoadedModules = NULL;	/* list of currently-loaded modules */
-static modInfo_t *pLoadedModulesLast = NULL; /* tail-pointer */
+static modInfo_t *pLoadedModulesLast = NULL;	/* tail-pointer */
 static int bCfsyslineInitialized = 0;
 
 
@@ -64,8 +64,9 @@ static rsRetVal moduleConstruct(modInfo_t **pThis)
 }
 
 
-/* Destructs a module objects. The object must not be linked to the
- * linked list of modules.
+/* Destructs a module object. The object must not be linked to the
+ * linked list of modules. Please note that all other dependencies on this
+ * modules must have been removed before (e.g. CfSysLineHandlers!)
  */
 static void moduleDestruct(modInfo_t *pThis)
 {
@@ -168,25 +169,32 @@ modInfo_t *omodGetNxt(modInfo_t *pThis)
 }
 
 
-/* unload a module. If this is called with a statically-linked
- * (builtin) module, nothing happens.
- * The module handle is invalid after this function call and 
- * MUST NOT be used any more.
- * This is currently a dummy, to be filled when we have a plug-in interface
- * rgerhards, 2007-08-09
+/* Prepare a module for unloading.
+ * This is currently a dummy, to be filled when we have a plug-in
+ * interface - rgerhards, 2007-08-09
+ * rgerhards, 2007-11-21:
+ * When this function is called, all instance-data must already have
+ * been destroyed. In the case of output modules, this happens when the
+ * rule set is being destroyed. When we implement other module types, we
+ * need to think how we handle it there (and if we have any instance data).
  */
-static rsRetVal modUnload(modInfo_t *pThis)
+static rsRetVal modPrepareUnload(modInfo_t *pThis)
 {
 	DEFiRet;
+	void *pModCookie;
 
 	assert(pThis != NULL);
 
-	if(pThis->eLinkType == eMOD_LINK_STATIC) {
-		ABORT_FINALIZE(RS_RET_OK);
-	}
+	/* WARNING - the current code does NOT work and causes an abort - this is acceptable right now
+	 * as I am DEVELOPING the working code and will NOT release until it is there. If you use a
+	 * CVS snapshot, be aware of this limitation. For now, you can just remove everything up to
+	 * (but not including) the END DEVEL comment. That will do the trick. rgerhards, 2007-11-21
+	 */
+	CHKiRet(pThis->modGetID(&pModCookie));
+	pThis->modExit(); /* tell the module to get ready for unload */
+	CHKiRet(unregCfSysLineHdlrs4Owner(pModCookie));
 
-	/* TODO: implement code */
-	ABORT_FINALIZE(RS_RET_NOT_IMPLEMENTED);
+	/* END DEVEL */
 
 finalize_it:
 	return iRet;
@@ -263,6 +271,14 @@ rsRetVal doModInit(rsRetVal (*modInit)(int, int*, rsRetVal(**)(), rsRetVal(*)())
 		moduleDestruct(pNew);
 		return iRet;
 	}
+	if((iRet = (*pNew->modQueryEtryPt)((uchar*)"modGetID", &pNew->modGetID)) != RS_RET_OK) {
+		moduleDestruct(pNew);
+		return iRet;
+	}
+	if((iRet = (*pNew->modQueryEtryPt)((uchar*)"modExit", &pNew->modExit)) != RS_RET_OK) {
+		moduleDestruct(pNew);
+		return iRet;
+	}
 
 	pNew->pszName = (uchar*) strdup((char*)name); /* we do not care if strdup() fails, we can accept that */
 	pNew->pModHdlr = pModHdlr;
@@ -306,11 +322,11 @@ void modPrintList(void)
 		}
 		dbgprintf(" module.\n");
 		dbgprintf("Entry points:\n");
-		dbgprintf("\tqueryEtryPt:        0x%x\n", (unsigned) pMod->modQueryEtryPt);
-		dbgprintf("\tdoAction:           0x%x\n", (unsigned) pMod->mod.om.doAction);
-		dbgprintf("\tparseSelectorAct:   0x%x\n", (unsigned) pMod->mod.om.parseSelectorAct);
-		dbgprintf("\tdbgPrintInstInfo:   0x%x\n", (unsigned) pMod->dbgPrintInstInfo);
-		dbgprintf("\tfreeInstance:       0x%x\n", (unsigned) pMod->freeInstance);
+		dbgprintf("\tqueryEtryPt:        0x%lx\n", (unsigned long) pMod->modQueryEtryPt);
+		dbgprintf("\tdoAction:           0x%lx\n", (unsigned long) pMod->mod.om.doAction);
+		dbgprintf("\tparseSelectorAct:   0x%lx\n", (unsigned long) pMod->mod.om.parseSelectorAct);
+		dbgprintf("\tdbgPrintInstInfo:   0x%lx\n", (unsigned long) pMod->dbgPrintInstInfo);
+		dbgprintf("\tfreeInstance:       0x%lx\n", (unsigned long) pMod->freeInstance);
 		dbgprintf("\n");
 		pMod = modGetNxt(pMod); /* done, go next */
 	}
@@ -332,7 +348,7 @@ rsRetVal modUnloadAndDestructAll(void)
 		pMod = modGetNxt(pModPrev); /* get next */
 		/* now we can destroy the previous module */
 		dbgprintf("Unloading module %s\n", modGetName(pModPrev));
-		modUnload(pModPrev);
+		modPrepareUnload(pModPrev);
 		moduleDestruct(pModPrev);
 	}
 
@@ -355,6 +371,7 @@ rsRetVal modUnloadAndDestructDynamic(void)
 		/* now we can destroy the previous module */
 		if(pModPrev->eLinkType != eMOD_LINK_STATIC) {
 			dbgprintf("Unloading module %s\n", modGetName(pModPrev));
+			modPrepareUnload(pModPrev);
 			moduleDestruct(pModPrev);
 		} else {
 			pLoadedModulesLast = pModPrev;
