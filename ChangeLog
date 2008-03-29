@@ -1,4 +1,17 @@
 ---------------------------------------------------------------------------
+Version 1.21.2 (rgerhards), 2007-12-28
+- created a gss-api output module. This keeps GSS-API code and
+  TCP/UDP code separated. It is also important for forward-
+  compatibility with v3. Please note that this change breaks compatibility
+  with config files created for 1.21.0 and 1.21.1 - this was considered
+  acceptable.
+- fixed an error in forwarding retry code (could lead to message corruption
+  but surfaced very seldom)
+- increased portability for older platforms (AI_NUMERICSERV moved)
+- removed socket leak in omfwd.c
+- cross-platform patch for GSS-API compile problem on some platforms
+  thanks to darix for the patch!
+---------------------------------------------------------------------------
 Version 1.21.1 (rgerhards), 2007-12-23
 - small doc fix for $IncludeConfig
 - fixed a bug in llDestroy()

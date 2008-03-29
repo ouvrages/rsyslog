@@ -33,8 +33,9 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 sbin_PROGRAMS = rklogd$(EXEEXT) rfc3195d$(EXEEXT) rsyslogd$(EXEEXT)
-@ENABLE_MYSQL_TRUE@am__append_1 = plugins/ommysql
-@ENABLE_PGSQL_TRUE@am__append_2 = plugins/ompgsql
+@ENABLE_GSSAPI_TRUE@am__append_1 = plugins/omgssapi
+@ENABLE_MYSQL_TRUE@am__append_2 = plugins/ommysql
+@ENABLE_PGSQL_TRUE@am__append_3 = plugins/ompgsql
 subdir = .
 DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
@@ -112,7 +113,7 @@ RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
 ETAGS = etags
 CTAGS = ctags
-DIST_SUBDIRS = doc plugins/ommysql plugins/ompgsql
+DIST_SUBDIRS = doc plugins/omgssapi plugins/ommysql plugins/ompgsql
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)
@@ -320,7 +321,7 @@ EXTRA_DIST = \
 	contrib/README \
 	$(man_MANS)
 
-SUBDIRS = doc $(am__append_1) $(am__append_2)
+SUBDIRS = doc $(am__append_1) $(am__append_2) $(am__append_3)
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
