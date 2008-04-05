@@ -13,19 +13,20 @@
  *
  * Copyright 2007 Rainer Gerhards and Adiscon GmbH.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This file is part of rsyslog.
  *
- * This program is distributed in the hope that it will be useful,
+ * Rsyslog is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Rsyslog is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * along with Rsyslog.  If not, see <http://www.gnu.org/licenses/>.
  *
  * A copy of the GPL can be found in the file "COPYING" in this distribution.
  */
@@ -57,10 +58,21 @@
 #include "syslogd.h"
 #include "omusrmsg.h"
 #include "module-template.h"
+#include "errmsg.h"
+
+
+/* portability: */
+#ifndef _PATH_DEV
+#	define _PATH_DEV	"/dev/"
+#endif
+
+
+MODULE_TYPE_OUTPUT
 
 /* internal structures
  */
 DEF_OMOD_STATIC_DATA
+DEFobjCurrIf(errmsg)
 
 typedef struct _instanceData {
 	int bIsWall; /* 1- is wall, 0 - individual users */
@@ -86,16 +98,11 @@ CODESTARTfreeInstance
 ENDfreeInstance
 
 
-BEGINneedUDPSocket
-CODESTARTneedUDPSocket
-ENDneedUDPSocket
-
-
 BEGINdbgPrintInstInfo
 	register int i;
 CODESTARTdbgPrintInstInfo
 	for (i = 0; i < MAXUNAMES && *pData->uname[i]; i++)
-		printf("%s, ", pData->uname[i]);
+		dbgprintf("%s, ", pData->uname[i]);
 ENDdbgPrintInstInfo
 
 
@@ -118,7 +125,7 @@ void setutent(void)
 {
 	assert(BSD_uf == NULL);
 	if ((BSD_uf = fopen(_PATH_UTMP, "r")) == NULL) {
-		logerror(_PATH_UTMP);
+		errmsg.LogError(NO_ERRCODE, "%s", _PATH_UTMP);
 		return;
 	}
 }
@@ -322,16 +329,6 @@ CODE_STD_FINALIZERparseSelectorAct
 ENDparseSelectorAct
 
 
-BEGINonSelectReadyWrite
-CODESTARTonSelectReadyWrite
-ENDonSelectReadyWrite
-
-
-BEGINgetWriteFDForSelect
-CODESTARTgetWriteFDForSelect
-ENDgetWriteFDForSelect
-
-
 BEGINmodExit
 CODESTARTmodExit
 ENDmodExit
@@ -345,8 +342,9 @@ ENDqueryEtryPt
 
 BEGINmodInit(UsrMsg)
 CODESTARTmodInit
-	*ipIFVersProvided = 1; /* so far, we only support the initial definition */
+	*ipIFVersProvided = CURR_MOD_IF_VERSION; /* we only support the current interface specification */
 CODEmodInit_QueryRegCFSLineHdlr
+	CHKiRet(objUse(errmsg, CORE_COMPONENT));
 ENDmodInit
 
 /*

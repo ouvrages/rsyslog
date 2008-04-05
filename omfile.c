@@ -12,21 +12,22 @@
  * of the "old" message code without any modifications. However, it
  * helps to have things at the right place one we go to the meat of it.
  *
- * Copyright 2007 Rainer Gerhards and Adiscon GmbH.
+ * Copyright 2007, 2008 Rainer Gerhards and Adiscon GmbH.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This file is part of rsyslog.
  *
- * This program is distributed in the hope that it will be useful,
+ * Rsyslog is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Rsyslog is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * along with Rsyslog.  If not, see <http://www.gnu.org/licenses/>.
  *
  * A copy of the GPL can be found in the file "COPYING" in this distribution.
  */
@@ -51,10 +52,14 @@
 #include "omfile.h"
 #include "cfsysline.h"
 #include "module-template.h"
+#include "errmsg.h"
+
+MODULE_TYPE_OUTPUT
 
 /* internal structures
  */
 DEF_OMOD_STATIC_DATA
+DEFobjCurrIf(errmsg)
 
 /* The following structure is a dynafile name cache entry.
  */
@@ -76,6 +81,8 @@ static uid_t	fileGID;	/* GID to be used for newly created files */
 static uid_t	dirUID;		/* UID to be used for newly created directories */
 static uid_t	dirGID;		/* GID to be used for newly created directories */
 static int	bCreateDirs;	/* auto-create directories for dynaFiles: 0 - no, 1 - yes */
+static int	bEnableSync = 0;/* enable syncing of files (no dash in front of pathname in conf): 0 - no, 1 - yes */
+static uchar	*pszTplName = NULL; /* name of the default template to use */
 /* end globals for default values */
 
 typedef struct _instanceData {
@@ -87,7 +94,6 @@ typedef struct _instanceData {
 		eTypeCONSOLE,
 		eTypePIPE
 	} fileType;	
-	struct template *pTpl;	/* pointer to template object */
 	char	bDynamicName;	/* 0 - static name, 1 - dynamic name (with properties) */
 	int	fCreateMode;	/* file creation mode for open() */
 	int	fDirCreateMode;	/* creation mode for mkdir() */
@@ -154,14 +160,14 @@ rsRetVal setDynaFileCacheSize(void __attribute__((unused)) *pVal, int iNewVal)
 		snprintf((char*) errMsg, sizeof(errMsg)/sizeof(uchar),
 		         "DynaFileCacheSize must be greater 0 (%d given), changed to 1.", iNewVal);
 		errno = 0;
-		logerror((char*) errMsg);
+		errmsg.LogError(NO_ERRCODE, "%s", errMsg);
 		iRet = RS_RET_VAL_OUT_OF_RANGE;
 		iNewVal = 1;
 	} else if(iNewVal > 10000) {
 		snprintf((char*) errMsg, sizeof(errMsg)/sizeof(uchar),
 		         "DynaFileCacheSize maximum is 10,000 (%d given), changed to 10,000.", iNewVal);
 		errno = 0;
-		logerror((char*) errMsg);
+		errmsg.LogError(NO_ERRCODE, "%s", errMsg);
 		iRet = RS_RET_VAL_OUT_OF_RANGE;
 		iNewVal = 10000;
 	}
@@ -169,7 +175,7 @@ rsRetVal setDynaFileCacheSize(void __attribute__((unused)) *pVal, int iNewVal)
 	iDynaFileCacheSize = iNewVal;
 	dbgprintf("DynaFileCacheSize changed to %d.\n", iNewVal);
 
-	return iRet;
+	RETiRet;
 }
 
 
@@ -214,8 +220,8 @@ static rsRetVal cflineParseOutchannel(instanceData *pData, uchar* p, omodStringR
 		snprintf(errMsg, sizeof(errMsg)/sizeof(char),
 			 "outchannel '%s' not found - ignoring action line",
 			 szBuf);
-		logerror(errMsg);
-		return RS_RET_NOT_FOUND;
+		errmsg.LogError(NO_ERRCODE, "%s", errMsg);
+		ABORT_FINALIZE(RS_RET_NOT_FOUND);
 	}
 
 	/* check if there is a file name in the outchannel... */
@@ -225,8 +231,8 @@ static rsRetVal cflineParseOutchannel(instanceData *pData, uchar* p, omodStringR
 		snprintf(errMsg, sizeof(errMsg)/sizeof(char),
 			 "outchannel '%s' has no file name template - ignoring action line",
 			 szBuf);
-		logerror(errMsg);
-		return RS_RET_ERR;
+		errmsg.LogError(NO_ERRCODE, "%s", errMsg);
+		ABORT_FINALIZE(RS_RET_ERR);
 	}
 
 	/* OK, we finally got a correct template. So let's use it... */
@@ -237,9 +243,12 @@ static rsRetVal cflineParseOutchannel(instanceData *pData, uchar* p, omodStringR
 	 */
 	pData->f_sizeLimitCmd = (char*) pOch->cmdOnSizeLimit;
 
-	iRet = cflineParseTemplateName(&p, pOMSR, iEntry, iTplOpts, (uchar*) " TradFmt");
+RUNLOG_VAR("%p", pszTplName);
+	iRet = cflineParseTemplateName(&p, pOMSR, iEntry, iTplOpts,
+				       (pszTplName == NULL) ? (uchar*)"RSYSLOG_FileFormat" : pszTplName);
 
-	return(iRet);
+finalize_it:
+	RETiRet;
 }
 
 
@@ -255,7 +264,7 @@ int resolveFileSizeLimit(instanceData *pData)
 	uchar *pCmd;
 	uchar *p;
 	off_t actualFileSize;
-	assert(pData != NULL);
+	ASSERT(pData != NULL);
 
 	if(pData->f_sizeLimitCmd == NULL)
 		return 1; /* nothing we can do in this case... */
@@ -305,14 +314,16 @@ int resolveFileSizeLimit(instanceData *pData)
  * as the index of the to-be-deleted entry. This index may
  * point to an unallocated entry, in whcih case the
  * function immediately returns. Parameter bFreeEntry is 1
- * if the entry should be free()ed and 0 if not.
+ * if the entry should be d_free()ed and 0 if not.
  */
 static void dynaFileDelCacheEntry(dynaFileCacheEntry **pCache, int iEntry, int bFreeEntry)
 {
-	assert(pCache != NULL);
+	ASSERT(pCache != NULL);
+
+	BEGINfunc;
 
 	if(pCache[iEntry] == NULL)
-		return;
+		FINALIZE;
 
 	dbgprintf("Removed entry %d for file '%s' from dynaCache.\n", iEntry,
 		pCache[iEntry]->pName == NULL ? "[OPEN FAILED]" : (char*)pCache[iEntry]->pName);
@@ -322,14 +333,17 @@ static void dynaFileDelCacheEntry(dynaFileCacheEntry **pCache, int iEntry, int b
 	 */
 	if(pCache[iEntry]->pName != NULL) {
 		close(pCache[iEntry]->fd);
-		free(pCache[iEntry]->pName);
+		d_free(pCache[iEntry]->pName);
 		pCache[iEntry]->pName = NULL;
 	}
 
 	if(bFreeEntry) {
-		free(pCache[iEntry]);
+		d_free(pCache[iEntry]);
 		pCache[iEntry] = NULL;
 	}
+
+finalize_it:
+	ENDfunc;
 }
 
 
@@ -338,14 +352,16 @@ static void dynaFileDelCacheEntry(dynaFileCacheEntry **pCache, int iEntry, int b
 static void dynaFileFreeCache(instanceData *pData)
 {
 	register int i;
-	assert(pData != NULL);
+	ASSERT(pData != NULL);
 
+	BEGINfunc;
 	for(i = 0 ; i < pData->iCurrCacheSize ; ++i) {
 		dynaFileDelCacheEntry(pData->dynCache, i, 1);
 	}
 
 	if(pData->dynCache != NULL)
-		free(pData->dynCache);
+		d_free(pData->dynCache);
+	ENDfunc;
 }
 
 
@@ -410,8 +426,8 @@ static int prepareDynFile(instanceData *pData, uchar *newFileName, unsigned iMsg
 	int iFirstFree;
 	dynaFileCacheEntry **pCache;
 
-	assert(pData != NULL);
-	assert(newFileName != NULL);
+	ASSERT(pData != NULL);
+	ASSERT(newFileName != NULL);
 
 	pCache = pData->dynCache;
 
@@ -482,7 +498,7 @@ static int prepareDynFile(instanceData *pData, uchar *newFileName, unsigned iMsg
 		if(iMsgOpts & INTERNAL_MSG)
 			dbgprintf("Could not open dynaFile, discarding message\n");
 		else
-			logerrorSz("Could not open dynamic file '%s' - discarding message", (char*)newFileName);
+			errmsg.LogError(NO_ERRCODE, "Could not open dynamic file '%s' - discarding message", (char*)newFileName);
 		dynaFileDelCacheEntry(pCache, iFirstFree, 1);
 		pData->iCurrElt = -1;
 		return -1;
@@ -508,14 +524,14 @@ static rsRetVal writeFile(uchar **ppString, unsigned iMsgOpts, instanceData *pDa
 	off_t actualFileSize;
 	DEFiRet;
 
-	assert(pData != NULL);
+	ASSERT(pData != NULL);
 
 	/* first check if we have a dynamic file name and, if so,
 	 * check if it still is ok or a new file needs to be created
 	 */
 	if(pData->bDynamicName) {
 		if(prepareDynFile(pData, ppString[1], iMsgOpts) != 0)
-			return RS_RET_ERR;
+			ABORT_FINALIZE(RS_RET_ERR);
 	}
 
 	/* create the message based on format specified */
@@ -539,14 +555,14 @@ again:
 					 "no longer writing to file %s; grown beyond configured file size of %lld bytes, actual size %lld - configured command did not resolve situation",
 					 pData->f_fname, (long long) pData->f_sizeLimit, (long long) actualFileSize);
 				errno = 0;
-				logerror(errMsg);
-				return RS_RET_DISABLE_ACTION;
+				errmsg.LogError(NO_ERRCODE, "%s", errMsg);
+				ABORT_FINALIZE(RS_RET_DISABLE_ACTION);
 			} else {
 				snprintf(errMsg, sizeof(errMsg),
 					 "file %s had grown beyond configured file size of %lld bytes, actual size was %lld - configured command resolved situation",
 					 pData->f_fname, (long long) pData->f_sizeLimit, (long long) actualFileSize);
 				errno = 0;
-				logerror(errMsg);
+				errmsg.LogError(NO_ERRCODE, "%s", errMsg);
 			}
 		}
 	}
@@ -557,14 +573,14 @@ again:
 		/* If a named pipe is full, just ignore it for now
 		   - mrn 24 May 96 */
 		if (pData->fileType == eTypePIPE && e == EAGAIN)
-			return RS_RET_OK;
+			ABORT_FINALIZE(RS_RET_OK);
 
 		/* If the filesystem is filled up, just ignore
 		 * it for now and continue writing when possible
 		 * based on patch for sysklogd by Martin Schulze on 2007-05-24
 		 */
 		if (pData->fileType == eTypeFILE && e == ENOSPC)
-			return RS_RET_OK;
+			ABORT_FINALIZE(RS_RET_OK);
 
 		(void) close(pData->fd);
 		/*
@@ -580,7 +596,7 @@ again:
 			pData->fd = open((char*) pData->f_fname, O_WRONLY|O_APPEND|O_NOCTTY);
 			if (pData->fd < 0) {
 				iRet = RS_RET_DISABLE_ACTION;
-				logerror((char*) pData->f_fname);
+				errmsg.LogError(NO_ERRCODE, "%s", pData->f_fname);
 			} else {
 				untty();
 				goto again;
@@ -588,11 +604,14 @@ again:
 		} else {
 			iRet = RS_RET_DISABLE_ACTION;
 			errno = e;
-			logerror((char*) pData->f_fname);
+			errmsg.LogError(NO_ERRCODE, "%s", pData->f_fname);
 		}
-	} else if (pData->bSyncFile)
+	} else if (pData->bSyncFile) {
 		fsync(pData->fd);
-	return(iRet);
+	}
+
+finalize_it:
+	RETiRet;
 }
 
 
@@ -609,21 +628,6 @@ CODESTARTfreeInstance
 	} else if(pData->fd != -1)
 		close(pData->fd);
 ENDfreeInstance
-
-
-BEGINonSelectReadyWrite
-CODESTARTonSelectReadyWrite
-ENDonSelectReadyWrite
-
-
-BEGINneedUDPSocket
-CODESTARTneedUDPSocket
-ENDneedUDPSocket
-
-
-BEGINgetWriteFDForSelect
-CODESTARTgetWriteFDForSelect
-ENDgetWriteFDForSelect
 
 
 BEGINtryResume
@@ -648,20 +652,24 @@ CODESTARTparseSelectorAct
 	 * the code further changes.  -- rgerhards, 2007-07-25
 	 */
 	if(*p == '$' || *p == '?' || *p == '|' || *p == '/' || *p == '-') {
-		if((iRet = createInstance(&pData)) != RS_RET_OK)
-			return iRet;
+		if((iRet = createInstance(&pData)) != RS_RET_OK) {
+			ENDfunc
+			return iRet; /* this can not use RET_iRet! */
+		}
 	} else {
 		/* this is not clean, but we need it for the time being
 		 * TODO: remove when cleaning up modularization 
 		 */
+		ENDfunc
 		return RS_RET_CONFLINE_UNPROCESSED;
 	}
 
-	if (*p == '-') {
+	if(*p == '-') {
 		pData->bSyncFile = 0;
 		p++;
-	} else
-		pData->bSyncFile = 1;
+	} else {
+		pData->bSyncFile = bEnableSync ? 1 : 0;
+	}
 
 	pData->f_sizeLimit = 0; /* default value, use outchannels to configure! */
 
@@ -690,7 +698,8 @@ CODESTARTparseSelectorAct
 		   */
 		CODE_STD_STRING_REQUESTparseSelectorAct(2)
 		++p; /* eat '?' */
-		if((iRet = cflineParseFileName(p, (uchar*) pData->f_fname, *ppOMSR, 0, OMSR_NO_RQD_TPL_OPTS))
+		if((iRet = cflineParseFileName(p, (uchar*) pData->f_fname, *ppOMSR, 0, OMSR_NO_RQD_TPL_OPTS,
+				               (pszTplName == NULL) ? (uchar*)"RSYSLOG_FileFormat" : pszTplName))
 		   != RS_RET_OK)
 			break;
 		/* "filename" is actually a template name, we need this as string 1. So let's add it
@@ -735,7 +744,8 @@ CODESTARTparseSelectorAct
 		 * to use is specified. So we need to scan for the first coma first
 		 * and then look at the rest of the line.
 		 */
-		if((iRet = cflineParseFileName(p, (uchar*) pData->f_fname, *ppOMSR, 0, OMSR_NO_RQD_TPL_OPTS))
+		if((iRet = cflineParseFileName(p, (uchar*) pData->f_fname, *ppOMSR, 0, OMSR_NO_RQD_TPL_OPTS,
+				               (pszTplName == NULL) ? (uchar*)"RSYSLOG_FileFormat" : pszTplName))
 		   != RS_RET_OK)
 			break;
 
@@ -758,7 +768,7 @@ CODESTARTparseSelectorAct
 	  	if ( pData->fd < 0 ){
 			pData->fd = -1;
 			dbgprintf("Error opening log file: %s\n", pData->f_fname);
-			logerror((char*) pData->f_fname);
+			errmsg.LogError(NO_ERRCODE, "%s", pData->f_fname);
 			break;
 		}
 		if (isatty(pData->fd)) {
@@ -790,6 +800,11 @@ static rsRetVal resetConfigVariables(uchar __attribute__((unused)) *pp, void __a
 	fCreateMode = 0644;
 	fDirCreateMode = 0644;
 	bCreateDirs = 1;
+	bEnableSync = 0;
+	if(pszTplName != NULL) {
+		free(pszTplName);
+		pszTplName = NULL;
+	}
 
 	return RS_RET_OK;
 }
@@ -797,6 +812,8 @@ static rsRetVal resetConfigVariables(uchar __attribute__((unused)) *pp, void __a
 
 BEGINmodExit
 CODESTARTmodExit
+	if(pszTplName != NULL)
+		free(pszTplName);
 ENDmodExit
 
 
@@ -808,8 +825,9 @@ ENDqueryEtryPt
 
 BEGINmodInit(File)
 CODESTARTmodInit
-	*ipIFVersProvided = 1; /* so far, we only support the initial definition */
+	*ipIFVersProvided = CURR_MOD_IF_VERSION; /* we only support the current interface specification */
 CODEmodInit_QueryRegCFSLineHdlr
+	CHKiRet(objUse(errmsg, CORE_COMPONENT));
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"dynafilecachesize", 0, eCmdHdlrInt, (void*) setDynaFileCacheSize, NULL, STD_LOADABLE_MODULE_ID));
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"dirowner", 0, eCmdHdlrUID, NULL, &dirUID, STD_LOADABLE_MODULE_ID));
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"dirgroup", 0, eCmdHdlrGID, NULL, &dirGID, STD_LOADABLE_MODULE_ID));
@@ -819,6 +837,8 @@ CODEmodInit_QueryRegCFSLineHdlr
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"filecreatemode", 0, eCmdHdlrFileCreateMode, NULL, &fCreateMode, STD_LOADABLE_MODULE_ID));
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"createdirs", 0, eCmdHdlrBinary, NULL, &bCreateDirs, STD_LOADABLE_MODULE_ID));
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"failonchownfailure", 0, eCmdHdlrBinary, NULL, &bFailOnChown, STD_LOADABLE_MODULE_ID));
+	CHKiRet(omsdRegCFSLineHdlr((uchar *)"actionfileenablesync", 0, eCmdHdlrBinary, NULL, &bEnableSync, STD_LOADABLE_MODULE_ID));
+	CHKiRet(regCfSysLineHdlr((uchar *)"actionfiledefaulttemplate", 0, eCmdHdlrGetWord, NULL, &pszTplName, NULL));
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"resetconfigvariables", 1, eCmdHdlrCustomHandler, resetConfigVariables, NULL, STD_LOADABLE_MODULE_ID));
 ENDmodInit
 /*

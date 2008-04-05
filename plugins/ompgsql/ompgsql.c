@@ -8,19 +8,20 @@
  *
  * Copyright 2007 Rainer Gerhards and Adiscon GmbH.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This file is part of rsyslog.
  *
- * This program is distributed in the hope that it will be useful,
+ * Rsyslog is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Rsyslog is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * along with Rsyslog.  If not, see <http://www.gnu.org/licenses/>.
  *
  * A copy of the GPL can be found in the file "COPYING" in this distribution.
  */
@@ -41,10 +42,14 @@
 #include "template.h"
 #include "ompgsql.h"
 #include "module-template.h"
+#include "errmsg.h"
+
+MODULE_TYPE_OUTPUT
 
 /* internal structures
  */
 DEF_OMOD_STATIC_DATA
+DEFobjCurrIf(errmsg)
 
 typedef struct _instanceData {
 	PGconn	*f_hpgsql;			/* handle to PgSQL */
@@ -87,25 +92,10 @@ CODESTARTfreeInstance
 ENDfreeInstance
 
 
-BEGINneedUDPSocket
-CODESTARTneedUDPSocket
-ENDneedUDPSocket
-
-
 BEGINdbgPrintInstInfo
 CODESTARTdbgPrintInstInfo
 	/* nothing special here */
 ENDdbgPrintInstInfo
-
-
-BEGINonSelectReadyWrite
-CODESTARTonSelectReadyWrite
-ENDonSelectReadyWrite
-
-
-BEGINgetWriteFDForSelect
-CODESTARTgetWriteFDForSelect
-ENDgetWriteFDForSelect
 
 
 /* log a database error with descriptive message.
@@ -123,7 +113,7 @@ static void reportDBError(instanceData *pData, int bSilent)
 	/* output log message */
 	errno = 0;
 	if(pData->f_hpgsql == NULL) {
-		logerror("unknown DB error occured - could not obtain PgSQL handle");
+		errmsg.LogError(NO_ERRCODE, "unknown DB error occured - could not obtain PgSQL handle");
 	} else { /* we can ask pgsql for the error description... */
 		ePgSQLStatus = PQstatus(pData->f_hpgsql);
 		snprintf(errMsg, sizeof(errMsg)/sizeof(char), "db error (%d): %s\n", ePgSQLStatus,
@@ -132,7 +122,7 @@ static void reportDBError(instanceData *pData, int bSilent)
 			dbgprintf("pgsql, DBError(silent): %s\n", errMsg);
 		else {
 			pData->eLastPgSQLStatus = ePgSQLStatus;
-			logerror(errMsg);
+			errmsg.LogError(NO_ERRCODE, "%s", errMsg);
 		}
 	}
 		
@@ -160,7 +150,7 @@ static rsRetVal initPgSQL(instanceData *pData, int bSilent)
 		iRet = RS_RET_SUSPENDED;
 	}
 
-	return iRet;
+	RETiRet;
 }
 
 
@@ -196,7 +186,7 @@ finalize_it:
 		pData->eLastPgSQLStatus = CONNECTION_OK; /* reset error for error supression */
 	}
 
-	return iRet;
+	RETiRet;
 }
 
 
@@ -274,7 +264,7 @@ CODE_STD_STRING_REQUESTparseSelectorAct(1)
 	 * Retries make no sense. 
 	 */
 	if (iPgSQLPropErr) { 
-		logerror("Trouble with PgSQL connection properties. -PgSQL logging disabled");
+		errmsg.LogError(NO_ERRCODE, "Trouble with PgSQL connection properties. -PgSQL logging disabled");
 		ABORT_FINALIZE(RS_RET_INVALID_PARAMS);
 	} else {
 		CHKiRet(initPgSQL(pData, 0));
@@ -296,8 +286,9 @@ ENDqueryEtryPt
 
 BEGINmodInit()
 CODESTARTmodInit
-	*ipIFVersProvided = 1; /* so far, we only support the initial definition */
+	*ipIFVersProvided = CURR_MOD_IF_VERSION; /* we only support the current interface specification */
 CODEmodInit_QueryRegCFSLineHdlr
+	CHKiRet(objUse(errmsg, CORE_COMPONENT));
 ENDmodInit
 /*
  * vi:set ai:

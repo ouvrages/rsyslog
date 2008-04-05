@@ -1,13 +1,27 @@
 /* This is the template processing code of rsyslog.
  * Please see syslogd.c for license information.
- * This code is placed under the GPL.
  * begun 2004-11-17 rgerhards
+ *
+ * Copyright 2004, 2007 Rainer Gerhards and Adiscon
+ *
+ * This file is part of rsyslog.
+ *
+ * Rsyslog is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Rsyslog is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Rsyslog.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * A copy of the GPL can be found in the file "COPYING" in this distribution.
  */
 #include "config.h"
-
-#ifdef __FreeBSD__
-#define	BSD
-#endif
 
 #include "rsyslog.h"
 #include <stdio.h>
@@ -20,7 +34,15 @@
 #include "template.h"
 #include "msg.h"
 #include "syslogd.h"
+#include "obj.h"
+#include "errmsg.h"
 
+/* static data */
+DEFobjCurrIf(obj)
+DEFobjCurrIf(errmsg)
+DEFobjCurrIf(regexp)
+
+static int bFirstRegexpErrmsg = 1; /**< did we already do a "can't load regexp" error message? */
 static struct template *tplRoot = NULL;	/* the root of the template list */
 static struct template *tplLast = NULL;	/* points to the last element of the template list */
 static struct template *tplLastStatic = NULL; /* last static element of the template list */
@@ -50,7 +72,7 @@ rsRetVal tplToString(struct template *pTpl, msg_t *pMsg, uchar** ppSz)
 {
 	DEFiRet;
 	struct templateEntry *pTpe;
-	rsCStrObj *pCStr;
+	cstr_t *pCStr;
 	unsigned short bMustBeFreed;
 	uchar *pVal;
 	size_t iLenVal;
@@ -64,10 +86,7 @@ rsRetVal tplToString(struct template *pTpl, msg_t *pMsg, uchar** ppSz)
 	 * free the obtained value (if requested). We continue this
 	 * loop until we got hold of all values.
 	 */
-	if((pCStr = rsCStrConstruct()) == NULL) {
-		dbgprintf("memory shortage, tplToString failed\n");
-		ABORT_FINALIZE(RS_RET_OUT_OF_MEMORY);
-	}
+	CHKiRet(rsCStrConstruct(&pCStr));
 
 	pTpe = pTpl->pEntryRoot;
 	while(pTpe != NULL) {
@@ -78,7 +97,7 @@ rsRetVal tplToString(struct template *pTpl, msg_t *pMsg, uchar** ppSz)
 							 ) {
 				dbgprintf("error %d during tplToString()\n", iRet);
 				/* it does not make sense to continue now */
-				rsCStrDestruct(pCStr);
+				rsCStrDestruct(&pCStr);
 				FINALIZE;
 			}
 		} else 	if(pTpe->eEntryType == FIELD) {
@@ -98,7 +117,7 @@ rsRetVal tplToString(struct template *pTpl, msg_t *pMsg, uchar** ppSz)
 			CHKiRet_Hdlr(rsCStrAppendStrWithLen(pCStr, (uchar*) pVal, iLenVal)) {
 				dbgprintf("error %d during tplToString()\n", iRet);
 				/* it does not make sense to continue now */
-				rsCStrDestruct(pCStr);
+				rsCStrDestruct(&pCStr);
 				if(bMustBeFreed)
 					free(pVal);
 				FINALIZE;
@@ -118,7 +137,7 @@ rsRetVal tplToString(struct template *pTpl, msg_t *pMsg, uchar** ppSz)
 finalize_it:
 	*ppSz = (iRet == RS_RET_OK) ? pVal : NULL;
 
-	return iRet;
+	RETiRet;
 }
 
 /* Helper to doSQLEscape. This is called if doSQLEscape
@@ -173,7 +192,7 @@ void doSQLEscape(uchar **pp, size_t *pLen, unsigned short *pbMustBeFreed, int es
 {
 	uchar *p;
 	int iLen;
-	rsCStrObj *pStrB;
+	cstr_t *pStrB;
 	uchar *pszGenerated;
 
 	assert(pp != NULL);
@@ -195,7 +214,7 @@ void doSQLEscape(uchar **pp, size_t *pLen, unsigned short *pbMustBeFreed, int es
 
 	p = *pp;
 	iLen = *pLen;
-	if((pStrB = rsCStrConstruct()) == NULL) {
+	if(rsCStrConstruct(&pStrB) != RS_RET_OK) {
 		/* oops - no mem ... Do emergency... */
 		doSQLEmergencyEscape(p, escapeMode);
 		return;
@@ -205,21 +224,21 @@ void doSQLEscape(uchar **pp, size_t *pLen, unsigned short *pbMustBeFreed, int es
 		if(*p == '\'') {
 			if(rsCStrAppendChar(pStrB, (escapeMode == 0) ? '\'' : '\\') != RS_RET_OK) {
 				doSQLEmergencyEscape(*pp, escapeMode);
-				rsCStrDestruct(pStrB);
+				rsCStrDestruct(&pStrB);
 				return;
 				}
 			iLen++;	/* reflect the extra character */
 		} else if((escapeMode == 1) && (*p == '\\')) {
 			if(rsCStrAppendChar(pStrB, '\\') != RS_RET_OK) {
 				doSQLEmergencyEscape(*pp, escapeMode);
-				rsCStrDestruct(pStrB);
+				rsCStrDestruct(&pStrB);
 				return;
 				}
 			iLen++;	/* reflect the extra character */
 		}
 		if(rsCStrAppendChar(pStrB, *p) != RS_RET_OK) {
 			doSQLEmergencyEscape(*pp, escapeMode);
-			rsCStrDestruct(pStrB);
+			rsCStrDestruct(&pStrB);
 			return;
 		}
 		++p;
@@ -299,7 +318,7 @@ struct template* tplConstruct(void)
 static int do_Constant(unsigned char **pp, struct template *pTpl)
 {
 	register unsigned char *p;
-	rsCStrObj *pStrB;
+	cstr_t *pStrB;
 	struct templateEntry *pTpe;
 	int i;
 
@@ -309,7 +328,7 @@ static int do_Constant(unsigned char **pp, struct template *pTpl)
 
 	p = *pp;
 
-	if((pStrB = rsCStrConstruct()) == NULL)
+	if(rsCStrConstruct(&pStrB) != RS_RET_OK)
 		 return 1;
 	rsCStrSetAllocIncrement(pStrB, 32);
 	/* process the message and expand escapes
@@ -462,9 +481,10 @@ static void doOptions(unsigned char **pp, struct templateEntry *pTpe)
 static int do_Parameter(unsigned char **pp, struct template *pTpl)
 {
 	unsigned char *p;
-	rsCStrObj *pStrB;
+	cstr_t *pStrB;
 	struct templateEntry *pTpe;
 	int iNum;	/* to compute numbers */
+	rsRetVal iRetLocal;
 
 #ifdef FEATURE_REGEXP
 	/* APR: variables for regex */
@@ -479,7 +499,7 @@ static int do_Parameter(unsigned char **pp, struct template *pTpl)
 
 	p = (unsigned char*) *pp;
 
-	if((pStrB = rsCStrConstruct()) == NULL)
+	if(rsCStrConstruct(&pStrB) != RS_RET_OK)
 		 return 1;
 
 	if((pTpe = tpeConstruct(pTpl)) == NULL) {
@@ -509,8 +529,7 @@ static int do_Parameter(unsigned char **pp, struct template *pTpl)
 			if (*p != ':') {
 				/* There is something more than an R , this is invalid ! */
 				/* Complain on extra characters */
-				logerrorSz
-				  ("error: invalid character in frompos after \"R\", property: '%%%s'",
+				errmsg.LogError(NO_ERRCODE, "error: invalid character in frompos after \"R\", property: '%%%s'",
 				    (char*) *pp);
 			} else {
 				pTpe->data.field.has_regex = 1;
@@ -534,8 +553,7 @@ static int do_Parameter(unsigned char **pp, struct template *pTpl)
 					pTpe->data.field.has_fields = 1;
 					if(!isdigit((int)*p)) {
 						/* complain and use default */
-						logerrorSz
-						  ("error: invalid character in frompos after \"F,\", property: '%%%s' - using 9 (HT) as field delimiter",
+						errmsg.LogError(NO_ERRCODE, "error: invalid character in frompos after \"F,\", property: '%%%s' - using 9 (HT) as field delimiter",
 						    (char*) *pp);
 						pTpe->data.field.field_delim = 9;
 					} else {
@@ -543,8 +561,7 @@ static int do_Parameter(unsigned char **pp, struct template *pTpl)
 						while(isdigit((int)*p))
 							iNum = iNum * 10 + *p++ - '0';
 						if(iNum < 0 || iNum > 255) {
-							logerrorInt
-							  ("error: non-USASCII delimiter character value in template - using 9 (HT) as substitute", iNum);
+							errmsg.LogError(NO_ERRCODE, "error: non-USASCII delimiter character value %d in template - using 9 (HT) as substitute", iNum);
 							pTpe->data.field.field_delim = 9;
 						  } else {
 							pTpe->data.field.field_delim = iNum;
@@ -554,8 +571,7 @@ static int do_Parameter(unsigned char **pp, struct template *pTpl)
 					/* invalid character after F, so we need to reject
 					 * this.
 					 */
-					logerrorSz
-					  ("error: invalid character in frompos after \"F\", property: '%%%s'",
+					errmsg.LogError(NO_ERRCODE, "error: invalid character in frompos after \"F\", property: '%%%s'",
 					    (char*) *pp);
 				}
 			} else {
@@ -596,9 +612,8 @@ static int do_Parameter(unsigned char **pp, struct template *pTpl)
 				longitud = regex_end - p;
 				/* Malloc for the regex string */
 				regex_char = (unsigned char *) malloc(longitud + 1);
-				if (regex_char == NULL) {
-					dbgprintf
-					    ("Could not allocate memory for template parameter!\n");
+				if(regex_char == NULL) {
+					dbgprintf("Could not allocate memory for template parameter!\n");
 					pTpe->data.field.has_regex = 0;
 					return 1;
 					/* TODO: RGer: check if we can recover better... (probably not) */
@@ -612,8 +627,21 @@ static int do_Parameter(unsigned char **pp, struct template *pTpl)
 
 				/* Now i compile the regex */
 				/* Remember that the re is an attribute of the Template entry */
-				if(regcomp(&(pTpe->data.field.re), (char*) regex_char, 0) != 0) {
-					dbgprintf("error: can not compile regex: '%s'\n", regex_char);
+				if((iRetLocal = objUse(regexp, LM_REGEXP_FILENAME)) == RS_RET_OK) {
+dbgprintf("compile data.field.re ptr: %p (pTpe %p)\n", (&(pTpe->data.field.re)), pTpe);
+					if(regexp.regcomp(&(pTpe->data.field.re), (char*) regex_char, 0) != 0) {
+						dbgprintf("error: can not compile regex: '%s'\n", regex_char);
+						pTpe->data.field.has_regex = 2;
+					}
+				} else {
+					/* regexp object could not be loaded */
+					dbgprintf("error %d trying to load regexp library - this may be desired and thus OK",
+						  iRetLocal);
+					if(bFirstRegexpErrmsg) { /* prevent flood of messages, maybe even an endless loop! */
+						bFirstRegexpErrmsg = 0;
+						errmsg.LogError(NO_ERRCODE, "regexp library could not be loaded (error %d), "
+								"regexp ignored", iRetLocal);
+					}
 					pTpe->data.field.has_regex = 2;
 				}
 
@@ -651,7 +679,6 @@ static int do_Parameter(unsigned char **pp, struct template *pTpl)
 #endif /* #ifdef FEATURE_REGEXP */
 	}
 
-	/* TODO: add more sanity checks. For now, we do the bare minimum */
 	if((pTpe->data.field.has_fields == 0) && (pTpe->data.field.iToPos < pTpe->data.field.iFromPos)) {
 		iNum = pTpe->data.field.iToPos;
 		pTpe->data.field.iToPos = pTpe->data.field.iFromPos;
@@ -822,6 +849,8 @@ void tplDeleteAll(void)
 {
 	struct template *pTpl, *pTplDel;
 	struct templateEntry *pTpe, *pTpeDel;
+	rsRetVal iRetLocal;
+	BEGINfunc
 
 	pTpl = tplRoot;
 	while(pTpl != NULL) {
@@ -841,6 +870,12 @@ void tplDeleteAll(void)
 				free(pTpeDel->data.constant.pConstant);
 				break;
 			case FIELD:
+				/* check if we have a regexp and, if so, delete it */
+				if(pTpeDel->data.field.has_regex != 0) {
+					if((iRetLocal = objUse(regexp, LM_REGEXP_FILENAME)) == RS_RET_OK) {
+						regexp.regfree(&(pTpeDel->data.field.re));
+					}
+				}
 				/*dbgprintf("(FIELD), value: '%s'", pTpeDel->data.field.pPropRepl);*/
 				free(pTpeDel->data.field.pPropRepl);
 				break;
@@ -854,15 +889,20 @@ void tplDeleteAll(void)
 			free(pTplDel->pszName);
 		free(pTplDel);
 	}
+	ENDfunc
 }
 
+
 /* Destroy all templates obtained from conf file
- * preserving hadcoded ones. This is called from init().
+ * preserving hardcoded ones. This is called from init().
  */
 void tplDeleteNew(void)
 {
 	struct template *pTpl, *pTplDel;
 	struct templateEntry *pTpe, *pTpeDel;
+	rsRetVal iRetLocal;
+
+	BEGINfunc
 
 	if(tplRoot == NULL || tplLastStatic == NULL)
 		return;
@@ -887,6 +927,12 @@ void tplDeleteNew(void)
 				free(pTpeDel->data.constant.pConstant);
 				break;
 			case FIELD:
+				/* check if we have a regexp and, if so, delete it */
+				if(pTpeDel->data.field.has_regex != 0) {
+					if((iRetLocal = objUse(regexp, LM_REGEXP_FILENAME)) == RS_RET_OK) {
+						regexp.regfree(&(pTpeDel->data.field.re));
+					}
+				}
 				/*dbgprintf("(FIELD), value: '%s'", pTpeDel->data.field.pPropRepl);*/
 				free(pTpeDel->data.field.pPropRepl);
 				break;
@@ -900,6 +946,7 @@ void tplDeleteNew(void)
 			free(pTplDel->pszName);
 		free(pTplDel);
 	}
+	ENDfunc
 }
 
 /* Store the pointer to the last hardcoded teplate */
@@ -1000,6 +1047,19 @@ int tplGetEntryCount(struct template *pTpl)
 	assert(pTpl != NULL);
 	return(pTpl->tpenElements);
 }
+
+/* our init function. TODO: remove once converted to a class
+ */
+rsRetVal templateInit()
+{
+	DEFiRet;
+	CHKiRet(objGetObjInterface(&obj));
+	CHKiRet(objUse(errmsg, CORE_COMPONENT));
+
+finalize_it:
+	RETiRet;
+}
+
 /*
  * vi:set ai:
  */

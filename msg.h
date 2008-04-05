@@ -5,25 +5,30 @@
  *
  * Copyright 2007 Rainer Gerhards and Adiscon GmbH.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This file is part of rsyslog.
  *
- * This program is distributed in the hope that it will be useful,
+ * Rsyslog is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Rsyslog is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * along with Rsyslog.  If not, see <http://www.gnu.org/licenses/>.
  *
  * A copy of the GPL can be found in the file "COPYING" in this distribution.
  */
+#include "template.h" /* this is a quirk, but these two are too interdependant... */
+
 #ifndef	MSG_H_INCLUDED
 #define	MSG_H_INCLUDED 1
 
+#include <pthread.h>
+#include "obj.h"
 #include "syslogd-types.h"
 #include "template.h"
 
@@ -43,10 +48,10 @@
  * called each time a "copy" is stored somewhere.
  */
 struct msg {
+	BEGINobjInstance;	/* Data to implement generic object - MUST be the first data element! */
+	pthread_mutexattr_t mutAttr;
+	pthread_mutex_t mut;
 	int	iRefCount;	/* reference counter (0 = unused) */
-	short	iSyslogVers;	/* version of syslog protocol
-				 * 0 - RFC 3164
-				 * 1 - RFC draft-protocol-08 */
 	short	bParseHOSTNAME;	/* should the hostname be parsed from the message? */
 	   /* background: the hostname is not present on "regular" messages
 	    * received via UNIX domain sockets from the same machine. However,
@@ -54,12 +59,14 @@ struct msg {
 	    * sockets. All in all, the parser would need parse templates, that would
 	    * resolve all these issues... rgerhards, 2005-10-06
 	    */
+	flowControl_t flowCtlType; /**< type of flow control we can apply, for enqueueing, needs not to be persisted because
+				        once data has entered the queue, this property is no longer needed. */
 	short	iSeverity;	/* the severity 0..7 */
 	uchar *pszSeverity;	/* severity as string... */
 	int iLenSeverity;	/* ... and its length. */
  	uchar *pszSeverityStr;   /* severity name... */
  	int iLenSeverityStr;    /* ... and its length. */
-	int	iFacility;	/* Facility code (up to 2^32-1) */
+	short	iFacility;	/* Facility code 0 .. 23*/
 	uchar *pszFacility;	/* Facility as string... */
 	int iLenFacility;	/* ... and its length. */
  	uchar *pszFacilityStr;   /* facility name... */
@@ -81,12 +88,12 @@ struct msg {
 	int	iLenHOSTNAME;	/* Length of HOSTNAME */
 	uchar	*pszRcvFrom;	/* System message was received from */
 	int	iLenRcvFrom;	/* Length of pszRcvFrom */
-	int	iProtocolVersion;/* protocol version of message received 0 - legacy, 1 syslog-protocol) */
-	rsCStrObj *pCSProgName;	/* the (BSD) program name */
-	rsCStrObj *pCSStrucData;/* STRUCTURED-DATA */
-	rsCStrObj *pCSAPPNAME;	/* APP-NAME */
-	rsCStrObj *pCSPROCID;	/* PROCID */
-	rsCStrObj *pCSMSGID;	/* MSGID */
+	short	iProtocolVersion;/* protocol version of message received 0 - legacy, 1 syslog-protocol) */
+	cstr_t *pCSProgName;	/* the (BSD) program name */
+	cstr_t *pCSStrucData;/* STRUCTURED-DATA */
+	cstr_t *pCSAPPNAME;	/* APP-NAME */
+	cstr_t *pCSPROCID;	/* PROCID */
+	cstr_t *pCSMSGID;	/* MSGID */
 	struct syslogTime tRcvdAt;/* time the message entered this program */
 	char *pszRcvdAt3164;	/* time as RFC3164 formatted string (always 15 charcters) */
 	char *pszRcvdAt3339;	/* time as RFC3164 formatted string (32 charcters at most) */
@@ -103,9 +110,10 @@ typedef struct msg msg_t;	/* new name */
 
 /* function prototypes
  */
+PROTOTYPEObjClassInit(msg);
 char* getProgramName(msg_t*);
-msg_t* MsgConstruct(void);
-void MsgDestruct(msg_t * pM);
+rsRetVal msgConstruct(msg_t **ppThis);
+rsRetVal msgDestruct(msg_t **ppM);
 msg_t* MsgDup(msg_t* pOld);
 msg_t *MsgAddRef(msg_t *pM);
 void setProtocolVersion(msg_t *pM, int iNewVersion);
@@ -124,7 +132,6 @@ char *getSeverityStr(msg_t *pM);
 char *getFacility(msg_t *pM);
 char *getFacilityStr(msg_t *pM);
 rsRetVal MsgSetAPPNAME(msg_t *pMsg, char* pszAPPNAME);
-int getAPPNAMELen(msg_t *pM);
 char *getAPPNAME(msg_t *pM);
 rsRetVal MsgSetPROCID(msg_t *pMsg, char* pszPROCID);
 int getPROCIDLen(msg_t *pM);
@@ -132,6 +139,7 @@ char *getPROCID(msg_t *pM);
 rsRetVal MsgSetMSGID(msg_t *pMsg, char* pszMSGID);
 void MsgAssignTAG(msg_t *pMsg, uchar *pBuf);
 void MsgSetTAG(msg_t *pMsg, char* pszTAG);
+rsRetVal MsgSetFlowControlType(msg_t *pMsg, flowControl_t eFlowCtl);
 char *getTAG(msg_t *pM);
 int getHOSTNAMELen(msg_t *pM);
 char *getHOSTNAME(msg_t *pM);
@@ -149,8 +157,19 @@ void MsgSetRawMsg(msg_t *pMsg, char* pszRawMsg);
 void moveHOSTNAMEtoTAG(msg_t *pM);
 char *getMSGID(msg_t *pM);
 char *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
-                 rsCStrObj *pCSPropName, unsigned short *pbMustBeFreed);
+                 cstr_t *pCSPropName, unsigned short *pbMustBeFreed);
 char *textpri(char *pRes, size_t pResLen, int pri);
+rsRetVal msgGetMsgVar(msg_t *pThis, cstr_t *pstrPropName, var_t **ppVar);
+rsRetVal MsgEnableThreadSafety(void);
+
+/* The MsgPrepareEnqueue() function is a macro for performance reasons.
+ * It needs one global variable to work. This is acceptable, as it gains
+ * us quite some performance and is fully abstracted using this header file.
+ * The important thing is that no other module is permitted to actually
+ * access that global variable! -- rgerhards, 2008-01-05
+ */
+extern void (*funcMsgPrepareEnqueue)(msg_t *pMsg);
+#define MsgPrepareEnqueue(pMsg) funcMsgPrepareEnqueue(pMsg)
 
 #endif /* #ifndef MSG_H_INCLUDED */
 /*

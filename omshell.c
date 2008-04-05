@@ -14,19 +14,20 @@
  *
  * Copyright 2007 Rainer Gerhards and Adiscon GmbH.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This file is part of rsyslog.
  *
- * This program is distributed in the hope that it will be useful,
+ * Rsyslog is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Rsyslog is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * along with Rsyslog.  If not, see <http://www.gnu.org/licenses/>.
  *
  * A copy of the GPL can be found in the file "COPYING" in this distribution.
  */
@@ -42,10 +43,14 @@
 #include "srUtils.h"
 #include "omshell.h"
 #include "module-template.h"
+#include "errmsg.h"
+
+MODULE_TYPE_OUTPUT
 
 /* internal structures
  */
 DEF_OMOD_STATIC_DATA
+DEFobjCurrIf(errmsg)
 
 typedef struct _instanceData {
 	uchar	progName[MAXFNAME]; /* program  to execute */
@@ -87,7 +92,7 @@ CODESTARTdoAction
 	 */
 	dbgprintf("\n");
 	if(execProg((uchar*) pData->progName, 1, ppString[0]) == 0)
-	 	logerrorSz("Executing program '%s' failed", (char*)pData->progName);
+	 	errmsg.LogError(NO_ERRCODE, "Executing program '%s' failed", (char*)pData->progName);
 ENDdoAction
 
 
@@ -108,7 +113,8 @@ CODE_STD_STRING_REQUESTparseSelectorAct(1)
 	case '^': /* bkalkbrenner 2005-09-20: execute shell command */
 		dbgprintf("exec\n");
 		++p;
-		iRet = cflineParseFileName(p, (uchar*) pData->progName, *ppOMSR, 0, OMSR_NO_RQD_TPL_OPTS);
+		iRet = cflineParseFileName(p, (uchar*) pData->progName, *ppOMSR, 0, OMSR_NO_RQD_TPL_OPTS,
+			                   (uchar*)"RSYSLOG_TraditionalFileFormat");
 		break;
 	default:
 		iRet = RS_RET_CONFLINE_UNPROCESSED;
@@ -117,21 +123,6 @@ CODE_STD_STRING_REQUESTparseSelectorAct(1)
 
 CODE_STD_FINALIZERparseSelectorAct
 ENDparseSelectorAct
-
-
-BEGINneedUDPSocket
-CODESTARTneedUDPSocket
-ENDneedUDPSocket
-
-
-BEGINonSelectReadyWrite
-CODESTARTonSelectReadyWrite
-ENDonSelectReadyWrite
-
-
-BEGINgetWriteFDForSelect
-CODESTARTgetWriteFDForSelect
-ENDgetWriteFDForSelect
 
 
 BEGINmodExit
@@ -147,8 +138,9 @@ ENDqueryEtryPt
 
 BEGINmodInit(Shell)
 CODESTARTmodInit
-	*ipIFVersProvided = 1; /* so far, we only support the initial definition */
+	*ipIFVersProvided = CURR_MOD_IF_VERSION; /* we only support the current interface specification */
 CODEmodInit_QueryRegCFSLineHdlr
+	CHKiRet(objUse(errmsg, CORE_COMPONENT));
 ENDmodInit
 
 /*
