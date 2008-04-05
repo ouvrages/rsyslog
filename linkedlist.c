@@ -11,21 +11,20 @@
  *
  * File begun on 2007-07-31 by RGerhards
  *
- * Copyright 2007 Rainer Gerhards and Adiscon GmbH.
+ * This file is part of rsyslog.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * Rsyslog is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful,
+ * Rsyslog is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * along with Rsyslog.  If not, see <http://www.gnu.org/licenses/>.
  *
  * A copy of the GPL can be found in the file "COPYING" in this distribution.
  */
@@ -80,7 +79,7 @@ static rsRetVal llDestroyElt(linkedList_t *pList, llElt_t *pElt)
 	free(pElt);
 	pList->iNumElts--; /* one less */
 
-	return iRet;
+	RETiRet;
 }
 
 
@@ -103,11 +102,11 @@ rsRetVal llDestroy(linkedList_t *pThis)
 		 */
 		llDestroyElt(pThis, pEltPrev);
 	}
-
+	/* now clean up the pointers */
 	pThis->pRoot = NULL;
 	pThis->pLast = NULL;
 
-	return iRet;
+	RETiRet;
 }
 
 /* llDestroyRootElt - destroy the root element but otherwise
@@ -135,7 +134,7 @@ rsRetVal llDestroyRootElt(linkedList_t *pThis)
 	CHKiRet(llDestroyElt(pThis, pPrev));
 
 finalize_it:
-	return iRet;
+	RETiRet;
 }
 
 
@@ -167,7 +166,7 @@ rsRetVal llGetNextElt(linkedList_t *pThis, linkedListCookie_t *ppElt, void **ppU
 
 	*ppElt = pElt;
 
-	return iRet;
+	RETiRet;
 }
 
 
@@ -205,7 +204,7 @@ static rsRetVal llEltConstruct(llElt_t **ppThis, void *pKey, void *pData)
 
 finalize_it:
 	*ppThis = pThis;
-	return iRet;
+	RETiRet;
 }
 
 
@@ -228,7 +227,7 @@ rsRetVal llAppend(linkedList_t *pThis, void *pKey, void *pData)
 	pThis->pLast = pElt;
 
 finalize_it:
-	return iRet;
+	RETiRet;
 }
 
 
@@ -268,7 +267,7 @@ static rsRetVal llUnlinkAndDelteElt(linkedList_t *pThis, llElt_t *pElt, llElt_t 
 	CHKiRet(llDestroyElt(pThis, pElt));
 
 finalize_it:
-	return iRet;
+	RETiRet;
 }
 
 /* find a user element based on the provided key - this is the
@@ -306,7 +305,7 @@ static rsRetVal llFindElt(linkedList_t *pThis, void *pKey, llElt_t **ppElt, llEl
 	} else
 		iRet = RS_RET_NOT_FOUND;
 
-	return iRet;
+	RETiRet;
 }
 
 
@@ -324,7 +323,7 @@ rsRetVal llFind(linkedList_t *pThis, void *pKey, void **ppData)
 	*ppData = pElt->pData;
 
 finalize_it:
-	return iRet;
+	RETiRet;
 }
 
 
@@ -346,7 +345,7 @@ rsRetVal llFindAndDelete(linkedList_t *pThis, void *pKey)
 	CHKiRet(llUnlinkAndDelteElt(pThis, pElt, pEltPrev));
 
 finalize_it:
-	return iRet;
+	RETiRet;
 }
 
 
@@ -361,7 +360,7 @@ rsRetVal llGetNumElts(linkedList_t *pThis, int *piCnt)
 
 	*piCnt = pThis->iNumElts;
 
-	return iRet;
+	RETiRet;
 }
 
 
@@ -405,7 +404,7 @@ rsRetVal llExecFunc(linkedList_t *pThis, rsRetVal (*pFunc)(void*, void*), void* 
 		iRet = iRetLL;
 
 finalize_it:
-	return iRet;
+	RETiRet;
 }
 
 

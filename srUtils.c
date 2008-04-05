@@ -7,27 +7,28 @@
  * \date    2003-09-09
  *          Coding begun.
  *
- * Copyright 2003-2007 Rainer Gerhards and Adiscon GmbH.
+ * Copyright 2003-2008 Rainer Gerhards and Adiscon GmbH.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This file is part of rsyslog.
  *
- * This program is distributed in the hope that it will be useful,
+ * Rsyslog is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Rsyslog is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * along with Rsyslog.  If not, see <http://www.gnu.org/licenses/>.
  *
  * A copy of the GPL can be found in the file "COPYING" in this distribution.
  */
 #include "config.h"
 
-#include "rsyslog.h"	/* THIS IS A MODIFICATION FOR RSYSLOG! 2004-11-18 rgerards */
+#include "rsyslog.h"
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -38,12 +39,64 @@
 #include <assert.h>
 #include <sys/wait.h>
 #include <ctype.h>
-#include "liblogging-stub.h"	/* THIS IS A MODIFICATION FOR RSYSLOG! 2004-11-18 rgerards */
+#include "liblogging-stub.h"
 #define TRUE 1
 #define FALSE 0
 #include "srUtils.h"
 #include "syslogd.h"
+#include "obj.h"
 
+
+/* here we host some syslog specific names. There currently is no better place
+ * to do it, but over here is also not ideal... -- rgerhards, 2008-02-14
+ */
+syslogName_t	syslogPriNames[] = {
+	{"alert",	LOG_ALERT},
+	{"crit",	LOG_CRIT},
+	{"debug",	LOG_DEBUG},
+	{"emerg",	LOG_EMERG},
+	{"err",		LOG_ERR},
+	{"error",	LOG_ERR},		/* DEPRECATED */
+	{"info",	LOG_INFO},
+	{"none",	INTERNAL_NOPRI},	/* INTERNAL */
+	{"notice",	LOG_NOTICE},
+	{"panic",	LOG_EMERG},		/* DEPRECATED */
+	{"warn",	LOG_WARNING},		/* DEPRECATED */
+	{"warning",	LOG_WARNING},
+	{"*",		TABLE_ALLPRI},
+	{NULL,		-1}
+};
+
+#ifndef LOG_AUTHPRIV
+#	define LOG_AUTHPRIV LOG_AUTH
+#endif
+syslogName_t	syslogFacNames[] = {
+	{"auth",         LOG_AUTH},
+	{"authpriv",     LOG_AUTHPRIV},
+	{"cron",         LOG_CRON},
+	{"daemon",       LOG_DAEMON},
+	{"kern",         LOG_KERN},
+	{"lpr",          LOG_LPR},
+	{"mail",         LOG_MAIL},
+	{"mark",         LOG_MARK},		/* INTERNAL */
+	{"news",         LOG_NEWS},
+	{"security",     LOG_AUTH},		/* DEPRECATED */
+	{"syslog",       LOG_SYSLOG},
+	{"user",         LOG_USER},
+	{"uucp",         LOG_UUCP},
+#if defined(LOG_FTP)
+	{"ftp",          LOG_FTP},
+#endif
+	{"local0",       LOG_LOCAL0},
+	{"local1",       LOG_LOCAL1},
+	{"local2",       LOG_LOCAL2},
+	{"local3",       LOG_LOCAL3},
+	{"local4",       LOG_LOCAL4},
+	{"local5",       LOG_LOCAL5},
+	{"local6",       LOG_LOCAL6},
+	{"local7",       LOG_LOCAL7},
+	{NULL,           -1},
+};
 
 /* ################################################################# *
  * private members                                                   *
@@ -57,11 +110,11 @@
  * public members                                                    *
  * ################################################################# */
 
-rsRetVal srUtilItoA(char *pBuf, int iLenBuf, int iToConv)
+rsRetVal srUtilItoA(char *pBuf, int iLenBuf, number_t iToConv)
 {
 	int i;
 	int bIsNegative;
-	char szBuf[32];	/* sufficiently large for my lifespan and those of my children... ;) */
+	char szBuf[64];	/* sufficiently large for my lifespan and those of my children... ;) */
 
 	assert(pBuf != NULL);
 	assert(iLenBuf > 1);	/* This is actually an app error and as thus checked for... */
@@ -238,6 +291,216 @@ void skipWhiteSpace(uchar **pp)
 }
 
 
-/*
- * vi:set ai:
+/* generate a file name from four parts:
+ * <directory name>/<name>.<number>
+ * If number is negative, it is not used. If any of the strings is
+ * NULL, an empty string is used instead. Length must be provided.
+ * lNumDigits is the minimum number of digits that lNum should have. This
+ * is to pretty-print the file name, e.g. lNum = 3, lNumDigits= 4 will
+ * result in "0003" being used inside the file name. Set lNumDigits to 0
+ * to use as few space as possible.
+ * rgerhards, 2008-01-03
+ */
+rsRetVal genFileName(uchar **ppName, uchar *pDirName, size_t lenDirName, uchar *pFName,
+		     size_t lenFName, long lNum, int lNumDigits)
+{
+	DEFiRet;
+	uchar *pName;
+	uchar *pNameWork;
+	size_t lenName;
+	uchar szBuf[128];	/* buffer for number */
+	char szFmtBuf[32];	/* buffer for snprintf format */
+	size_t lenBuf;
+
+	if(lNum < 0) {
+		szBuf[0] = '\0';
+		lenBuf = 0;
+	} else {
+		if(lNumDigits > 0) {
+			snprintf(szFmtBuf, sizeof(szFmtBuf), ".%%0%dld", lNumDigits);
+			lenBuf = snprintf((char*)szBuf, sizeof(szBuf), szFmtBuf, lNum);
+		} else
+			lenBuf = snprintf((char*)szBuf, sizeof(szBuf), ".%ld", lNum);
+	}
+
+	lenName = lenDirName + 1 + lenFName + lenBuf + 1; /* last +1 for \0 char! */
+	if((pName = malloc(sizeof(uchar) * lenName)) == NULL)
+		ABORT_FINALIZE(RS_RET_OUT_OF_MEMORY);
+	
+	/* got memory, now construct string */
+	memcpy(pName, pDirName, lenDirName);
+	pNameWork = pName + lenDirName;
+	*pNameWork++ = '/';
+	memcpy(pNameWork, pFName, lenFName);
+	pNameWork += lenFName;
+	if(lenBuf > 0) {
+		memcpy(pNameWork, szBuf, lenBuf);
+		pNameWork += lenBuf;
+	}
+	*pNameWork = '\0';
+
+	*ppName = pName;
+
+finalize_it:
+	RETiRet;
+}
+
+/* get the number of digits required to represent a given number. We use an
+ * iterative approach as we do not like to draw in the floating point
+ * library just for log(). -- rgerhards, 2008-01-10
+ */
+int getNumberDigits(long lNum)
+{
+	int iDig;
+
+	if(lNum == 0)
+		iDig = 1;
+	else
+		for(iDig = 0 ; lNum != 0 ; ++iDig)
+			lNum /= 10;
+
+	return iDig;
+}
+
+
+/* compute an absolute time timeout suitable for calls to pthread_cond_timedwait()
+ * rgerhards, 2008-01-14
+ */
+rsRetVal
+timeoutComp(struct timespec *pt, long iTimeout)
+{
+	assert(pt != NULL);
+	/* compute timeout */
+	clock_gettime(CLOCK_REALTIME, pt);
+	pt->tv_nsec += (iTimeout % 1000) * 1000000; /* think INTEGER arithmetic! */
+	if(pt->tv_nsec > 999999999) { /* overrun? */
+		pt->tv_nsec -= 1000000000;
+	}
+	pt->tv_sec += iTimeout / 1000;
+	return RS_RET_OK; /* so far, this is static... */
+}
+
+
+/* This function is kind of the reverse of timeoutComp() - it takes an absolute
+ * timeout value and computes how far this is in the future. If the value is already
+ * in the past, 0 is returned. The return value is in ms.
+ * rgerhards, 2008-01-25
+ */
+long
+timeoutVal(struct timespec *pt)
+{
+	struct timespec t;
+	long iTimeout;
+
+	assert(pt != NULL);
+	/* compute timeout */
+	clock_gettime(CLOCK_REALTIME, &t);
+	iTimeout = (pt->tv_nsec - t.tv_nsec) / 1000000;
+	iTimeout += (pt->tv_sec - t.tv_sec) * 1000;
+
+	if(iTimeout < 0)
+		iTimeout = 0;
+
+	return iTimeout;
+}
+
+
+/* cancellation cleanup handler - frees provided mutex
+ * rgerhards, 2008-01-14
+ */
+void
+mutexCancelCleanup(void *arg)
+{
+	BEGINfunc
+	assert(arg != NULL);
+	d_pthread_mutex_unlock((pthread_mutex_t*) arg);
+	ENDfunc
+}
+
+
+/* rsSleep() - a fairly portable way to to sleep. It 
+ * will wake up when
+ * a) the wake-time is over
+ * rgerhards, 2008-01-28
+ */
+void
+srSleep(int iSeconds, int iuSeconds)
+{
+	struct timeval tvSelectTimeout;
+
+	BEGINfunc
+	tvSelectTimeout.tv_sec = iSeconds;
+	tvSelectTimeout.tv_usec = iuSeconds; /* micro seconds */
+	select(0, NULL, NULL, NULL, &tvSelectTimeout);
+	ENDfunc
+}
+
+
+/* From varmojfekoj's mail on why he provided rs_strerror_r():
+ * There are two problems with strerror_r():
+ * I see you've rewritten some of the code which calls it to use only
+ * the supplied buffer; unfortunately the GNU implementation sometimes
+ * doesn't use the buffer at all and returns a pointer to some
+ * immutable string instead, as noted in the man page.
+ *
+ * The other problem is that on some systems strerror_r() has a return
+ * type of int.
+ *
+ * So I've written a wrapper function rs_strerror_r(), which should
+ * take care of all this and be used instead.
+ *
+ * Added 2008-01-30
+ */
+char *rs_strerror_r(int errnum, char *buf, size_t buflen) {
+#ifdef	__hpux
+	char *pszErr;
+	pszErr = strerror(errnum);
+	snprintf(buf, buflen, "%s", pszErr);
+#else
+#	ifdef STRERROR_R_CHAR_P
+		char *p = strerror_r(errnum, buf, buflen);
+		if (p != buf) {
+			strncpy(buf, p, buflen);
+			buf[buflen - 1] = '\0';
+		}
+#	else
+		strerror_r(errnum, buf, buflen);
+#	endif
+#endif /* #ifdef __hpux */
+	return buf;
+}
+
+
+/*  Decode a symbolic name to a numeric value
+ */
+int decodeSyslogName(uchar *name, syslogName_t *codetab)
+{
+	register syslogName_t *c;
+	register uchar *p;
+	uchar buf[80];
+
+	ASSERT(name != NULL);
+	ASSERT(codetab != NULL);
+
+	dbgprintf("symbolic name: %s", name);
+	if (isdigit((int) *name))
+	{
+		dbgprintf("\n");
+		return (atoi((char*) name));
+	}
+	strncpy((char*) buf, (char*) name, 79);
+	for (p = buf; *p; p++)
+		if (isupper((int) *p))
+			*p = tolower((int) *p);
+	for (c = codetab; c->c_name; c++)
+		if (!strcmp((char*) buf, (char*) c->c_name))
+		{
+			dbgprintf(" ==> %d\n", c->c_val);
+			return (c->c_val);
+		}
+	return (-1);
+}
+
+
+/* vim:set ai:
  */

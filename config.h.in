@@ -3,8 +3,8 @@
 /* Description */
 #undef BSD
 
-/* klogd functionality is integrated. */
-#undef FEATURE_KLOGD
+/* Defined if debug mode is enabled (its easier to check). */
+#undef DEBUG
 
 /* Regular expressions support enabled. */
 #undef FEATURE_REGEXP
@@ -21,11 +21,20 @@
 /* Define to 1 if you have the <arpa/nameser.h> header file. */
 #undef HAVE_ARPA_NAMESER_H
 
+/* Define to 1 if you have the `basename' function. */
+#undef HAVE_BASENAME
+
 /* Define to 1 if your system has a working `chown' function. */
 #undef HAVE_CHOWN
 
 /* Define to 1 if you have the `clock_gettime' function. */
 #undef HAVE_CLOCK_GETTIME
+
+/* Define to 1 if you have the <dbi/dbi.h> header file. */
+#undef HAVE_DBI_DBI_H
+
+/* Define to 1 if libdbi supports the new plugin-safe interface */
+#undef HAVE_DBI_R
 
 /* Define to 1 if you have the declaration of `strerror_r', and to 0 if you
    don't. */
@@ -39,6 +48,9 @@
 
 /* Define to 1 if you have the <fcntl.h> header file. */
 #undef HAVE_FCNTL_H
+
+/* Define to 1 if you have the `flock' function. */
+#undef HAVE_FLOCK
 
 /* Define to 1 if you have the `fork' function. */
 #undef HAVE_FORK
@@ -54,6 +66,15 @@
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
+
+/* Define to 1 if you have the <libgen.h> header file. */
+#undef HAVE_LIBGEN_H
+
+/* Define to 1 if you have the <librelp.h> header file. */
+#undef HAVE_LIBRELP_H
+
+/* Define to 1 if you have the <librfc3195.h> header file. */
+#undef HAVE_LIBRFC3195_H
 
 /* Define to 1 if you have the <locale.h> header file. */
 #undef HAVE_LOCALE_H
@@ -82,6 +103,9 @@
 
 /* Define to 1 if you have the <netinet/in.h> header file. */
 #undef HAVE_NETINET_IN_H
+
+/* Define to 1 if you have the <net-snmp/net-snmp-config.h> header file. */
+#undef HAVE_NET_SNMP_NET_SNMP_CONFIG_H
 
 /* Define to 1 if you have the <paths.h> header file. */
 #undef HAVE_PATHS_H
@@ -214,15 +238,14 @@
 /* Define to 1 if you have the `vprintf' function. */
 #undef HAVE_VPRINTF
 
-/* Define to 1 if you have the `wait3' system call. Deprecated, you should no
-   longer depend upon `wait3'. */
-#undef HAVE_WAIT3
-
 /* Define to 1 if `fork' works. */
 #undef HAVE_WORKING_FORK
 
 /* Define to 1 if `vfork' works. */
 #undef HAVE_WORKING_VFORK
+
+/* the host environment, can be queried via a system variable */
+#undef HOSTENV
 
 /* Define to 1 if `lstat' dereferences a symlink specified with a trailing
    slash. */
@@ -257,6 +280,9 @@
 
 /* Define as the return type of signal handlers (`int' or `void'). */
 #undef RETSIGTYPE
+
+/* Defined if runtime instrumentation mode is enabled. */
+#undef RTINST
 
 /* Define to the type of arg 1 for `select'. */
 #undef SELECT_TYPE_ARG1
@@ -293,6 +319,10 @@
 
 /* Multithreading support enabled. */
 #undef USE_PTHREADS
+
+/* Defined if valgrind support settings are to be enabled (e.g. prevents
+   dlclose()). */
+#undef VALGRIND
 
 /* Version number of package */
 #undef VERSION

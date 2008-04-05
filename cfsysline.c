@@ -3,21 +3,20 @@
  *
  * File begun on 2007-07-30 by RGerhards
  *
- * Copyright 2007 Rainer Gerhards and Adiscon GmbH.
+ * This file is part of rsyslog.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * Rsyslog is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful,
+ * Rsyslog is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * along with Rsyslog.  If not, see <http://www.gnu.org/licenses/>.
  *
  * A copy of the GPL can be found in the file "COPYING" in this distribution.
  */
@@ -35,10 +34,15 @@
 
 #include "syslogd.h" /* TODO: when the module interface & library design is done, this should be able to go away */
 #include "cfsysline.h"
+#include "obj.h"
+#include "errmsg.h"
 #include "srUtils.h"
 
 
 /* static data */
+DEFobjCurrIf(obj)
+DEFobjCurrIf(errmsg)
+
 linkedList_t llCmdList; /* this is NOT a pointer - no typo here ;) */
 
 /* --------------- START functions for handling canned syntaxes --------------- */
@@ -61,7 +65,7 @@ static rsRetVal doGetChar(uchar **pp, rsRetVal (*pSetHdlr)(void*, uid_t), void *
 
 	/* if we are not at a '\0', we have our new char - no validity checks here... */
 	if(**pp == '\0') {
-		logerror("No character available");
+		errmsg.LogError(NO_ERRCODE, "No character available");
 		iRet = RS_RET_NOT_FOUND;
 	} else {
 		if(pSetHdlr == NULL) {
@@ -75,7 +79,7 @@ static rsRetVal doGetChar(uchar **pp, rsRetVal (*pSetHdlr)(void*, uid_t), void *
 	}
 
 finalize_it:
-	return iRet;
+	RETiRet;
 }
 
 
@@ -93,7 +97,57 @@ static rsRetVal doCustomHdlr(uchar **pp, rsRetVal (*pSetHdlr)(uchar**, void*), v
 	CHKiRet(pSetHdlr(pp, pVal));
 
 finalize_it:
-	return iRet;
+	RETiRet;
+}
+
+
+/* Parse a number from the configuration line. This functions just parses
+ * the number and does NOT call any handlers or set any values. It is just
+ * for INTERNAL USE by other parse functions!
+ * rgerhards, 2008-01-08
+ */
+static rsRetVal parseIntVal(uchar **pp, int64 *pVal)
+{
+	DEFiRet;
+	uchar *p;
+	int64 i;	
+	int bWasNegative;
+
+	assert(pp != NULL);
+	assert(*pp != NULL);
+	assert(pVal != NULL);
+	
+	skipWhiteSpace(pp); /* skip over any whitespace */
+	p = *pp;
+
+	if(*p == '-') {
+		bWasNegative = 1;
+		++p; /* eat it */
+	} else {
+		bWasNegative = 0;
+	}
+
+	if(!isdigit((int) *p)) {
+		errno = 0;
+		errmsg.LogError(NO_ERRCODE, "invalid number");
+		ABORT_FINALIZE(RS_RET_INVALID_INT);
+	}
+
+	/* pull value */
+	for(i = 0 ; *p && (isdigit((int) *p) || *p == '.' || *p == ',')  ; ++p) {
+		if(isdigit((int) *p)) {
+			i = i * 10 + *p - '0';
+		}
+	}
+
+	if(bWasNegative)
+		i *= -1;
+
+	*pVal = i;
+	*pp = p;
+
+finalize_it:
+	RETiRet;
 }
 
 
@@ -104,36 +158,77 @@ static rsRetVal doGetInt(uchar **pp, rsRetVal (*pSetHdlr)(void*, uid_t), void *p
 {
 	uchar *p;
 	DEFiRet;
-	int i;	
+	int64 i;	
 
 	assert(pp != NULL);
 	assert(*pp != NULL);
 	
-	skipWhiteSpace(pp); /* skip over any whitespace */
+	CHKiRet(parseIntVal(pp, &i));
 	p = *pp;
-
-	if(!isdigit((int) *p)) {
-		errno = 0;
-		logerror("invalid number");
-		ABORT_FINALIZE(RS_RET_INVALID_INT);
-	}
-
-	/* pull value */
-	for(i = 0 ; *p && isdigit((int) *p) ; ++p)
-		i = i * 10 + *p - '0';
 
 	if(pSetHdlr == NULL) {
 		/* we should set value directly to var */
-		*((int*)pVal) = i;
+		*((int*)pVal) = (int) i;
 	} else {
 		/* we set value via a set function */
-		CHKiRet(pSetHdlr(pVal, i));
+		CHKiRet(pSetHdlr(pVal, (int) i));
 	}
 
 	*pp = p;
 
 finalize_it:
-	return iRet;
+	RETiRet;
+}
+
+
+/* Parse a size from the configuration line. This is basically an integer
+ * syntax, but modifiers may be added after the integer (e.g. 1k to mean
+ * 1024). The size must immediately follow the number. Note that the
+ * param value must be int64!
+ * rgerhards, 2008-01-09
+ */
+static rsRetVal doGetSize(uchar **pp, rsRetVal (*pSetHdlr)(void*, uid_t), void *pVal)
+{
+	DEFiRet;
+	int64 i;
+
+	assert(pp != NULL);
+	assert(*pp != NULL);
+	
+	CHKiRet(parseIntVal(pp, &i));
+
+	/* we now check if the next character is one of our known modifiers.
+	 * If so, we accept it as such. If not, we leave it alone. tera and
+	 * above does not make any sense as that is above a 32-bit int value.
+	 */
+	switch(**pp) {
+		/* traditional binary-based definitions */
+		case 'k': i *= 1024; ++(*pp); break;
+		case 'm': i *= 1024 * 1024; ++(*pp); break;
+		case 'g': i *= 1024 * 1024 * 1024; ++(*pp); break;
+		case 't': i *= (int64) 1024 * 1024 * 1024 * 1024; ++(*pp); break; /* tera */
+		case 'p': i *= (int64) 1024 * 1024 * 1024 * 1024 * 1024; ++(*pp); break; /* peta */
+		case 'e': i *= (int64) 1024 * 1024 * 1024 * 1024 * 1024 * 1024; ++(*pp); break; /* exa */
+		/* and now the "new" 1000-based definitions */
+		case 'K': i *= 1000; ++(*pp); break;
+		case 'M': i *= 10000; ++(*pp); break;
+		case 'G': i *= 100000; ++(*pp); break;
+		case 'T': i *= 1000000; ++(*pp); break; /* tera */
+		case 'P': i *= 10000000; ++(*pp); break; /* peta */
+		case 'E': i *= 100000000; ++(*pp); break; /* exa */
+	}
+
+	/* done */
+	if(pSetHdlr == NULL) {
+		/* we should set value directly to var */
+		*((int64*)pVal) = i;
+	} else {
+		/* we set value via a set function */
+		CHKiRet(pSetHdlr(pVal, i));
+	}
+
+finalize_it:
+	RETiRet;
 }
 
 
@@ -173,7 +268,7 @@ static rsRetVal doFileCreateMode(uchar **pp, rsRetVal (*pSetHdlr)(void*, uid_t),
 		snprintf((char*) errMsg, sizeof(errMsg)/sizeof(uchar),
 		         "value must be octal (e.g 0644).");
 		errno = 0;
-		logerror((char*) errMsg);
+		errmsg.LogError(NO_ERRCODE, "%s", errMsg);
 		ABORT_FINALIZE(RS_RET_INVALID_VALUE);
 	}
 
@@ -194,7 +289,7 @@ static rsRetVal doFileCreateMode(uchar **pp, rsRetVal (*pSetHdlr)(void*, uid_t),
 	*pp = p;
 
 finalize_it:
-	return iRet;
+	RETiRet;
 }
 
 
@@ -218,7 +313,7 @@ static int doParseOnOffOption(uchar **pp)
 	skipWhiteSpace(pp); /* skip over any whitespace */
 
 	if(getSubString(pp, (char*) szOpt, sizeof(szOpt) / sizeof(uchar), ' ')  != 0) {
-		logerror("Invalid $-configline - could not extract on/off option");
+		errmsg.LogError(NO_ERRCODE, "Invalid $-configline - could not extract on/off option");
 		return -1;
 	}
 	
@@ -227,7 +322,7 @@ static int doParseOnOffOption(uchar **pp)
 	} else if(!strcmp((char*)szOpt, "off")) {
 		return 0;
 	} else {
-		logerrorSz("Option value must be on or off, but is '%s'", (char*)pOptStart);
+		errmsg.LogError(NO_ERRCODE, "Option value must be on or off, but is '%s'", (char*)pOptStart);
 		return -1;
 	}
 }
@@ -248,14 +343,14 @@ static rsRetVal doGetGID(uchar **pp, rsRetVal (*pSetHdlr)(void*, uid_t), void *p
 	assert(*pp != NULL);
 
 	if(getSubString(pp, (char*) szName, sizeof(szName) / sizeof(uchar), ' ')  != 0) {
-		logerror("could not extract group name");
+		errmsg.LogError(NO_ERRCODE, "could not extract group name");
 		ABORT_FINALIZE(RS_RET_NOT_FOUND);
 	}
 
 	getgrnam_r((char*)szName, &gBuf, stringBuf, sizeof(stringBuf), &pgBuf);
 
 	if(pgBuf == NULL) {
-		logerrorSz("ID for group '%s' could not be found or error", (char*)szName);
+		errmsg.LogError(NO_ERRCODE, "ID for group '%s' could not be found or error", (char*)szName);
 		iRet = RS_RET_NOT_FOUND;
 	} else {
 		if(pSetHdlr == NULL) {
@@ -271,7 +366,7 @@ static rsRetVal doGetGID(uchar **pp, rsRetVal (*pSetHdlr)(void*, uid_t), void *p
 	skipWhiteSpace(pp); /* skip over any whitespace */
 
 finalize_it:
-	return iRet;
+	RETiRet;
 }
 
 
@@ -290,14 +385,14 @@ static rsRetVal doGetUID(uchar **pp, rsRetVal (*pSetHdlr)(void*, uid_t), void *p
 	assert(*pp != NULL);
 
 	if(getSubString(pp, (char*) szName, sizeof(szName) / sizeof(uchar), ' ')  != 0) {
-		logerror("could not extract user name");
+		errmsg.LogError(NO_ERRCODE, "could not extract user name");
 		ABORT_FINALIZE(RS_RET_NOT_FOUND);
 	}
 
 	getpwnam_r((char*)szName, &pwBuf, stringBuf, sizeof(stringBuf), &ppwBuf);
 
 	if(ppwBuf == NULL) {
-		logerrorSz("ID for user '%s' could not be found or error", (char*)szName);
+		errmsg.LogError(NO_ERRCODE, "ID for user '%s' could not be found or error", (char*)szName);
 		iRet = RS_RET_NOT_FOUND;
 	} else {
 		if(pSetHdlr == NULL) {
@@ -313,7 +408,7 @@ static rsRetVal doGetUID(uchar **pp, rsRetVal (*pSetHdlr)(void*, uid_t), void *p
 	skipWhiteSpace(pp); /* skip over any whitespace */
 
 finalize_it:
-	return iRet;
+	RETiRet;
 }
 
 
@@ -344,11 +439,43 @@ static rsRetVal doBinaryOptionLine(uchar **pp, rsRetVal (*pSetHdlr)(void*, int),
 	skipWhiteSpace(pp); /* skip over any whitespace */
 
 finalize_it:
-	return iRet;
+	RETiRet;
 }
 
 
-/* Parse and a word config line option. A word is a consequitive
+/* parse a whitespace-delimited word from the provided string. This is a
+ * helper function for a number of syntaxes. The parsed value is returned
+ * in ppStrB (which must be provided by caller).
+ * rgerhards, 2008-02-14
+ */
+static rsRetVal
+getWord(uchar **pp, cstr_t **ppStrB)
+{
+	DEFiRet;
+	uchar *p;
+
+	ASSERT(pp != NULL);
+	ASSERT(*pp != NULL);
+	ASSERT(ppStrB != NULL);
+
+	CHKiRet(rsCStrConstruct(ppStrB));
+
+	/* parse out the word */
+	p = *pp;
+
+	while(*p && !isspace((int) *p)) {
+		CHKiRet(rsCStrAppendChar(*ppStrB, *p++));
+	}
+	CHKiRet(rsCStrFinish(*ppStrB));
+
+	*pp = p;
+
+finalize_it:
+	RETiRet;
+}
+
+
+/* Parse and a word config line option. A word is a consequtive
  * sequence of non-whitespace characters. pVal must be
  * a pointer to a string which is to receive the option
  * value. The returned string must be freed by the caller.
@@ -360,28 +487,19 @@ finalize_it:
  * no custom handler is defined. If it is, the customer handler
  * must do the cleanup. I have checked and this was al also memory
  * leak with some code. Obviously, not a large one. -- rgerhards, 2007-12-20
+ * Just to clarify: if pVal is parsed to a custom handler, this handler
+ * is responsible for freeing pVal. -- rgerhards, 2008-03-20
  */
 static rsRetVal doGetWord(uchar **pp, rsRetVal (*pSetHdlr)(void*, uchar*), void *pVal)
 {
 	DEFiRet;
-	rsCStrObj *pStrB;
-	uchar *p;
+	cstr_t *pStrB;
 	uchar *pNewVal;
 
-	assert(pp != NULL);
-	assert(*pp != NULL);
+	ASSERT(pp != NULL);
+	ASSERT(*pp != NULL);
 
-	if((pStrB = rsCStrConstruct()) == NULL) 
-		return RS_RET_OUT_OF_MEMORY;
-
-	/* parse out the word */
-	p = *pp;
-
-	while(*p && !isspace((int) *p)) {
-		CHKiRet(rsCStrAppendChar(pStrB, *p++));
-	}
-	CHKiRet(rsCStrFinish(pStrB));
-
+	CHKiRet(getWord(pp, &pStrB));
 	CHKiRet(rsCStrConvSzStrAndDestruct(pStrB, &pNewVal, 0));
 	pStrB = NULL;
 
@@ -396,16 +514,75 @@ static rsRetVal doGetWord(uchar **pp, rsRetVal (*pSetHdlr)(void*, uchar*), void 
 		CHKiRet(pSetHdlr(pVal, pNewVal));
 	}
 
-	*pp = p;
 	skipWhiteSpace(pp); /* skip over any whitespace */
 
 finalize_it:
 	if(iRet != RS_RET_OK) {
 		if(pStrB != NULL)
-			rsCStrDestruct(pStrB);
+			rsCStrDestruct(&pStrB);
 	}
 
-	return iRet;
+	RETiRet;
+}
+
+
+/* parse a syslog name from the string. This is the generic code that is
+ * called by the facility/severity functions. Note that we do not check the
+ * validity of numerical values, something that should probably change over
+ * time (TODO). -- rgerhards, 2008-02-14
+ */
+static rsRetVal
+doSyslogName(uchar **pp, rsRetVal (*pSetHdlr)(void*, int), void *pVal, syslogName_t *pNameTable)
+{
+	DEFiRet;
+	cstr_t *pStrB;
+	int iNewVal;
+
+	ASSERT(pp != NULL);
+	ASSERT(*pp != NULL);
+
+	CHKiRet(getWord(pp, &pStrB)); /* get word */
+	iNewVal = decodeSyslogName(rsCStrGetSzStr(pStrB), pNameTable);
+
+	if(pSetHdlr == NULL) {
+		/* we should set value directly to var */
+		*((int*)pVal) = iNewVal; /* set new one */
+	} else {
+		/* we set value via a set function */
+		CHKiRet(pSetHdlr(pVal, iNewVal));
+	}
+
+	skipWhiteSpace(pp); /* skip over any whitespace */
+
+finalize_it:
+	if(pStrB != NULL)
+		rsCStrDestruct(&pStrB);
+
+	RETiRet;
+}
+
+
+/* Implements the facility syntax.
+ * rgerhards, 2008-02-14
+ */
+static rsRetVal
+doFacility(uchar **pp, rsRetVal (*pSetHdlr)(void*, int), void *pVal)
+{
+	DEFiRet;
+	iRet = doSyslogName(pp, pSetHdlr, pVal, syslogFacNames);
+	RETiRet;
+}
+
+
+/* Implements the severity syntax.
+ * rgerhards, 2008-02-14
+ */
+static rsRetVal
+doSeverity(uchar **pp, rsRetVal (*pSetHdlr)(void*, int), void *pVal)
+{
+	DEFiRet;
+	iRet = doSyslogName(pp, pSetHdlr, pVal, syslogPriNames);
+	RETiRet;
 }
 
 
@@ -417,7 +594,7 @@ finalize_it:
  */
 static rsRetVal cslchDestruct(void *pThis)
 {
-	assert(pThis != NULL);
+	ASSERT(pThis != NULL);
 	free(pThis);
 	
 	return RS_RET_OK;
@@ -438,7 +615,7 @@ static rsRetVal cslchConstruct(cslCmdHdlr_t **ppThis)
 
 finalize_it:
 	*ppThis = pThis;
-	return iRet;
+	RETiRet;
 }
 
 /* destructor for linked list keys. As we do not use any dynamic memory,
@@ -511,8 +688,17 @@ static rsRetVal cslchCallHdlr(cslCmdHdlr_t *pThis, uchar **ppConfLine)
 	case eCmdHdlrInt:
 		pHdlr = doGetInt;
 		break;
+	case eCmdHdlrSize:
+		pHdlr = doGetSize;
+		break;
 	case eCmdHdlrGetChar:
 		pHdlr = doGetChar;
+		break;
+	case eCmdHdlrFacility:
+		pHdlr = doFacility;
+		break;
+	case eCmdHdlrSeverity:
+		pHdlr = doSeverity;
 		break;
 	case eCmdHdlrGetWord:
 		pHdlr = doGetWord;
@@ -527,7 +713,7 @@ static rsRetVal cslchCallHdlr(cslCmdHdlr_t *pThis, uchar **ppConfLine)
 	CHKiRet(pHdlr(ppConfLine, pThis->cslCmdHdlr, pThis->pData));
 
 finalize_it:
-	return iRet;
+	RETiRet;
 }
 
 
@@ -576,7 +762,7 @@ static rsRetVal cslcConstruct(cslCmd_t **ppThis, int bChainingPermitted)
 
 finalize_it:
 	*ppThis = pThis;
-	return iRet;
+	RETiRet;
 }
 
 
@@ -599,21 +785,7 @@ finalize_it:
 			cslchDestruct(pCmdHdlr);
 	}
 
-	return iRet;
-}
-
-
-/* function that initializes this module here. This is primarily a hook
- * for syslogd.
- */
-rsRetVal cfsyslineInit(void)
-{
-	DEFiRet;
-
-	CHKiRet(llInit(&llCmdList, cslcDestruct, cslcKeyDestruct, strcasecmp));
-
-finalize_it:
-	return iRet;
+	RETiRet;
 }
 
 
@@ -626,9 +798,9 @@ finalize_it:
 rsRetVal regCfSysLineHdlr(uchar *pCmdName, int bChainingPermitted, ecslCmdHdrlType eType, rsRetVal (*pHdlr)(), void *pData,
 			  void *pOwnerCookie)
 {
+	DEFiRet;
 	cslCmd_t *pThis;
 	uchar *pMyCmdName;
-	DEFiRet;
 
 	iRet = llFind(&llCmdList, (void *) pCmdName, (void*) &pThis);
 	if(iRet == RS_RET_NOT_FOUND) {
@@ -661,7 +833,7 @@ rsRetVal regCfSysLineHdlr(uchar *pCmdName, int bChainingPermitted, ecslCmdHdrlTy
 	}
 
 finalize_it:
-	return iRet;
+	RETiRet;
 }
 
 
@@ -695,7 +867,7 @@ DEFFUNC_llExecFunc(unregHdlrsHeadExec)
 	}
 
 finalize_it:
-	return iRet;
+	RETiRet;
 }
 /* unregister and destroy cfSysLineHandlers for a specific owner. This method is
  * most importantly used before unloading a loadable module providing some handlers.
@@ -711,7 +883,7 @@ rsRetVal unregCfSysLineHdlrs4Owner(void *pOwnerCookie)
 	 */
 	iRet = llExecFunc(&llCmdList, unregHdlrsHeadExec, pOwnerCookie);
 
-	return iRet;
+	RETiRet;
 }
 
 
@@ -733,7 +905,7 @@ rsRetVal processCfSysLineCommand(uchar *pCmdName, uchar **p)
 	iRet = llFind(&llCmdList, (void *) pCmdName, (void*) &pCmd);
 
 	if(iRet == RS_RET_NOT_FOUND) {
-		logerror("invalid or yet-unknown config file command - have you forgotten to load a module?");
+		errmsg.LogError(NO_ERRCODE, "invalid or yet-unknown config file command - have you forgotten to load a module?");
 	}
 
 	if(iRet != RS_RET_OK)
@@ -765,7 +937,7 @@ rsRetVal processCfSysLineCommand(uchar *pCmdName, uchar **p)
 		iRet = iRetLL;
 
 finalize_it:
-	return iRet;
+	RETiRet;
 }
 
 
@@ -781,24 +953,38 @@ void dbgPrintCfSysLineHandlers(void)
 	linkedListCookie_t llCookieCmdHdlr;
 	uchar *pKey;
 
-	printf("\nSytem Line Configuration Commands:\n");
+	dbgprintf("Sytem Line Configuration Commands:\n");
 	llCookieCmd = NULL;
 	while((iRet = llGetNextElt(&llCmdList, &llCookieCmd, (void*)&pCmd)) == RS_RET_OK) {
 		llGetKey(llCookieCmd, (void*) &pKey); /* TODO: using the cookie is NOT clean! */
-		printf("\tCommand '%s':\n", pKey);
+		dbgprintf("\tCommand '%s':\n", pKey);
 		llCookieCmdHdlr = NULL;
 		while((iRet = llGetNextElt(&pCmd->llCmdHdlrs, &llCookieCmdHdlr, (void*)&pCmdHdlr)) == RS_RET_OK) {
-			printf("\t\ttype : %d\n", pCmdHdlr->eType);
-			printf("\t\tpData: 0x%lx\n", (unsigned long) pCmdHdlr->pData);
-			printf("\t\tHdlr : 0x%lx\n", (unsigned long) pCmdHdlr->cslCmdHdlr);
-			printf("\t\tOwner: 0x%lx\n", (unsigned long) llCookieCmdHdlr->pKey);
-			printf("\n");
+			dbgprintf("\t\ttype : %d\n", pCmdHdlr->eType);
+			dbgprintf("\t\tpData: 0x%lx\n", (unsigned long) pCmdHdlr->pData);
+			dbgprintf("\t\tHdlr : 0x%lx\n", (unsigned long) pCmdHdlr->cslCmdHdlr);
+			dbgprintf("\t\tOwner: 0x%lx\n", (unsigned long) llCookieCmdHdlr->pKey);
+			dbgprintf("\n");
 		}
 	}
-	printf("\n");
-
+	dbgprintf("\n");
+	ENDfunc
 }
 
-/*
- * vi:set ai:
+
+/* our init function. TODO: remove once converted to a class
+ */
+rsRetVal cfsyslineInit()
+{
+	DEFiRet;
+	CHKiRet(objGetObjInterface(&obj));
+	CHKiRet(objUse(errmsg, CORE_COMPONENT));
+
+	CHKiRet(llInit(&llCmdList, cslcDestruct, cslcKeyDestruct, strcasecmp));
+
+finalize_it:
+	RETiRet;
+}
+
+/* vim:set ai:
  */

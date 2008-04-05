@@ -1,27 +1,44 @@
 html_files = \
 	bugs.html \
+	debug.html \
 	features.html \
 	generic_design.html \
+	expression.html \
 	history.html \
 	how2help.html \
 	install.html \
 	ipv6.html \
+	log_rotation_fix_size.html \
 	manual.html \
 	man_rsyslogd.html \
 	modules.html \
 	property_replacer.html \
+	rsyslog_ng_comparison.html \
 	rsyslog_conf.html \
 	rsyslog-example.conf \
 	rsyslog_mysql.html \
 	rsyslog_packages.html \
+	rsyslog_high_database_rate.html \
 	rsyslog_php_syslog_ng.html \
 	rsyslog_recording_pri.html \
 	rsyslog_stunnel.html \
-	professional_support.html \
 	status.html \
 	syslog-protocol.html \
 	version_naming.html \
 	contributors.html \
+	dev_queue.html \
+	omsnmp.html \
+	omlibdbi.html \
+	imfile.html \
+	imtcp.html \
+	imgssapi.html \
+	professional_support.html \
+	queues.html \
+	queueWorkerLogic.dia \
+	queueWorkerLogic.jpg \
+	queueWorkerLogic_small.jpg \
+	rainerscript.html \
+	rscript_abnf.html \
 	rsconf1_actionexeconlywhenpreviousissuspended.html \
 	rsconf1_actionresumeinterval.html \
 	rsconf1_allowedsender.html \
@@ -45,10 +62,13 @@ html_files = \
 	rsconf1_gssmode.html \
 	rsconf1_includeconfig.html \
 	rsconf1_mainmsgqueuesize.html \
+	rsconf1_markmessageperiod.html \
 	rsconf1_modload.html \
 	rsconf1_moddir.html \
 	rsconf1_repeatedmsgreduction.html \
 	rsconf1_resetconfigvariables.html \
-	rsconf1_umask.html
+	rsconf1_umask.html \
+	v3compatibility.html \
+	src/classes.dia
 
 EXTRA_DIST = $(html_files)

@@ -6,19 +6,20 @@
  *
  * Copyright 2007 Rainer Gerhards and Adiscon GmbH.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This file is part of rsyslog.
  *
- * This program is distributed in the hope that it will be useful,
+ * Rsyslog is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Rsyslog is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * along with Rsyslog.  If not, see <http://www.gnu.org/licenses/>.
  *
  * A copy of the GPL can be found in the file "COPYING" in this distribution.
  */
@@ -26,9 +27,11 @@
 #define	SYSLOGD_TYPES_INCLUDED 1
 
 #include "stringbuf.h"
-#include "net.h"
+//#include "net.h"
 #include <sys/param.h>
-#include <sys/syslog.h>
+#if HAVE_SYSLOG_H
+#include <syslog.h>
+#endif
 
 #define FALSE 0
 #define TRUE 1
@@ -63,11 +66,6 @@ typedef struct _syslogCode {
 	int     c_val;
 } syslogCODE;
 
-typedef enum _TCPFRAMINGMODE {
-		TCP_FRAMING_OCTET_STUFFING = 0, /* traditional LF-delimited */
-		TCP_FRAMING_OCTET_COUNTING = 1  /* -transport-tls like octet count */
-	} TCPFRAMINGMODE;
-
 /* values for host comparisons specified with host selector blocks
  * (+host, -host). rgerhards 2005-10-18.
  */
@@ -98,14 +96,7 @@ struct syslogTime {
 	 * OffsetMode to know the direction.
 	 */
 };
-
-#ifdef SYSLOG_INET
-struct AllowedSenders {
-	struct NetAddr allowedSender; /* ip address allowed */
-	uint8_t SignificantBits;      /* defines how many bits should be discarded (eqiv to mask) */
-	struct AllowedSenders *pNext;
-};
-#endif
+typedef struct syslogTime syslogTime_t;
 
 #endif /* #ifndef SYSLOGD_TYPES_INCLUDED */
 /*

@@ -8,19 +8,20 @@
  *
  * Copyright 2007 Rainer Gerhards and Adiscon GmbH.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This file is part of rsyslog.
  *
- * This program is distributed in the hope that it will be useful,
+ * Rsyslog is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Rsyslog is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * along with Rsyslog.  If not, see <http://www.gnu.org/licenses/>.
  *
  * A copy of the GPL can be found in the file "COPYING" in this distribution.
  */
@@ -48,11 +49,11 @@ static rsRetVal iminternalDestruct(iminternal_t *pThis)
 	assert(pThis != NULL);
 
 	if(pThis->pMsg != NULL)
-		MsgDestruct(pThis->pMsg);
+		msgDestruct(&pThis->pMsg);
 
 	free(pThis);
 
-	return iRet;
+	RETiRet;
 }
 
 
@@ -77,8 +78,8 @@ finalize_it:
 
 	*ppThis = pThis;
 
-	return iRet;
-};
+	RETiRet;
+}
 
 
 /* add a message to the linked list
@@ -110,7 +111,7 @@ finalize_it:
 			iminternalDestruct(pThis);
 	}
 
-	return iRet;
+	RETiRet;
 }
 
 
@@ -141,7 +142,7 @@ rsRetVal iminternalRemoveMsg(int *pPri, msg_t **ppMsg, int *pFlags)
 	}
 
 finalize_it:
-	return iRet;
+	RETiRet;
 }
 
 /* tell the caller if we have any messages ready for processing.
@@ -165,7 +166,7 @@ rsRetVal modInitIminternal(void)
 
 	iRet = llInit(&llMsgs, iminternalDestruct, NULL, NULL);
 
-	return iRet;
+	RETiRet;
 }
 
 
@@ -181,7 +182,7 @@ rsRetVal modExitIminternal(void)
 
 	iRet = llDestroy(&llMsgs);
 
-	return iRet;
+	RETiRet;
 }
 
 /*

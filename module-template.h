@@ -6,31 +6,63 @@
  *
  * Copyright 2007 Rainer Gerhards and Adiscon GmbH.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This file is part of rsyslog.
  *
- * This program is distributed in the hope that it will be useful,
+ * Rsyslog is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Rsyslog is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * along with Rsyslog.  If not, see <http://www.gnu.org/licenses/>.
  *
  * A copy of the GPL can be found in the file "COPYING" in this distribution.
  */
 #ifndef	MODULE_TEMPLATE_H_INCLUDED
 #define	MODULE_TEMPLATE_H_INCLUDED 1
 
+#include "modules.h"
+#include "obj.h"
 #include "objomsr.h"
+#include "threads.h"
 
 /* macro to define standard output-module static data members
  */
+#define DEF_MOD_STATIC_DATA \
+	static __attribute__((unused)) rsRetVal (*omsdRegCFSLineHdlr)();
+
 #define DEF_OMOD_STATIC_DATA \
-	static rsRetVal (*omsdRegCFSLineHdlr)();
+	DEF_MOD_STATIC_DATA \
+	DEFobjCurrIf(obj)
+#define DEF_IMOD_STATIC_DATA \
+	DEF_MOD_STATIC_DATA \
+	DEFobjCurrIf(obj)
+#define DEF_LMOD_STATIC_DATA \
+	DEF_MOD_STATIC_DATA
+
+
+/* Macro to define the module type. Each module can only have a single type. If
+ * a module provides multiple types, several separate modules must be created which
+ * then should share a single library containing the majority of code. This macro
+ * must be present in each module. -- rgerhards, 2007-12-14
+ */
+#define MODULE_TYPE(x)\
+static rsRetVal modGetType(eModType_t *modType) \
+	{ \
+		*modType = x; \
+		return RS_RET_OK;\
+	}
+
+#define MODULE_TYPE_INPUT MODULE_TYPE(eMOD_IN)
+#define MODULE_TYPE_OUTPUT MODULE_TYPE(eMOD_OUT)
+#define MODULE_TYPE_LIB \
+	DEF_LMOD_STATIC_DATA \
+	MODULE_TYPE(eMOD_LIB)
 
 /* macro to define a unique module id. This must be able to fit in a void*. The
  * module id must be unique inside a running rsyslogd application. It is used to
@@ -76,12 +108,13 @@ static rsRetVal createInstance(instanceData **ppData)\
 #define CODESTARTcreateInstance \
 	if((pData = calloc(1, sizeof(instanceData))) == NULL) {\
 		*ppData = NULL;\
+		ENDfunc \
 		return RS_RET_OUT_OF_MEMORY;\
 	}
 
 #define ENDcreateInstance \
 	*ppData = pData;\
-	return iRet;\
+	RETiRet;\
 }
 
 /* freeInstance()
@@ -105,7 +138,7 @@ static rsRetVal freeInstance(void* pModData)\
 #define ENDfreeInstance \
 	if(pData != NULL)\
 		free(pData); /* we need to free this in any case */\
-	return iRet;\
+	RETiRet;\
 }
 
 /* isCompatibleWithFeature()
@@ -113,12 +146,13 @@ static rsRetVal freeInstance(void* pModData)\
 #define BEGINisCompatibleWithFeature \
 static rsRetVal isCompatibleWithFeature(syslogFeature __attribute__((unused)) eFeat)\
 {\
-	rsRetVal iRet = RS_RET_INCOMPATIBLE;
+	rsRetVal iRet = RS_RET_INCOMPATIBLE; \
+	BEGINfunc
 
 #define CODESTARTisCompatibleWithFeature
 
 #define ENDisCompatibleWithFeature \
-	return iRet;\
+	RETiRet;\
 }
 
 /* doAction()
@@ -132,7 +166,7 @@ static rsRetVal doAction(uchar __attribute__((unused)) **ppString, unsigned __at
 	/* ppString may be NULL if the output module requested no strings */
 
 #define ENDdoAction \
-	return iRet;\
+	RETiRet;\
 }
 
 
@@ -150,71 +184,7 @@ static rsRetVal dbgPrintInstInfo(void *pModData)\
 	pData = (instanceData*) pModData;
 
 #define ENDdbgPrintInstInfo \
-	return iRet;\
-}
-
-
-/* needUDPSocket()
- * Talks back to syslogd if the global UDP syslog socket is needed for
- * sending. Returns 0 if not, 1 if needed. This interface hopefully goes
- * away at some time, because it is kind of a hack. However, currently
- * there is no way around it, so we need to support it.
- * rgerhards, 2007-07-26
- */
-#define BEGINneedUDPSocket \
-static rsRetVal needUDPSocket(void *pModData)\
-{\
-	rsRetVal iRet = RS_RET_FALSE;\
-	instanceData *pData = NULL;
-
-#define CODESTARTneedUDPSocket \
-	pData = (instanceData*) pModData;
-
-#define ENDneedUDPSocket \
-	return iRet;\
-}
-
-
-/* onSelectReadyWrite()
- * Extra comments:
- * This is called when select() returned with a writable file descriptor
- * for this module. The fd was most probably obtained by getWriteFDForSelect()
- * before.
- */
-#define BEGINonSelectReadyWrite \
-static rsRetVal onSelectReadyWrite(void *pModData)\
-{\
-	rsRetVal iRet = RS_RET_NONE;\
-	instanceData *pData = NULL;
-
-#define CODESTARTonSelectReadyWrite \
-	pData = (instanceData*) pModData;
-
-#define ENDonSelectReadyWrite \
-	return iRet;\
-}
-
-
-/* getWriteFDForSelect()
- * Extra comments:
- * Gets writefd for select call. Must only be returned when the selector must
- * be written to. If the module has no such fds, it must return RS_RET_NONE.
- * In this case, the default implementation is sufficient.
- * This interface will probably go away over time, but we need it now to
- * continue modularization.
- */
-#define BEGINgetWriteFDForSelect \
-static rsRetVal getWriteFDForSelect(void *pModData, short  __attribute__((unused)) *fd)\
-{\
-	rsRetVal iRet = RS_RET_NONE;\
-	instanceData *pData = NULL;
-
-#define CODESTARTgetWriteFDForSelect \
-	assert(fd != NULL);\
-	pData = (instanceData*) pModData;
-
-#define ENDgetWriteFDForSelect \
-	return iRet;\
+	RETiRet;\
 }
 
 
@@ -259,12 +229,13 @@ finalize_it:\
 			OMSRdestruct(*ppOMSR);\
 			*ppOMSR = NULL;\
 		}\
-		if(pData != NULL)\
+		if(pData != NULL) {\
 			freeInstance(pData);\
+		} \
 	}
 
 #define ENDparseSelectorAct \
-	return iRet;\
+	RETiRet;\
 }
 
 
@@ -286,7 +257,7 @@ static rsRetVal tryResume(instanceData __attribute__((unused)) *pData)\
 	assert(pData != NULL);
 
 #define ENDtryResume \
-	return iRet;\
+	RETiRet;\
 }
 
 
@@ -300,45 +271,74 @@ static rsRetVal queryEtryPt(uchar *name, rsRetVal (**pEtryPoint)())\
 	DEFiRet;
 
 #define CODESTARTqueryEtryPt \
-	if((name == NULL) || (pEtryPoint == NULL))\
+	if((name == NULL) || (pEtryPoint == NULL)) {\
+		ENDfunc \
 		return RS_RET_PARAM_ERROR;\
+	} \
 	*pEtryPoint = NULL;
 
 #define ENDqueryEtryPt \
 	if(iRet == RS_RET_OK)\
-		iRet = (*pEtryPoint == NULL) ? RS_RET_NOT_FOUND : RS_RET_OK;\
-	return iRet;\
+		if(*pEtryPoint == NULL) { \
+			dbgprintf("entry point '%s' not present in module\n", name); \
+			iRet = RS_RET_MODULE_ENTRY_POINT_NOT_FOUND;\
+		} \
+	RETiRet;\
 }
+
+/* the following definition is the standard block for queryEtryPt for all types
+ * of modules. It should be included in any module, and typically is so by calling
+ * the module-type specific macros.
+ */
+#define CODEqueryEtryPt_STD_MOD_QUERIES \
+	if(!strcmp((char*) name, "modExit")) {\
+		*pEtryPoint = modExit;\
+	} else if(!strcmp((char*) name, "modGetID")) {\
+		*pEtryPoint = modGetID;\
+	} else if(!strcmp((char*) name, "getType")) {\
+		*pEtryPoint = modGetType;\
+	}
 
 /* the following definition is the standard block for queryEtryPt for output
  * modules. This can be used if no specific handling (e.g. to cover version
  * differences) is needed.
  */
 #define CODEqueryEtryPt_STD_OMOD_QUERIES \
-	if(!strcmp((char*) name, "doAction")) {\
+	CODEqueryEtryPt_STD_MOD_QUERIES \
+	else if(!strcmp((char*) name, "doAction")) {\
 		*pEtryPoint = doAction;\
-	} else if(!strcmp((char*) name, "parseSelectorAct")) {\
-		*pEtryPoint = parseSelectorAct;\
-	} else if(!strcmp((char*) name, "isCompatibleWithFeature")) {\
-		*pEtryPoint = isCompatibleWithFeature;\
 	} else if(!strcmp((char*) name, "dbgPrintInstInfo")) {\
 		*pEtryPoint = dbgPrintInstInfo;\
 	} else if(!strcmp((char*) name, "freeInstance")) {\
 		*pEtryPoint = freeInstance;\
-	} else if(!strcmp((char*) name, "modExit")) {\
-		*pEtryPoint = modExit;\
-	} else if(!strcmp((char*) name, "getWriteFDForSelect")) {\
-		*pEtryPoint = getWriteFDForSelect;\
-	} else if(!strcmp((char*) name, "onSelectReadyWrite")) {\
-		*pEtryPoint = onSelectReadyWrite;\
-	} else if(!strcmp((char*) name, "needUDPSocket")) {\
-		*pEtryPoint = needUDPSocket;\
+	} else if(!strcmp((char*) name, "parseSelectorAct")) {\
+		*pEtryPoint = parseSelectorAct;\
+	} else if(!strcmp((char*) name, "isCompatibleWithFeature")) {\
+		*pEtryPoint = isCompatibleWithFeature;\
 	} else if(!strcmp((char*) name, "tryResume")) {\
 		*pEtryPoint = tryResume;\
-	} else if(!strcmp((char*) name, "modGetID")) {\
-		*pEtryPoint = modGetID;\
 	}
 
+/* the following definition is the standard block for queryEtryPt for INPUT
+ * modules. This can be used if no specific handling (e.g. to cover version
+ * differences) is needed.
+ */
+#define CODEqueryEtryPt_STD_IMOD_QUERIES \
+	CODEqueryEtryPt_STD_MOD_QUERIES \
+	else if(!strcmp((char*) name, "runInput")) {\
+		*pEtryPoint = runInput;\
+	} else if(!strcmp((char*) name, "willRun")) {\
+		*pEtryPoint = willRun;\
+	} else if(!strcmp((char*) name, "afterRun")) {\
+		*pEtryPoint = afterRun;\
+	}
+
+/* the following definition is the standard block for queryEtryPt for LIBRARY
+ * modules. This can be used if no specific handling (e.g. to cover version
+ * differences) is needed.
+ */
+#define CODEqueryEtryPt_STD_LIB_QUERIES \
+	CODEqueryEtryPt_STD_MOD_QUERIES
 
 /* modInit()
  * This has an extra parameter, which is the specific name of the modInit
@@ -366,19 +366,25 @@ static rsRetVal queryEtryPt(uchar *name, rsRetVal (**pEtryPoint)())\
  * cached, left-in-memory copy of a previous incarnation.
  */
 #define BEGINmodInit(uniqName) \
-rsRetVal modInit##uniqName(int iIFVersRequested __attribute__((unused)), int *ipIFVersProvided, rsRetVal (**pQueryEtryPt)(), rsRetVal (*pHostQueryEtryPt)(uchar*, rsRetVal (**)()))\
+rsRetVal modInit##uniqName(int iIFVersRequested __attribute__((unused)), int *ipIFVersProvided, rsRetVal (**pQueryEtryPt)(), rsRetVal (*pHostQueryEtryPt)(uchar*, rsRetVal (**)()), modInfo_t __attribute__((unused)) *pModInfo)\
 {\
-	DEFiRet;
+	DEFiRet; \
+	rsRetVal (*pObjGetObjInterface)(obj_if_t *pIf);
 
 #define CODESTARTmodInit \
 	assert(pHostQueryEtryPt != NULL);\
-	if((pQueryEtryPt == NULL) || (ipIFVersProvided == NULL))\
-		return RS_RET_PARAM_ERROR;
+	iRet = pHostQueryEtryPt((uchar*)"objGetObjInterface", &pObjGetObjInterface); \
+	if((iRet != RS_RET_OK) || (pQueryEtryPt == NULL) || (ipIFVersProvided == NULL) || (pObjGetObjInterface == NULL)) { \
+		ENDfunc \
+		return (iRet == RS_RET_OK) ? RS_RET_PARAM_ERROR : iRet; \
+	} \
+	/* now get the obj interface so that we can access other objects */ \
+	CHKiRet(pObjGetObjInterface(&obj));
 
 #define ENDmodInit \
 finalize_it:\
 	*pQueryEtryPt = queryEtryPt;\
-	return iRet;\
+	RETiRet;\
 }
 
 
@@ -408,8 +414,67 @@ static rsRetVal modExit(void)\
 #define CODESTARTmodExit 
 
 #define ENDmodExit \
-	return iRet;\
+	RETiRet;\
 }
+
+
+/* runInput()
+ * This is the main function for input modules. It is used to gather data from the
+ * input source and submit it to the message queue. Each runInput() instance has its own
+ * thread. This is handled by the rsyslog engine. It needs to spawn off new threads only
+ * if there is a module-internal need to do so.
+ */
+#define BEGINrunInput \
+static rsRetVal runInput(thrdInfo_t __attribute__((unused)) *pThrd)\
+{\
+	DEFiRet;
+
+#define CODESTARTrunInput \
+	dbgSetThrdName((uchar*)__FILE__); /* we need to provide something better later */
+
+#define ENDrunInput \
+	RETiRet;\
+}
+
+
+/* willRun()
+ * This is a function that will be replaced in the longer term. It is used so
+ * that a module can tell the caller if it will run or not. This is to be replaced
+ * when we introduce input module instances. However, these require config syntax
+ * changes and I may (or may not... ;)) hold that until another config file 
+ * format is available. -- rgerhards, 2007-12-17
+ * returns RS_RET_NO_RUN if it will not run (RS_RET_OK or error otherwise)
+ */
+#define BEGINwillRun \
+static rsRetVal willRun(void)\
+{\
+	DEFiRet;
+
+#define CODESTARTwillRun 
+
+#define ENDwillRun \
+	RETiRet;\
+}
+
+
+/* afterRun()
+ * This function is called after an input module has been run and its thread has
+ * been terminated. It shall do any necessary cleanup.
+ * This is expected to evolve into a freeInstance type of call once the input module
+ * interface evolves to support multiple instances.
+ * rgerhards, 2007-12-17
+ */
+#define BEGINafterRun \
+static rsRetVal afterRun(void)\
+{\
+	DEFiRet;
+
+#define CODESTARTafterRun 
+
+#define ENDafterRun \
+	RETiRet;\
+}
+
 
 /*
  * vi:set ai:

@@ -23,6 +23,25 @@
  * necessary buffer space.
  *
  * begun 2005-09-09 rgerhards
+ *
+ * Copyright (C) 2005 by Rainer Gerhards and Adiscon GmbH
+ *
+ * This file is part of rsyslog.
+ *
+ * Rsyslog is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Rsyslog is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Rsyslog.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * A copy of the GPL can be found in the file "COPYING" in this distribution.
  */
 #ifndef _PARSE_H_INCLUDED__
 #define _PARSE_H_INCLUDED__ 1
@@ -37,7 +56,7 @@ struct rsParsObject
 #ifndef NDEBUG
 	rsObjID OID;			/**< object ID */
 #endif
-	rsCStrObj *pCStr;		/**< pointer to the string object we are parsing */
+	cstr_t *pCStr;		/**< pointer to the string object we are parsing */
 	int iCurrPos;			/**< current parsing position (char offset) */
 };
 typedef struct rsParsObject rsParsObj;
@@ -52,7 +71,7 @@ int rsParsGetParsePointer(rsParsObj *pThis);
  * Construct a rsPars object.
  */
 rsRetVal rsParsConstruct(rsParsObj **ppThis);
-rsRetVal rsParsAssignString(rsParsObj *pThis, rsCStrObj *pCStr);
+rsRetVal rsParsAssignString(rsParsObj *pThis, cstr_t *pCStr);
 
 /* parse an integer. The parse pointer is advanced */
 rsRetVal parsInt(rsParsObj *pThis, int* pInt);
@@ -72,10 +91,10 @@ rsRetVal parsSkipWhitespace(rsParsObj *pThis);
  * Output:
  * ppCStr Pointer to the parsed string
  */
-rsRetVal parsDelimCStr(rsParsObj *pThis, rsCStrObj **ppCStr, char cDelim, int bTrimLeading, int bTrimTrailing);
+rsRetVal parsDelimCStr(rsParsObj *pThis, cstr_t **ppCStr, char cDelim, int bTrimLeading, int bTrimTrailing);
 
 rsRetVal parsSkipAfterChar(rsParsObj *pThis, char c);
-rsRetVal parsQuotedCStr(rsParsObj *pThis, rsCStrObj **ppCStr);
+rsRetVal parsQuotedCStr(rsParsObj *pThis, cstr_t **ppCStr);
 rsRetVal rsParsConstructFromSz(rsParsObj **ppThis, unsigned char *psz);
 rsRetVal rsParsDestruct(rsParsObj *pThis);
 int parsIsAtEndOfParseString(rsParsObj *pThis);

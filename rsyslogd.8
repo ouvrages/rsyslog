@@ -1,7 +1,7 @@
-.\" Copyright 2004-2005 Rainer Gerhards and Adiscon for the rsyslog modifications
+.\" Copyright 2004-2008 Rainer Gerhards and Adiscon for the rsyslog modifications
 .\" May be distributed under the GNU General Public License
 .\"
-.TH RSYSLOGD 8 "12 February 2008" "Version 2.0.2" "Linux System Administration"
+.TH RSYSLOGD 8 "02 April 2008" "Version 3.14.0" "Linux System Administration"
 .SH NAME
 rsyslogd \- reliable and extended syslogd 
 .SH SYNOPSIS
@@ -9,19 +9,10 @@ rsyslogd \- reliable and extended syslogd
 .RB [ " \-4 " ]
 .RB [ " \-6 " ]
 .RB [ " \-A " ]
-.RB [ " \-a "
-.I socket
-]
 .RB [ " \-d " ]
-.RB [ " \-e " ]
-.br
 .RB [ " \-f "
 .I config file
 ]
-.RB [ " \-g "
-.I port,max-nbr-of-sessions
-]
-.RB [ " \-h " ] 
 .br
 .RB [ " \-i "
 .I pid file
@@ -29,26 +20,12 @@ rsyslogd \- reliable and extended syslogd
 .RB [ " \-l "
 .I hostlist
 ]
-.RB [ " \-m "
-.I interval
-] 
 .RB [ " \-n " ]
-.RB [ " \-o " ]
 .br
-.RB [ " \-p"
-.IB socket 
-]
 .RB [ " \-q " ]
 .RB [ " \-Q " ]
-.RB [ " \-r "
-.I [port]
-]
 .RB [ " \-s "
 .I domainlist
-]
-.br
-.RB [ " \-t "
-.I port,max-nbr-of-sessions
 ]
 .RB [ " \-v " ]
 .RB [ " \-w " ]
@@ -59,7 +36,17 @@ rsyslogd \- reliable and extended syslogd
 is a system utility providing support for message logging.
 Support of both internet and
 unix domain sockets enables this utility to support both local
-and remote logging (via UDP and TCP).
+and remote logging.
+
+.B Note that this version of rsyslog ships with extensive documentation in html format.
+This is provided in the ./doc subdirectory and probably
+in a separate package if you installed rsyslog via a packaging system.
+To use rsyslog's advanced features, you
+.B need
+to look at the html documentation, because the man pages only cover
+basic aspects of operation.
+.B For details and configuration examples, see the rsyslog.conf (5)
+.B man page and the online documentation at http://www.rsyslog.com/doc
 
 .BR Rsyslogd (8)
 is derived from the sysklogd package which in turn is derived from the
@@ -71,7 +58,7 @@ message contains at least a time and a hostname field, normally a
 program name field, too, but that depends on how trusty the logging
 program is. The rsyslog package supports free definition of output formats
 via templates. It also supports precise timestamps and writing directly
-to MySQL databases. If the database option is used, tools like phpLogCon can
+to databases. If the database option is used, tools like phpLogCon can
 be used to view the log data.
 
 While the
@@ -98,12 +85,11 @@ option, is read at startup.  Any lines that begin with the hash mark
 (``#'') and empty lines are ignored.  If an error occurs during parsing
 the error element is ignored. It is tried to parse the rest of the line.
 
-For details and configuration examples, see the
-.B rsyslog.conf (5)
-man page.
-
 .LP
 .SH OPTIONS
+.B Note that in version 3 of rsyslog a number of command line options
+.B have been deprecated and replaced with config file directives. The
+.B -c option controls the backward compatibility mode in use.
 .TP
 .BI "\-A"
 When sending UDP messages, there are potentially multiple pathes to
@@ -130,17 +116,27 @@ If neither -4 nor -6 is given,
 .B rsyslogd
 listens to all configured addresses of the system.
 .TP
-.BI "\-a " "socket"
-Using this argument you can specify additional sockets from that
-.B rsyslogd
-has to listen to.  This is needed if you're going to let some daemon
-run within a chroot() environment.  You can use up to 19 additional
-sockets.  If your environment needs even more, you have to increase
-the symbol
-.B MAXFUNIX
-within the syslogd.c source file.  An example for a chroot() daemon is
-described by the people from OpenBSD at
-http://www.psionic.com/papers/dns.html.
+.BI "\-c " "version"
+Selects the desired backward compatibility mode. It must always be the
+first option on the command line, as it influences processing of the
+other options. To use the rsyslog v3 native interface, specify -c3. To
+use compatibility mode , either do not use -c at all or use
+-c<version> where 
+.IR version
+is the rsyslog version that it shall be
+compatible with. Using -c0 tells rsyslog to be command-line compatible
+to sysklogd, which is the default if -c is not given.
+.B Please note that rsyslogd issues warning messages if the -c3
+.B command line option is not given.
+This is to alert you that your are running in compatibility
+mode. Compatibility mode interfers with you rsyslog.conf commands and
+may cause some undesired side-effects. It is meant to be used with a
+plain old rsyslog.conf - if you use new features, things become
+messy. So the best advice is to work through this document, convert
+your options and config file and then use rsyslog in native mode. In
+order to aid you in this process, rsyslog logs every
+compatibility-mode config file directive it has generated. So you can
+simply copy them from your logfile and paste them to the config.
 .TP
 .B "\-d"
 Turns on debug mode.  Using this the daemon will not proceed a 
@@ -149,26 +145,10 @@ to set itself in the background, but opposite to that stay in the
 foreground and write much debug information on the current tty.  See the
 DEBUGGING section for more information.
 .TP
-.B "\-e"
-Set the default of $RepeatedMsgReduction config option to "off". 
-Hine: "e" like "every message". For further information, see there.
-.TP
 .BI "\-f " "config file"
 Specify an alternative configuration file instead of
 .IR /etc/rsyslog.conf ","
 which is the default.
-.TP
-.BI "\-g "
-Identical to -t except that every tcp connection is authenticated
-using gss-api (kerberos 5). Service name may be set using
-$GssListenServiceName or the default "host" will be used. Encryption
-can be used if specified by the client and supported by both sides.
-.TP
-.BI "\-h "
-By default rsyslogd will not forward messages it receives from remote hosts.
-Specifying this switch on the command line will cause the log daemon to
-forward any remote messages it receives to forwarding hosts which have been
-defined.
 .TP
 .BI "\-i " "pid file"
 Specify an alternative pid file instead of the default one.
@@ -180,30 +160,11 @@ Specify a hostname that should be logged only with its simple hostname
 and not the fqdn.  Multiple hosts may be specified using the colon
 (``:'') separator.
 .TP
-.BI "\-m " "interval"
-The
-.B rsyslogd
-logs a mark timestamp regularly.  The default
-.I interval
-between two \fI-- MARK --\fR lines is 20 minutes.  This can be changed
-with this option.  Setting the
-.I interval
-to zero turns it off entirely.
-.TP
 .B "\-n"
 Avoid auto-backgrounding.  This is needed especially if the
 .B rsyslogd
 is started and controlled by
 .BR init (8).
-.TP
-.B "\-o"
-Omit reading the standard local log socket. This option is most
-useful for running multiple instances of rsyslogd on a single 
-machine. When specified, no local log socket is opened at all.
-.TP
-.BI "\-p " "socket"
-You can specify an alternative unix domain socket instead of
-.IR /dev/log "."
 .TP
 .BI "\-q " "add hostname if DNS fails during ACL processing"
 During ACL processing, hostnames are resolved to IP addreses for
@@ -213,15 +174,6 @@ slower operation once DNS is up again.
 .TP
 .BI "\-Q " "do not resolve hostnames during ACL processing"
 Do not resolve hostnames to IP addresses during ACL processing.
-.TP
-.BI "\-r " ["port"]
-Activates the syslog/udp listener service. The listener
-will listen to the specified port.  If no port is specified,
-0 is used as port number, which in turn will lead to a
-lookup of the system default syslog port. If there is
-no system default, 514 is used. Please note that the port
-must immediately follow the -r option. Thus "-r514" is valid
-while "-r 514" is invalid (note the space).
 .TP
 .BI "\-s " "domainlist"
 Specify a domainname that should be stripped off before
@@ -233,17 +185,6 @@ domains.  For example if
 is specified and the host logging resolves to satu.infodrom.north.de
 no domain would be cut, you will have to specify two domains like:
 .BR "\-s north.de:infodrom.north.de" .
-.TP
-.BI "\-t " "port,max-nbr-of-sessions"
-Activates the syslog/tcp listener service. The listener will listen to
-the specified port. If max-nbr-of-sessions is specified, that becomes
-the maximum number of concurrent tcp sessions. If not specified, the
-default is 200. Please note that syslog/tcp is not standardized,
-but the implementation in rsyslogd follows common practice and is
-compatible with e.g. Cisco PIX, syslog-ng and MonitorWare (Windows).
-Please note that the port
-must immediately follow the -t option. Thus "-t514" is valid
-while "-t 514" is invalid (note the space).
 .TP
 .B "\-v"
 Print version and exit.
@@ -262,11 +203,18 @@ reacts to a set of signals.  You may easily send a signal to
 using the following:
 .IP
 .nf
-kill -SIGNAL `cat /var/run/rsyslogd.pid`
+kill -SIGNAL $(cat /var/run/syslogd.pid)
+.fi
+.PP
+Note that -SIGNAL must be replaced with the actual signal
+you are trying to send, e.g. with HUP. So it then becomes:
+.IP
+.nf
+kill -HUP $(cat /var/run/syslogd.pid)
 .fi
 .PP
 .TP
-.B SIGHUP
+.B HUP
 This lets
 .B rsyslogd
 perform a re-initialization.  All open files are closed, the
@@ -276,186 +224,19 @@ will be reread and the
 .BR rsyslog (3)
 facility is started again.
 .TP
-.B SIGTERM "," SIGINT "," SIGQUIT
+.B TERM ", " INT ", " QUIT
 .B Rsyslogd
 will die.
 .TP
-.B SIGUSR1
+.B USR1
 Switch debugging on/off.  This option can only be used if
 .B rsyslogd
 is started with the
 .B "\-d"
 debug option.
 .TP
-.B SIGCHLD
+.B CHLD
 Wait for childs if some were born, because of wall'ing messages.
-.LP
-.SH SUPPORT FOR REMOTE LOGGING
-.B Rsyslogd
-provides network support to the syslogd facility.
-Network support means that messages can be forwarded from one node
-running rsyslogd to another node running rsyslogd (or a
-compatible syslog implementation) where they will be
-actually logged to a disk file.
-
-To enable this you have to specify one of
-.B "\-g"
-,
-.B "\-r"
-or
-.B "\-t"
-options on the command line.  The default behavior is that
-.B rsyslogd
-won't listen to the network. You can also combine these
-options if you want rsyslogd to listen to both TCP and UDP
-messages. Only one of the TCP listener options can be used.
-The last one specified will take effect.
-
-The strategy is to have rsyslogd listen on a unix domain socket for
-locally generated log messages.  This behavior will allow rsyslogd to
-inter-operate with the syslog found in the standard C library.  At the
-same time rsyslogd listens on the standard syslog port for messages
-forwarded from other hosts.  To have this work correctly the
-.BR services (5)
-files (typically found in
-.IR /etc )
-must have the following
-entry:
-.IP
-.nf
-	syslog          514/udp
-.fi
-.PP
-If this entry is missing
-.B rsyslogd
-will use the well known port of 514 (so in most cases, it's not
-really needed).
-
-To cause messages to be forwarded to another host replace
-the normal file line in the
-.I rsyslog.conf
-file with the name of the host to which the messages is to be sent
-prepended with an @ (for UDP delivery) or the sequence @@ (for
-TCP delivery). The host name can also be followed by a colon and
-a port number, in which case the message is sent to the specified
-port on the remote host.
-.IP
-For example, to forward
-.B ALL
-messages to a remote host use the
-following
-.I rsyslog.conf
-entry:
-.IP
-.nf
-	# Sample rsyslogd configuration file to
-	# messages to a remote host forward all.
-	*.*			@hostname
-.fi
-More samples can be found in sample.conf.
-
-If the remote hostname cannot be resolved at startup, because the
-name-server might not be accessible (it may be started after rsyslogd)
-you don't have to worry.
-.B Rsyslogd
-will retry to resolve the name ten times and then complain.  Another
-possibility to avoid this is to place the hostname in
-.IR /etc/hosts .
-
-With normal
-.BR syslogd s
-you would get syslog-loops if you send out messages that were received
-from a remote host to the same host (or more complicated to a third
-host that sends it back to the first one, and so on).
-
-To avoid this no messages that were received from a
-remote host are sent out to another (or the same) remote host. You can
-disable this feature by the
-.B \-h
-option.
-
-If the remote host is located in the same domain as the host, 
-.B rsyslogd
-is running on, only the simple hostname will be logged instead of
-the whole fqdn.
-
-In a local network you may provide a central log server to have all
-the important information kept on one machine.  If the network consists
-of different domains you don't have to complain about logging fully
-qualified names instead of simple hostnames.  You may want to use the
-strip-domain feature
-.B \-s
-of this server.  You can tell
-.B rsyslogd
-to strip off several domains other than the one the server is located
-in and only log simple hostnames.
-
-Using the
-.B \-l
-option there's also a possibility to define single hosts as local
-machines.  This, too, results in logging only their simple hostnames
-and not the fqdns.
-
-.SH OUTPUT TO DATABASES
-.B Rsyslogd
-has support for writing data to MySQL database tables. The exact specifics
-are described in the
-.B rsyslog.conf (5)
-man page. Be sure to read it if you plan to use database logging.
-
-While it is often handy to have the data in a database, you must be aware
-of the implications. Most importantly, database logging takes far
-longer than logging to a text file. A system that can handle a large
-log volume when writing to text files can most likely not handle
-a similar large volume when writing to a database table.
-
-.SH OUTPUT TO NAMED PIPES (FIFOs)
-.B Rsyslogd
-has support for logging output to named pipes
-(fifos).  A fifo or named pipe can be used as a destination for log
-messages by prepending a pipy symbol (``|'') to the name of the
-file.  This is handy for debugging.  Note that the fifo must be created
-with the mkfifo command before
-.B rsyslogd
-is started.
-.IP
-The following configuration file routes debug messages from the
-kernel to a fifo:
-.IP
-.nf
-	# Sample configuration to route kernel debugging
-	# messages ONLY to /usr/adm/debug which is a
-	# named pipe.
-	kern.=debug			|/usr/adm/debug
-.fi
-.LP
-.SH INSTALLATION CONCERNS
-There is probably one important consideration when installing
-rsyslogd.  It is dependent on proper
-formatting of messages by the syslog function.  The functioning of the
-syslog function in the shared libraries changed somewhere in the
-region of libc.so.4.[2-4].n.  The specific change was to
-null-terminate the message before transmitting it to the 
-.I /dev/log
-socket.  Proper functioning of this version of rsyslogd is dependent on
-null-termination of the message.
-
-This problem will typically manifest itself if old statically linked
-binaries are being used on the system.  Binaries using old versions of
-the syslog function will cause empty lines to be logged followed by
-the message with the first character in the message removed.
-Relinking these binaries to newer versions of the shared libraries
-will correct this problem.
-
-The
-.BR rsyslogd (8)
-can be run from
-.BR init (8)
-or started as part of the rc.*
-sequence.  If it is started from init the option \fI\-n\fR must be set,
-otherwise you'll get tons of syslog daemons started.  This is because 
-.BR init (8)
-depends on the process ID.
 .LP
 .SH SECURITY THREATS
 There is the potential for the rsyslogd daemon to be
@@ -477,20 +258,10 @@ if filled, will not impair the machine.
 The ext2 filesystem can be used which can be configured to limit a
 certain percentage of a filesystem to usage by root only.  \fBNOTE\fP
 that this will require rsyslogd to be run as a non-root process.
-\fBALSO NOTE\fP that this will prevent usage of remote logging since
+\fBALSO NOTE\fP that this will prevent usage of remote logging on the default port since
 rsyslogd will be unable to bind to the 514/UDP socket.
 .IP 4.
 Disabling inet domain sockets will limit risk to the local machine.
-.IP 5.
-Use step 4 and if the problem persists and is not secondary to a rogue
-program/daemon get a 3.5 ft (approx. 1 meter) length of sucker rod*
-and have a chat with the user in question.
-
-Sucker rod def. \(em 3/4, 7/8 or 1in. hardened steel rod, male
-threaded on each end.  Primary use in the oil industry in Western
-North Dakota and other locations to pump 'suck' oil from oil wells.
-Secondary uses are for the construction of cattle feed lots and for
-dealing with the occasional recalcitrant or belligerent individual.
 .SS Message replay and spoofing
 If remote logging is enabled, messages can easily be spoofed and replayed.
 As the messages are transmitted in clear-text, an attacker might use
@@ -505,45 +276,7 @@ When debugging is turned on using
 .B "\-d"
 option then
 .B rsyslogd
-will be very verbose by writing much of what it does on stdout.  Whenever
-the configuration file is reread and re-parsed you'll see a tabular,
-corresponding to the internal data structure.  This tabular consists of
-four fields:
-.TP
-.I number
-This field contains a serial number starting by zero.  This number
-represents the position in the internal data structure (i.e. the
-array).  If one number is left out then there might be an error in the
-corresponding line in
-.IR /etc/rsyslog.conf .
-.TP
-.I pattern
-This field is tricky and represents the internal structure
-exactly.  Every column stands for a facility (refer to
-.BR syslog (3)).
-As you can see, there are still some facilities left free for former
-use, only the left most are used.  Every field in a column represents
-the priorities (refer to
-.BR syslog (3)).
-.TP
-.I action
-This field describes the particular action that takes place whenever a
-message is received that matches the pattern.  Refer to the
-.BR syslog.conf (5)
-manpage for all possible actions.
-.TP
-.I arguments
-This field shows additional arguments to the actions in the last
-field.  For file-logging this is the filename for the logfile; for
-user-logging this is a list of users; for remote logging this is the
-hostname of the machine to log to; for console-logging this is the
-used console; for tty-logging this is the specified tty; wall has no
-additional arguments.
-.TP
-.SS templates
-There will also be a second internal structure which lists all
-defined templates and there contents. This also enables you to see
-the internally-defined, hardcoded templates.
+will be very verbose by writing much of what it does on stdout.
 .SH FILES
 .PD 0
 .TP
@@ -560,6 +293,54 @@ The Unix domain socket to from where local syslog messages are read.
 .I /var/run/rsyslogd.pid
 The file containing the process id of 
 .BR rsyslogd .
+.TP
+.I prefix/lib/rsyslog
+Default directory for
+.B rsyslogd
+modules. The
+.I prefix
+is specified during compilation (e.g. /usr/local).
+.SH ENVIRONMENT
+.TP
+.B RSYSLOG_DEBUG
+Controls runtime debug support.It contains an option string with the
+following options possible (all are case insensitive):
+
+.RS
+.IP LogFuncFlow
+Print out the logical flow of functions (entering and exiting them)
+.IP FileTrace
+Ppecifies which files to trace LogFuncFlow. If not set (the
+default), a LogFuncFlow trace is provided for all files. Set to
+limit it to the files specified.FileTrace may be specified multiple
+times, one file each (e.g. export RSYSLOG_DEBUG="LogFuncFlow
+FileTrace=vm.c FileTrace=expr.c"
+.IP PrintFuncDB
+Print the content of the debug function database whenever debug
+information is printed (e.g. abort case)!
+.IP PrintAllDebugInfoOnExit
+Print all debug information immediately before rsyslogd exits
+(currently not implemented!)
+.IP PrintMutexAction
+Print mutex action as it happens. Useful for finding deadlocks and
+such.
+.IP NoLogTimeStamp
+Do not prefix log lines with a timestamp (default is to do that).
+.IP NoStdOut
+Do not emit debug messages to stdout. If RSYSLOG_DEBUGLOG is not
+set, this means no messages will be displayed at all.
+.IP Help
+Display a very short list of commands - hopefully a life saver if
+you can't access the documentation...
+.RE
+
+.TP
+.B RSYSLOG_DEBUGLOG
+If set, writes (allmost) all debug message to the specified log file
+in addition to stdout.
+.TP
+.B RSYSLOG_MODDIR
+Provides the default directory in which loadable modules reside.
 .PD
 .SH BUGS
 Please review the file BUGS for up-to-date information on known
@@ -591,11 +372,4 @@ Adiscon GmbH
 Grossrinderfeld, Germany
 .TP
 rgerhards@adiscon.com
-
-.TP
-Michael Meckelein
-.TP
-Adiscon GmbH
-.TP
-mmeckelein@adiscon.com
 .PD

@@ -9,36 +9,47 @@
  *
  * Copyright 2007 Rainer Gerhards and Adiscon GmbH.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This file is part of rsyslog.
  *
- * This program is distributed in the hope that it will be useful,
+ * Rsyslog is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Rsyslog is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * along with Rsyslog.  If not, see <http://www.gnu.org/licenses/>.
  *
  * A copy of the GPL can be found in the file "COPYING" in this distribution.
  */
 #include "config.h"
-#include "rsyslog.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #define SYSLOG_NAMES
-#include <sys/syslog.h>
 #include <string.h>
 #include <assert.h>
 #include <ctype.h>
+#include "rsyslog.h"
 #include "syslogd.h"
 #include "srUtils.h"
+#include "stringbuf.h"
 #include "template.h"
 #include "msg.h"
+#include "var.h"
+#include "datetime.h"
+#include "regexp.h"
+#include "atomic.h"
+
+/* static data */
+DEFobjStaticHelpers
+DEFobjCurrIf(var)
+DEFobjCurrIf(datetime)
+DEFobjCurrIf(regexp)
 
 static syslogCODE rs_prioritynames[] =
   {
@@ -57,17 +68,22 @@ static syslogCODE rs_prioritynames[] =
     { NULL, -1 }
   };
 
+#ifndef LOG_AUTHPRIV
+#	define LOG_AUTHPRIV LOG_AUTH
+#endif
 static syslogCODE rs_facilitynames[] =
   {
     { "auth", LOG_AUTH },
     { "authpriv", LOG_AUTHPRIV },
     { "cron", LOG_CRON },
     { "daemon", LOG_DAEMON },
-    { "ftp", LOG_FTP },
+#if defined(LOG_FTP)
+	{"ftp",          LOG_FTP},
+#endif
     { "kern", LOG_KERN },
     { "lpr", LOG_LPR },
     { "mail", LOG_MAIL },
-    { "mark", INTERNAL_MARK },          /* INTERNAL */
+    //{ "mark", INTERNAL_MARK },          /* INTERNAL */
     { "news", LOG_NEWS },
     { "security", LOG_AUTH },           /* DEPRECATED */
     { "syslog", LOG_SYSLOG },
@@ -84,6 +100,9 @@ static syslogCODE rs_facilitynames[] =
     { NULL, -1 }
   };
 
+/* some forward declarations */
+static int getAPPNAMELen(msg_t *pM);
+
 /* The following functions will support advanced output module
  * multithreading, once this is implemented. Currently, we
  * include them as hooks only. The idea is that we need to guard
@@ -96,96 +115,197 @@ static syslogCODE rs_facilitynames[] =
  * for "set" methods, as these are called during input. Only "get"
  * functions that modify important structures have them.
  * rgerhards, 2007-07-20
+ * We now support locked and non-locked operations, depending on
+ * the configuration of rsyslog. To support this, we use function
+ * pointers. Initially, we start in non-locked mode. There, all
+ * locking operations call into dummy functions. When locking is
+ * enabled, the function pointers are changed to functions doing
+ * actual work. We also introduced another MsgPrepareEnqueue() function
+ * which initializes the locking structures, if needed. This is
+ * necessary because internal messages during config file startup
+ * processing are always created in non-locking mode. So we can
+ * not initialize locking structures during constructions. We now
+ * postpone this until when the message is fully constructed and
+ * enqueued. Then we know the status of locking. This has a nice
+ * side effect, and that is that during the initial creation of
+ * the Msg object no locking needs to be done, which results in better
+ * performance. -- rgerhards, 2008-01-05
  */
-#define MsgLock(pMsg)
-#define MsgUnlock(pMsg)
+static void (*funcLock)(msg_t *pMsg);
+static void (*funcUnlock)(msg_t *pMsg);
+static void (*funcDeleteMutex)(msg_t *pMsg);
+void (*funcMsgPrepareEnqueue)(msg_t *pMsg);
+#if 1 /* This is a debug aid */
+#define MsgLock(pMsg) 	funcLock(pMsg)
+#define MsgUnlock(pMsg) funcUnlock(pMsg)
+#else
+#define MsgLock(pMsg) 	{dbgprintf("line %d\n - ", __LINE__); funcLock(pMsg);; }
+#define MsgUnlock(pMsg) {dbgprintf("line %d - ", __LINE__); funcUnlock(pMsg); }
+#endif
+
+/* the next function is a dummy to be used by the looking functions
+ * when the class is not yet running in an environment where locking
+ * is necessary. Please note that the need to lock can (and will) change
+ * during a single run. Typically, this is depending on the operation mode
+ * of the message queues (which is operator-configurable). -- rgerhards, 2008-01-05
+ */
+static void MsgLockingDummy(msg_t __attribute__((unused)) *pMsg)
+{
+	/* empty be design */
+}
+
+
+/* The following function prepares a message for enqueue into the queue. This is
+ * where a message may be accessed by multiple threads. This implementation here
+ * is the version for multiple concurrent acces. It initializes the locking
+ * structures.
+ */
+static void MsgPrepareEnqueueLockingCase(msg_t *pThis)
+{
+	assert(pThis != NULL);
+	pthread_mutexattr_settype(&pThis->mutAttr, PTHREAD_MUTEX_RECURSIVE);
+	pthread_mutex_init(&pThis->mut, &pThis->mutAttr);
+}
+
+/* ... and now the locking and unlocking implementations: */
+static void MsgLockLockingCase(msg_t *pThis)
+{
+	/* DEV debug only! dbgprintf("MsgLock(0x%lx)\n", (unsigned long) pThis); */
+	assert(pThis != NULL);
+	pthread_mutex_lock(&pThis->mut);
+}
+
+static void MsgUnlockLockingCase(msg_t *pThis)
+{
+	/* DEV debug only! dbgprintf("MsgUnlock(0x%lx)\n", (unsigned long) pThis); */
+	assert(pThis != NULL);
+	pthread_mutex_unlock(&pThis->mut);
+}
+
+/* delete the mutex object on message destruction (locking case)
+ */
+static void MsgDeleteMutexLockingCase(msg_t *pThis)
+{
+	assert(pThis != NULL);
+	pthread_mutex_destroy(&pThis->mut);
+}
+
+/* enable multiple concurrent access on the message object
+ * This works on a class-wide basis and can bot be undone.
+ * That is, if it is once enabled, it can not be disabled during
+ * the same run. When this function is called, no other thread
+ * must manipulate message objects. Then we would have race conditions,
+ * but guarding against this is counter-productive because it
+ * would cost additional time. Plus, it would be a programming error.
+ * rgerhards, 2008-01-05
+ */
+rsRetVal MsgEnableThreadSafety(void)
+{
+	funcLock = MsgLockLockingCase;
+	funcUnlock = MsgUnlockLockingCase;
+	funcMsgPrepareEnqueue = MsgPrepareEnqueueLockingCase;
+	funcDeleteMutex = MsgDeleteMutexLockingCase;
+	return RS_RET_OK;
+}
+
+/* end locking functions */
 
 
 /* "Constructor" for a msg "object". Returns a pointer to
  * the new object or NULL if no such object could be allocated.
  * An object constructed via this function should only be destroyed
- * via "MsgDestruct()".
+ * via "msgDestruct()".
  */
-msg_t* MsgConstruct(void)
+rsRetVal msgConstruct(msg_t **ppThis)
 {
+	DEFiRet;
 	msg_t *pM;
 
-	if((pM = calloc(1, sizeof(msg_t))) != NULL)
-	{ /* initialize members that are non-zero */
-		pM->iRefCount = 1;
-		pM->iSyslogVers = -1;
-		pM->iSeverity = -1;
-		pM->iFacility = -1;
-		getCurrTime(&(pM->tRcvdAt));
-	}
+	assert(ppThis != NULL);
+	if((pM = calloc(1, sizeof(msg_t))) == NULL)
+		ABORT_FINALIZE(RS_RET_OUT_OF_MEMORY);
 
-	/* DEV debugging only! dbgprintf("MsgConstruct\t0x%x, ref 1\n", (int)pM);*/
+	/* initialize members that are non-zero */
+	pM->iRefCount = 1;
+	pM->iSeverity = -1;
+	pM->iFacility = -1;
+	datetime.getCurrTime(&(pM->tRcvdAt));
+	objConstructSetObjInfo(pM);
 
-	return(pM);
+	/* DEV debugging only! dbgprintf("msgConstruct\t0x%x, ref 1\n", (int)pM);*/
+
+	*ppThis = pM;
+
+finalize_it:
+	RETiRet;
 }
 
 
-/* Destructor for a msg "object". Must be called to dispose
- * of a msg object.
- */
-void MsgDestruct(msg_t * pM)
-{
-	assert(pM != NULL);
-	/* DEV Debugging only ! dbgprintf("MsgDestruct\t0x%x, Ref now: %d\n", (int)pM, pM->iRefCount - 1); */
-	if(--pM->iRefCount == 0)
+BEGINobjDestruct(msg) /* be sure to specify the object type also in END and CODESTART macros! */
+	int currRefCount;
+CODESTARTobjDestruct(msg)
+	/* DEV Debugging only ! dbgprintf("msgDestruct\t0x%lx, Ref now: %d\n", (unsigned long)pM, pM->iRefCount - 1); */
+#	ifdef DO_HAVE_ATOMICS
+		currRefCount = ATOMIC_DEC_AND_FETCH(pThis->iRefCount);
+#	else
+		currRefCount = --pThis->iRefCount;
+# 	endif
+	if(currRefCount == 0)
 	{
-		/* DEV Debugging Only! dbgprintf("MsgDestruct\t0x%x, RefCount now 0, doing DESTROY\n", (int)pM); */
-		if(pM->pszUxTradMsg != NULL)
-			free(pM->pszUxTradMsg);
-		if(pM->pszRawMsg != NULL)
-			free(pM->pszRawMsg);
-		if(pM->pszTAG != NULL)
-			free(pM->pszTAG);
-		if(pM->pszHOSTNAME != NULL)
-			free(pM->pszHOSTNAME);
-		if(pM->pszRcvFrom != NULL)
-			free(pM->pszRcvFrom);
-		if(pM->pszMSG != NULL)
-			free(pM->pszMSG);
-		if(pM->pszFacility != NULL)
-			free(pM->pszFacility);
-		if(pM->pszFacilityStr != NULL)
-			free(pM->pszFacilityStr);
-		if(pM->pszSeverity != NULL)
-			free(pM->pszSeverity);
-		if(pM->pszSeverityStr != NULL)
-			free(pM->pszSeverityStr);
-		if(pM->pszRcvdAt3164 != NULL)
-			free(pM->pszRcvdAt3164);
-		if(pM->pszRcvdAt3339 != NULL)
-			free(pM->pszRcvdAt3339);
-		if(pM->pszRcvdAt_MySQL != NULL)
-			free(pM->pszRcvdAt_MySQL);
-		if(pM->pszRcvdAt_PgSQL != NULL)
-			free(pM->pszRcvdAt_PgSQL);
-		if(pM->pszTIMESTAMP3164 != NULL)
-			free(pM->pszTIMESTAMP3164);
-		if(pM->pszTIMESTAMP3339 != NULL)
-			free(pM->pszTIMESTAMP3339);
-		if(pM->pszTIMESTAMP_MySQL != NULL)
-			free(pM->pszTIMESTAMP_MySQL);
-		if(pM->pszTIMESTAMP_PgSQL != NULL)
-			free(pM->pszTIMESTAMP_PgSQL);
-		if(pM->pszPRI != NULL)
-			free(pM->pszPRI);
-		if(pM->pCSProgName != NULL)
-			rsCStrDestruct(pM->pCSProgName);
-		if(pM->pCSStrucData != NULL)
-			rsCStrDestruct(pM->pCSStrucData);
-		if(pM->pCSAPPNAME != NULL)
-			rsCStrDestruct(pM->pCSAPPNAME);
-		if(pM->pCSPROCID != NULL)
-			rsCStrDestruct(pM->pCSPROCID);
-		if(pM->pCSMSGID != NULL)
-			rsCStrDestruct(pM->pCSMSGID);
-		free(pM);
+		/* DEV Debugging Only! dbgprintf("msgDestruct\t0x%lx, RefCount now 0, doing DESTROY\n", (unsigned long)pThis); */
+		if(pThis->pszUxTradMsg != NULL)
+			free(pThis->pszUxTradMsg);
+		if(pThis->pszRawMsg != NULL)
+			free(pThis->pszRawMsg);
+		if(pThis->pszTAG != NULL)
+			free(pThis->pszTAG);
+		if(pThis->pszHOSTNAME != NULL)
+			free(pThis->pszHOSTNAME);
+		if(pThis->pszRcvFrom != NULL)
+			free(pThis->pszRcvFrom);
+		if(pThis->pszMSG != NULL)
+			free(pThis->pszMSG);
+		if(pThis->pszFacility != NULL)
+			free(pThis->pszFacility);
+		if(pThis->pszFacilityStr != NULL)
+			free(pThis->pszFacilityStr);
+		if(pThis->pszSeverity != NULL)
+			free(pThis->pszSeverity);
+		if(pThis->pszSeverityStr != NULL)
+			free(pThis->pszSeverityStr);
+		if(pThis->pszRcvdAt3164 != NULL)
+			free(pThis->pszRcvdAt3164);
+		if(pThis->pszRcvdAt3339 != NULL)
+			free(pThis->pszRcvdAt3339);
+		if(pThis->pszRcvdAt_MySQL != NULL)
+			free(pThis->pszRcvdAt_MySQL);
+		if(pThis->pszRcvdAt_PgSQL != NULL)
+			free(pThis->pszRcvdAt_PgSQL);
+		if(pThis->pszTIMESTAMP3164 != NULL)
+			free(pThis->pszTIMESTAMP3164);
+		if(pThis->pszTIMESTAMP3339 != NULL)
+			free(pThis->pszTIMESTAMP3339);
+		if(pThis->pszTIMESTAMP_MySQL != NULL)
+			free(pThis->pszTIMESTAMP_MySQL);
+		if(pThis->pszTIMESTAMP_PgSQL != NULL)
+			free(pThis->pszTIMESTAMP_PgSQL);
+		if(pThis->pszPRI != NULL)
+			free(pThis->pszPRI);
+		if(pThis->pCSProgName != NULL)
+			rsCStrDestruct(&pThis->pCSProgName);
+		if(pThis->pCSStrucData != NULL)
+			rsCStrDestruct(&pThis->pCSStrucData);
+		if(pThis->pCSAPPNAME != NULL)
+			rsCStrDestruct(&pThis->pCSAPPNAME);
+		if(pThis->pCSPROCID != NULL)
+			rsCStrDestruct(&pThis->pCSPROCID);
+		if(pThis->pCSMSGID != NULL)
+			rsCStrDestruct(&pThis->pCSMSGID);
+		funcDeleteMutex(pThis);
+	} else {
+		pThis = NULL; /* tell framework not to destructing the object! */
 	}
-}
+ENDobjDestruct(msg)
 
 
 /* The macros below are used in MsgDup(). I use macros
@@ -195,7 +315,7 @@ void MsgDestruct(msg_t * pM)
 #define tmpCOPYSZ(name) \
 	if(pOld->psz##name != NULL) { \
 		if((pNew->psz##name = srUtilStrDup(pOld->psz##name, pOld->iLen##name)) == NULL) {\
-			MsgDestruct(pNew);\
+			msgDestruct(&pNew);\
 			return NULL;\
 		}\
 		pNew->iLen##name = pOld->iLen##name;\
@@ -208,7 +328,7 @@ void MsgDestruct(msg_t * pM)
 #define tmpCOPYCSTR(name) \
 	if(pOld->pCS##name != NULL) {\
 		if(rsCStrConstructFromCStr(&(pNew->pCS##name), pOld->pCS##name) != RS_RET_OK) {\
-			MsgDestruct(pNew);\
+			msgDestruct(&pNew);\
 			return NULL;\
 		}\
 	}
@@ -226,15 +346,13 @@ msg_t* MsgDup(msg_t* pOld)
 
 	assert(pOld != NULL);
 
-	if((pNew = (msg_t*) calloc(1, sizeof(msg_t))) == NULL) {
-		glblHadMemShortage = 1;
+	BEGINfunc
+	if(msgConstruct(&pNew) != RS_RET_OK) {
 		return NULL;
 	}
 
 	/* now copy the message properties */
 	pNew->iRefCount = 1;
-	pNew->iSyslogVers = pOld->iSyslogVers;
-	pNew->bParseHOSTNAME = pOld->bParseHOSTNAME;
 	pNew->iSeverity = pOld->iSeverity;
 	pNew->iFacility = pOld->iFacility;
 	pNew->bParseHOSTNAME = pOld->bParseHOSTNAME;
@@ -264,10 +382,57 @@ msg_t* MsgDup(msg_t* pOld)
 	 * if they are needed once again. So we let them re-create if needed.
 	 */
 
+	ENDfunc
 	return pNew;
 }
 #undef tmpCOPYSZ
 #undef tmpCOPYCSTR
+
+
+/* This method serializes a message object. That means the whole
+ * object is modified into text form. That text form is suitable for
+ * later reconstruction of the object by calling MsgDeSerialize().
+ * The most common use case for this method is the creation of an
+ * on-disk representation of the message object.
+ * We do not serialize the cache properties. We re-create them when needed.
+ * This saves us a lot of memory. Performance is no concern, as serializing
+ * is a so slow operation that recration of the caches does not count. Also,
+ * we do not serialize bParseHOSTNAME, as this is only a helper variable
+ * during msg construction - and never again used later.
+ * rgerhards, 2008-01-03
+ */
+static rsRetVal MsgSerialize(msg_t *pThis, strm_t *pStrm)
+{
+	DEFiRet;
+
+	assert(pThis != NULL);
+	assert(pStrm != NULL);
+
+	CHKiRet(obj.BeginSerialize(pStrm, (obj_t*) pThis));
+	objSerializeSCALAR(pStrm, iProtocolVersion, SHORT);
+	objSerializeSCALAR(pStrm, iSeverity, SHORT);
+	objSerializeSCALAR(pStrm, iFacility, SHORT);
+	objSerializeSCALAR(pStrm, msgFlags, INT);
+	objSerializeSCALAR(pStrm, tRcvdAt, SYSLOGTIME);
+	objSerializeSCALAR(pStrm, tTIMESTAMP, SYSLOGTIME);
+
+	objSerializePTR(pStrm, pszRawMsg, PSZ);
+	objSerializePTR(pStrm, pszMSG, PSZ);
+	objSerializePTR(pStrm, pszUxTradMsg, PSZ);
+	objSerializePTR(pStrm, pszTAG, PSZ);
+	objSerializePTR(pStrm, pszHOSTNAME, PSZ);
+	objSerializePTR(pStrm, pszRcvFrom, PSZ);
+
+	objSerializePTR(pStrm, pCSStrucData, CSTR);
+	objSerializePTR(pStrm, pCSAPPNAME, CSTR);
+	objSerializePTR(pStrm, pCSPROCID, CSTR);
+	objSerializePTR(pStrm, pCSMSGID, CSTR);
+
+	CHKiRet(obj.EndSerialize(pStrm));
+
+finalize_it:
+	RETiRet;
+}
 
 
 /* Increment reference count - see description of the "msg"
@@ -280,9 +445,13 @@ msg_t* MsgDup(msg_t* pOld)
 msg_t *MsgAddRef(msg_t *pM)
 {
 	assert(pM != NULL);
-	MsgLock();
-	pM->iRefCount++;
-	MsgUnlock();
+#	ifdef DO_HAVE_ATOMICS
+		ATOMIC_INC(pM->iRefCount);
+#	else
+		MsgLock(pM);
+		pM->iRefCount++;
+		MsgUnlock(pM);
+#	endif
 	/* DEV debugging only! dbgprintf("MsgAddRef\t0x%x done, Ref now: %d\n", (int)pM, pM->iRefCount);*/
 	return(pM);
 }
@@ -301,7 +470,7 @@ msg_t *MsgAddRef(msg_t *pM)
 static rsRetVal aquirePROCIDFromTAG(msg_t *pM)
 {
 	register int i;
-	int iRet;
+	DEFiRet;
 
 	assert(pM != NULL);
 	if(pM->pCSPROCID != NULL)
@@ -320,12 +489,10 @@ static rsRetVal aquirePROCIDFromTAG(msg_t *pM)
 	++i; /* skip '[' */
 
 	/* now obtain the PROCID string... */
-	if((pM->pCSPROCID = rsCStrConstruct()) == NULL) 
-		return RS_RET_OBJ_CREATION_FAILED; /* best we can do... */
+	CHKiRet(rsCStrConstruct(&pM->pCSPROCID));
 	rsCStrSetAllocIncrement(pM->pCSPROCID, 16);
 	while((i < pM->iLenTAG) && (pM->pszTAG[i] != ']')) {
-		if((iRet = rsCStrAppendChar(pM->pCSPROCID, pM->pszTAG[i])) != RS_RET_OK)
-			return iRet;
+		CHKiRet(rsCStrAppendChar(pM->pCSPROCID, pM->pszTAG[i]));
 		++i;
 	}
 
@@ -335,16 +502,15 @@ static rsRetVal aquirePROCIDFromTAG(msg_t *pM)
 		 * the buffer and simply return. Note that this is NOT an error
 		 * case!
 		 */
-		rsCStrDestruct(pM->pCSPROCID);
-		pM->pCSPROCID = NULL;
-		return RS_RET_OK;
+		rsCStrDestruct(&pM->pCSPROCID);
+		FINALIZE;
 	}
 
 	/* OK, finaally we could obtain a PROCID. So let's use it ;) */
-	if((iRet = rsCStrFinish(pM->pCSPROCID)) != RS_RET_OK)
-		return iRet;
+	CHKiRet(rsCStrFinish(pM->pCSPROCID));
 
-	return RS_RET_OK;
+finalize_it:
+	RETiRet;
 }
 
 
@@ -366,29 +532,27 @@ static rsRetVal aquirePROCIDFromTAG(msg_t *pM)
  */
 static rsRetVal aquireProgramName(msg_t *pM)
 {
+	DEFiRet;
 	register int i;
-	int iRet;
 
 	assert(pM != NULL);
 	if(pM->pCSProgName == NULL) {
 		/* ok, we do not yet have it. So let's parse the TAG
 		 * to obtain it.
 		 */
-		if((pM->pCSProgName = rsCStrConstruct()) == NULL) 
-			return RS_RET_OBJ_CREATION_FAILED; /* best we can do... */
+		CHKiRet(rsCStrConstruct(&pM->pCSProgName));
 		rsCStrSetAllocIncrement(pM->pCSProgName, 33);
 		for(  i = 0
 		    ; (i < pM->iLenTAG) && isprint((int) pM->pszTAG[i])
 		      && (pM->pszTAG[i] != '\0') && (pM->pszTAG[i] != ':')
 		      && (pM->pszTAG[i] != '[')  && (pM->pszTAG[i] != '/')
 		    ; ++i) {
-			if((iRet = rsCStrAppendChar(pM->pCSProgName, pM->pszTAG[i])) != RS_RET_OK)
-				return iRet;
+			CHKiRet(rsCStrAppendChar(pM->pCSProgName, pM->pszTAG[i]));
 		}
-		if((iRet = rsCStrFinish(pM->pCSProgName)) != RS_RET_OK)
-			return iRet;
+		CHKiRet(rsCStrFinish(pM->pCSProgName));
 	}
-	return RS_RET_OK;
+finalize_it:
+	RETiRet;
 }
 
 
@@ -485,7 +649,7 @@ char *getPRI(msg_t *pM)
 	if(pM == NULL)
 		return "";
 
-	MsgLock();
+	MsgLock(pM);
 	if(pM->pszPRI == NULL) {
 		/* OK, we need to construct it... 
 		 * we use a 5 byte buffer - as of 
@@ -496,7 +660,7 @@ char *getPRI(msg_t *pM)
 		pM->iLenPRI = snprintf((char*)pM->pszPRI, 5, "%d",
 			LOG_MAKEPRI(pM->iFacility, pM->iSeverity));
 	}
-	MsgUnlock();
+	MsgUnlock(pM);
 
 	return (char*)pM->pszPRI;
 }
@@ -517,64 +681,64 @@ char *getTimeReported(msg_t *pM, enum tplFormatTypes eFmt)
 
 	switch(eFmt) {
 	case tplFmtDefault:
-		MsgLock();
+		MsgLock(pM);
 		if(pM->pszTIMESTAMP3164 == NULL) {
 			if((pM->pszTIMESTAMP3164 = malloc(16)) == NULL) {
 				glblHadMemShortage = 1;
-				MsgUnlock();
+				MsgUnlock(pM);
 				return "";
 			}
-			formatTimestamp3164(&pM->tTIMESTAMP, pM->pszTIMESTAMP3164, 16);
+			datetime.formatTimestamp3164(&pM->tTIMESTAMP, pM->pszTIMESTAMP3164, 16);
 		}
-		MsgUnlock();
+		MsgUnlock(pM);
 		return(pM->pszTIMESTAMP3164);
 	case tplFmtMySQLDate:
-		MsgLock();
+		MsgLock(pM);
 		if(pM->pszTIMESTAMP_MySQL == NULL) {
 			if((pM->pszTIMESTAMP_MySQL = malloc(15)) == NULL) {
 				glblHadMemShortage = 1;
-				MsgUnlock();
+				MsgUnlock(pM);
 				return "";
 			}
-			formatTimestampToMySQL(&pM->tTIMESTAMP, pM->pszTIMESTAMP_MySQL, 15);
+			datetime.formatTimestampToMySQL(&pM->tTIMESTAMP, pM->pszTIMESTAMP_MySQL, 15);
 		}
-		MsgUnlock();
+		MsgUnlock(pM);
 		return(pM->pszTIMESTAMP_MySQL);
         case tplFmtPgSQLDate:
-                MsgLock();
+                MsgLock(pM);
                 if(pM->pszTIMESTAMP_PgSQL == NULL) {
                         if((pM->pszTIMESTAMP_PgSQL = malloc(21)) == NULL) {
                                 glblHadMemShortage = 1;
-                                MsgUnlock();
+                                MsgUnlock(pM);
                                 return "";
                         }
-                        formatTimestampToPgSQL(&pM->tTIMESTAMP, pM->pszTIMESTAMP_PgSQL, 21);
+                        datetime.formatTimestampToPgSQL(&pM->tTIMESTAMP, pM->pszTIMESTAMP_PgSQL, 21);
                 }
-                MsgUnlock();
+                MsgUnlock(pM);
                 return(pM->pszTIMESTAMP_PgSQL);
 	case tplFmtRFC3164Date:
-		MsgLock();
+		MsgLock(pM);
 		if(pM->pszTIMESTAMP3164 == NULL) {
 			if((pM->pszTIMESTAMP3164 = malloc(16)) == NULL) {
 				glblHadMemShortage = 1;
-				MsgUnlock();
+				MsgUnlock(pM);
 				return "";
 			}
-			formatTimestamp3164(&pM->tTIMESTAMP, pM->pszTIMESTAMP3164, 16);
+			datetime.formatTimestamp3164(&pM->tTIMESTAMP, pM->pszTIMESTAMP3164, 16);
 		}
-		MsgUnlock();
+		MsgUnlock(pM);
 		return(pM->pszTIMESTAMP3164);
 	case tplFmtRFC3339Date:
-		MsgLock();
+		MsgLock(pM);
 		if(pM->pszTIMESTAMP3339 == NULL) {
 			if((pM->pszTIMESTAMP3339 = malloc(33)) == NULL) {
 				glblHadMemShortage = 1;
-				MsgUnlock();
+				MsgUnlock(pM);
 				return ""; /* TODO: check this: can it cause a free() of constant memory?) */
 			}
-			formatTimestamp3339(&pM->tTIMESTAMP, pM->pszTIMESTAMP3339, 33);
+			datetime.formatTimestamp3339(&pM->tTIMESTAMP, pM->pszTIMESTAMP3339, 33);
 		}
-		MsgUnlock();
+		MsgUnlock(pM);
 		return(pM->pszTIMESTAMP3339);
 	}
 	return "INVALID eFmt OPTION!";
@@ -587,64 +751,64 @@ char *getTimeGenerated(msg_t *pM, enum tplFormatTypes eFmt)
 
 	switch(eFmt) {
 	case tplFmtDefault:
-		MsgLock();
+		MsgLock(pM);
 		if(pM->pszRcvdAt3164 == NULL) {
 			if((pM->pszRcvdAt3164 = malloc(16)) == NULL) {
 				glblHadMemShortage = 1;
-				MsgUnlock();
+				MsgUnlock(pM);
 				return "";
 			}
-			formatTimestamp3164(&pM->tRcvdAt, pM->pszRcvdAt3164, 16);
+			datetime.formatTimestamp3164(&pM->tRcvdAt, pM->pszRcvdAt3164, 16);
 		}
-		MsgUnlock();
+		MsgUnlock(pM);
 		return(pM->pszRcvdAt3164);
 	case tplFmtMySQLDate:
-		MsgLock();
+		MsgLock(pM);
 		if(pM->pszRcvdAt_MySQL == NULL) {
 			if((pM->pszRcvdAt_MySQL = malloc(15)) == NULL) {
 				glblHadMemShortage = 1;
-				MsgUnlock();
+				MsgUnlock(pM);
 				return "";
 			}
-			formatTimestampToMySQL(&pM->tRcvdAt, pM->pszRcvdAt_MySQL, 15);
+			datetime.formatTimestampToMySQL(&pM->tRcvdAt, pM->pszRcvdAt_MySQL, 15);
 		}
-		MsgUnlock();
+		MsgUnlock(pM);
 		return(pM->pszRcvdAt_MySQL);
         case tplFmtPgSQLDate:
-                MsgLock();
+                MsgLock(pM);
                 if(pM->pszRcvdAt_PgSQL == NULL) {
                         if((pM->pszRcvdAt_PgSQL = malloc(21)) == NULL) {
                                 glblHadMemShortage = 1;
-                                MsgUnlock();
+                                MsgUnlock(pM);
                                 return "";
                         }
-                        formatTimestampToPgSQL(&pM->tRcvdAt, pM->pszRcvdAt_PgSQL, 21);
+                        datetime.formatTimestampToPgSQL(&pM->tRcvdAt, pM->pszRcvdAt_PgSQL, 21);
                 }
-                MsgUnlock();
+                MsgUnlock(pM);
                 return(pM->pszRcvdAt_PgSQL);
 	case tplFmtRFC3164Date:
-		MsgLock();
+		MsgLock(pM);
 		if(pM->pszRcvdAt3164 == NULL) {
 			if((pM->pszRcvdAt3164 = malloc(16)) == NULL) {
 					glblHadMemShortage = 1;
-					MsgUnlock();
+					MsgUnlock(pM);
 					return "";
 				}
-			formatTimestamp3164(&pM->tRcvdAt, pM->pszRcvdAt3164, 16);
+			datetime.formatTimestamp3164(&pM->tRcvdAt, pM->pszRcvdAt3164, 16);
 		}
-		MsgUnlock();
+		MsgUnlock(pM);
 		return(pM->pszRcvdAt3164);
 	case tplFmtRFC3339Date:
-		MsgLock();
+		MsgLock(pM);
 		if(pM->pszRcvdAt3339 == NULL) {
 			if((pM->pszRcvdAt3339 = malloc(33)) == NULL) {
 				glblHadMemShortage = 1;
-				MsgUnlock();
+				MsgUnlock(pM);
 				return "";
 			}
-			formatTimestamp3339(&pM->tRcvdAt, pM->pszRcvdAt3339, 33);
+			datetime.formatTimestamp3339(&pM->tRcvdAt, pM->pszRcvdAt3339, 33);
 		}
-		MsgUnlock();
+		MsgUnlock(pM);
 		return(pM->pszRcvdAt3339);
 	}
 	return "INVALID eFmt OPTION!";
@@ -656,14 +820,14 @@ char *getSeverity(msg_t *pM)
 	if(pM == NULL)
 		return "";
 
-	MsgLock();
+	MsgLock(pM);
 	if(pM->pszSeverity == NULL) {
 		/* we use a 2 byte buffer - can only be one digit */
-		if((pM->pszSeverity = malloc(2)) == NULL) { MsgUnlock() ; return ""; }
+		if((pM->pszSeverity = malloc(2)) == NULL) { MsgUnlock(pM) ; return ""; }
 		pM->iLenSeverity =
 		   snprintf((char*)pM->pszSeverity, 2, "%d", pM->iSeverity);
 	}
-	MsgUnlock();
+	MsgUnlock(pM);
 	return((char*)pM->pszSeverity);
 }
 
@@ -677,7 +841,7 @@ char *getSeverityStr(msg_t *pM)
 	if(pM == NULL)
 		return "";
 
-	MsgLock();
+	MsgLock(pM);
 	if(pM->pszSeverityStr == NULL) {
 		for(c = rs_prioritynames, val = pM->iSeverity; c->c_name; c++)
 			if(c->c_val == val) {
@@ -686,15 +850,15 @@ char *getSeverityStr(msg_t *pM)
 			}
 		if(name == NULL) {
 			/* we use a 2 byte buffer - can only be one digit */
-			if((pM->pszSeverityStr = malloc(2)) == NULL) { MsgUnlock() ; return ""; }
+			if((pM->pszSeverityStr = malloc(2)) == NULL) { MsgUnlock(pM) ; return ""; }
 			pM->iLenSeverityStr =
 				snprintf((char*)pM->pszSeverityStr, 2, "%d", pM->iSeverity);
 		} else {
-			if((pM->pszSeverityStr = (uchar*) strdup(name)) == NULL) { MsgUnlock() ; return ""; }
+			if((pM->pszSeverityStr = (uchar*) strdup(name)) == NULL) { MsgUnlock(pM) ; return ""; }
 			pM->iLenSeverityStr = strlen((char*)name);
 		}
 	}
-	MsgUnlock();
+	MsgUnlock(pM);
 	return((char*)pM->pszSeverityStr);
 }
 
@@ -703,17 +867,17 @@ char *getFacility(msg_t *pM)
 	if(pM == NULL)
 		return "";
 
-	MsgLock();
+	MsgLock(pM);
 	if(pM->pszFacility == NULL) {
 		/* we use a 12 byte buffer - as of 
 		 * syslog-protocol, facility can go
 		 * up to 2^32 -1
 		 */
-		if((pM->pszFacility = malloc(12)) == NULL) { MsgUnlock() ; return ""; }
+		if((pM->pszFacility = malloc(12)) == NULL) { MsgUnlock(pM) ; return ""; }
 		pM->iLenFacility =
 		   snprintf((char*)pM->pszFacility, 12, "%d", pM->iFacility);
 	}
-	MsgUnlock();
+	MsgUnlock(pM);
 	return((char*)pM->pszFacility);
 }
 
@@ -726,7 +890,7 @@ char *getFacilityStr(msg_t *pM)
         if(pM == NULL)
                 return "";
 
-	MsgLock();
+	MsgLock(pM);
         if(pM->pszFacilityStr == NULL) {
                 for(c = rs_facilitynames, val = pM->iFacility << 3; c->c_name; c++)
                         if(c->c_val == val) {
@@ -738,93 +902,88 @@ char *getFacilityStr(msg_t *pM)
 			 * syslog-protocol, facility can go
 			 * up to 2^32 -1
 			 */
-			if((pM->pszFacilityStr = malloc(12)) == NULL) { MsgUnlock() ; return ""; }
+			if((pM->pszFacilityStr = malloc(12)) == NULL) { MsgUnlock(pM) ; return ""; }
 			pM->iLenFacilityStr =
 				snprintf((char*)pM->pszFacilityStr, 12, "%d", val >> 3);
                 } else {
-                        if((pM->pszFacilityStr = (uchar*)strdup(name)) == NULL) { MsgUnlock() ; return ""; }
+                        if((pM->pszFacilityStr = (uchar*)strdup(name)) == NULL) { MsgUnlock(pM) ; return ""; }
                         pM->iLenFacilityStr = strlen((char*)name);
                 }
         }
-	MsgUnlock();
+	MsgUnlock(pM);
         return((char*)pM->pszFacilityStr);
 }
 
 
+/* set flow control state (if not called, the default - NO_DELAY - is used)
+ * This needs no locking because it is only done while the object is
+ * not fully constructed (which also means you must not call this
+ * method after the msg has been handed over to a queue).
+ * rgerhards, 2008-03-14
+ */
+rsRetVal
+MsgSetFlowControlType(msg_t *pMsg, flowControl_t eFlowCtl)
+{
+	DEFiRet;
+	assert(pMsg != NULL);
+	assert(eFlowCtl == eFLOWCTL_NO_DELAY || eFlowCtl == eFLOWCTL_LIGHT_DELAY || eFlowCtl == eFLOWCTL_FULL_DELAY);
+
+	pMsg->flowCtlType = eFlowCtl;
+
+	RETiRet;
+}
+
+
 /* rgerhards 2004-11-24: set APP-NAME in msg object
+ * TODO: revisit msg locking code!
  */
 rsRetVal MsgSetAPPNAME(msg_t *pMsg, char* pszAPPNAME)
 {
+	DEFiRet;
 	assert(pMsg != NULL);
 	if(pMsg->pCSAPPNAME == NULL) {
 		/* we need to obtain the object first */
-		if((pMsg->pCSAPPNAME = rsCStrConstruct()) == NULL) 
-			return RS_RET_OBJ_CREATION_FAILED; /* best we can do... */
+		CHKiRet(rsCStrConstruct(&pMsg->pCSAPPNAME));
 		rsCStrSetAllocIncrement(pMsg->pCSAPPNAME, 128);
 	}
 	/* if we reach this point, we have the object */
-	return rsCStrSetSzStr(pMsg->pCSAPPNAME, (uchar*) pszAPPNAME);
+	iRet = rsCStrSetSzStr(pMsg->pCSAPPNAME, (uchar*) pszAPPNAME);
+
+finalize_it:
+	RETiRet;
 }
 
 
-/* This function tries to emulate APPNAME if it is not present. Its
- * main use is when we have received a log record via legacy syslog and
- * now would like to send out the same one via syslog-protocol.
- */
-static void tryEmulateAPPNAME(msg_t *pM)
-{
-	assert(pM != NULL);
-	if(pM->pCSAPPNAME != NULL)
-		return; /* we are already done */
-
-	if(getProtocolVersion(pM) == 0) {
-		/* only then it makes sense to emulate */
-		MsgSetAPPNAME(pM, getProgramName(pM));
-	}
-}
-
-
-/* rgerhards, 2005-11-24
- */
-int getAPPNAMELen(msg_t *pM)
-{
-	assert(pM != NULL);
-	MsgLock();
-	if(pM->pCSAPPNAME == NULL)
-		tryEmulateAPPNAME(pM);
-	MsgUnlock();
-	return (pM->pCSAPPNAME == NULL) ? 0 : rsCStrLen(pM->pCSAPPNAME);
-}
-
-
+static void tryEmulateAPPNAME(msg_t *pM); /* forward reference */
 /* rgerhards, 2005-11-24
  */
 char *getAPPNAME(msg_t *pM)
 {
 	assert(pM != NULL);
-	MsgLock();
+	MsgLock(pM);
 	if(pM->pCSAPPNAME == NULL)
 		tryEmulateAPPNAME(pM);
-	MsgUnlock();
+	MsgUnlock(pM);
 	return (pM->pCSAPPNAME == NULL) ? "" : (char*) rsCStrGetSzStrNoNULL(pM->pCSAPPNAME);
 }
-
-
 
 
 /* rgerhards 2004-11-24: set PROCID in msg object
  */
 rsRetVal MsgSetPROCID(msg_t *pMsg, char* pszPROCID)
 {
-	assert(pMsg != NULL);
+	DEFiRet;
+	ISOBJ_TYPE_assert(pMsg, msg);
 	if(pMsg->pCSPROCID == NULL) {
 		/* we need to obtain the object first */
-		if((pMsg->pCSPROCID = rsCStrConstruct()) == NULL) 
-			return RS_RET_OBJ_CREATION_FAILED; /* best we can do... */
+		CHKiRet(rsCStrConstruct(&pMsg->pCSPROCID));
 		rsCStrSetAllocIncrement(pMsg->pCSPROCID, 128);
 	}
 	/* if we reach this point, we have the object */
-	return rsCStrSetSzStr(pMsg->pCSPROCID, (uchar*) pszPROCID);
+	iRet = rsCStrSetSzStr(pMsg->pCSPROCID, (uchar*) pszPROCID);
+
+finalize_it:
+	RETiRet;
 }
 
 /* rgerhards, 2005-11-24
@@ -832,10 +991,10 @@ rsRetVal MsgSetPROCID(msg_t *pMsg, char* pszPROCID)
 int getPROCIDLen(msg_t *pM)
 {
 	assert(pM != NULL);
-	MsgLock();
+	MsgLock(pM);
 	if(pM->pCSPROCID == NULL)
 		aquirePROCIDFromTAG(pM);
-	MsgUnlock();
+	MsgUnlock(pM);
 	return (pM->pCSPROCID == NULL) ? 1 : rsCStrLen(pM->pCSPROCID);
 }
 
@@ -844,12 +1003,15 @@ int getPROCIDLen(msg_t *pM)
  */
 char *getPROCID(msg_t *pM)
 {
-	assert(pM != NULL);
-	MsgLock();
+	char* pszRet;
+
+	ISOBJ_TYPE_assert(pM, msg);
+	MsgLock(pM);
 	if(pM->pCSPROCID == NULL)
 		aquirePROCIDFromTAG(pM);
-	MsgUnlock();
-	return (pM->pCSPROCID == NULL) ? "-" : (char*) rsCStrGetSzStrNoNULL(pM->pCSPROCID);
+	pszRet = (pM->pCSPROCID == NULL) ? "-" : (char*) rsCStrGetSzStrNoNULL(pM->pCSPROCID);
+	MsgUnlock(pM);
+	return pszRet;
 }
 
 
@@ -857,15 +1019,18 @@ char *getPROCID(msg_t *pM)
  */
 rsRetVal MsgSetMSGID(msg_t *pMsg, char* pszMSGID)
 {
-	assert(pMsg != NULL);
+	DEFiRet;
+	ISOBJ_TYPE_assert(pMsg, msg);
 	if(pMsg->pCSMSGID == NULL) {
 		/* we need to obtain the object first */
-		if((pMsg->pCSMSGID = rsCStrConstruct()) == NULL) 
-			return RS_RET_OBJ_CREATION_FAILED; /* best we can do... */
+		CHKiRet(rsCStrConstruct(&pMsg->pCSMSGID));
 		rsCStrSetAllocIncrement(pMsg->pCSMSGID, 128);
 	}
 	/* if we reach this point, we have the object */
-	return rsCStrSetSzStr(pMsg->pCSMSGID, (uchar*) pszMSGID);
+	iRet = rsCStrSetSzStr(pMsg->pCSMSGID, (uchar*) pszMSGID);
+
+finalize_it:
+	RETiRet;
 }
 
 /* rgerhards, 2005-11-24
@@ -966,17 +1131,17 @@ char *getTAG(msg_t *pM)
 {
 	char *ret;
 
-	MsgLock();
 	if(pM == NULL)
 		ret = "";
 	else {
+		MsgLock(pM);
 		tryEmulateTAG(pM);
 		if(pM->pszTAG == NULL)
 			ret = "";
 		else
 			ret = (char*) pM->pszTAG;
+		MsgUnlock(pM);
 	}
-	MsgUnlock();
 	return(ret);
 }
 
@@ -1020,15 +1185,18 @@ char *getRcvFrom(msg_t *pM)
  */
 rsRetVal MsgSetStructuredData(msg_t *pMsg, char* pszStrucData)
 {
-	assert(pMsg != NULL);
+	DEFiRet;
+	ISOBJ_TYPE_assert(pMsg, msg);
 	if(pMsg->pCSStrucData == NULL) {
 		/* we need to obtain the object first */
-		if((pMsg->pCSStrucData = rsCStrConstruct()) == NULL) 
-			return RS_RET_OBJ_CREATION_FAILED; /* best we can do... */
+		CHKiRet(rsCStrConstruct(&pMsg->pCSStrucData));
 		rsCStrSetAllocIncrement(pMsg->pCSStrucData, 128);
 	}
 	/* if we reach this point, we have the object */
-	return rsCStrSetSzStr(pMsg->pCSStrucData, (uchar*) pszStrucData);
+	iRet = rsCStrSetSzStr(pMsg->pCSStrucData, (uchar*) pszStrucData);
+
+finalize_it:
+	RETiRet;
 }
 
 /* get the length of the "STRUCTURED-DATA" sz string
@@ -1060,13 +1228,13 @@ int getProgramNameLen(msg_t *pM)
 	int iRet;
 
 	assert(pM != NULL);
-	MsgLock();
+	MsgLock(pM);
 	if((iRet = aquireProgramName(pM)) != RS_RET_OK) {
 		dbgprintf("error %d returned by aquireProgramName() in getProgramNameLen()\n", iRet);
-		MsgUnlock();
+		MsgUnlock(pM);
 		return 0; /* best we can do (consistent wiht what getProgramName() returns) */
 	}
-	MsgUnlock();
+	MsgUnlock(pM);
 
 	return (pM->pCSProgName == NULL) ? 0 : rsCStrLen(pM->pCSProgName);
 }
@@ -1075,20 +1243,99 @@ int getProgramNameLen(msg_t *pM)
 /* get the "programname" as sz string
  * rgerhards, 2005-10-19
  */
-char *getProgramName(msg_t *pM)
+char *getProgramName(msg_t *pM) /* this is the non-locking version for internal use */
+{
+	int iRet;
+	char *pszRet;
+
+	assert(pM != NULL);
+	MsgLock(pM);
+	if((iRet = aquireProgramName(pM)) != RS_RET_OK) {
+		dbgprintf("error %d returned by aquireProgramName() in getProgramName()\n", iRet);
+		pszRet = ""; /* best we can do */
+	} else {
+		pszRet = (pM->pCSProgName == NULL) ? "" : (char*) rsCStrGetSzStrNoNULL(pM->pCSProgName);
+	}
+
+	MsgUnlock(pM);
+	return pszRet;
+}
+/* The code below was an approach without PTHREAD_MUTEX_RECURSIVE
+ * However, it turned out to be quite complex. So far, we use recursive
+ * locking, which is OK from a performance point of view, especially as
+ * we do not anticipate that multithreading msg objects is used often.
+ * However, we may re-think about using non-recursive locking and I leave this
+ * code in here to conserve the idea. -- rgerhards, 2008-01-05
+ */
+#if 0
+static char *getProgramNameNoLock(msg_t *pM) /* this is the non-locking version for internal use */
 {
 	int iRet;
 
 	assert(pM != NULL);
-	MsgLock();
 	if((iRet = aquireProgramName(pM)) != RS_RET_OK) {
 		dbgprintf("error %d returned by aquireProgramName() in getProgramName()\n", iRet);
-		MsgUnlock();
 		return ""; /* best we can do */
 	}
-	MsgUnlock();
 
 	return (pM->pCSProgName == NULL) ? "" : (char*) rsCStrGetSzStrNoNULL(pM->pCSProgName);
+}
+char *getProgramName(msg_t *pM) /* this is the external callable version */
+{
+	char *pszRet;
+
+	MsgLock(pM);
+	pszRet = getProgramNameNoLock(pM);
+	MsgUnlock(pM);
+	return pszRet;
+}
+/* an alternative approach has been: */
+/* The macro below is used to generate external function definitions
+ * for such functions that may also be called internally (and thus have
+ * both a locking and non-locking implementation. Over time, we could
+ * reconsider how we handle that. -- rgerhards, 2008-01-05
+ */
+#define EXT_LOCKED_FUNC(fName, ret) \
+ret fName(msg_t *pM) \
+{ \
+	ret valRet; \
+	MsgLock(pM); \
+	valRet = fName##NoLock(pM); \
+	MsgUnlock(pM); \
+	return(valRet); \
+}
+EXT_LOCKED_FUNC(getProgramName, char*)
+/* in this approach, the external function is provided by the macro and
+ * needs not to be writen.
+ */
+#endif /* #if 0 -- saved code */
+
+
+/* This function tries to emulate APPNAME if it is not present. Its
+ * main use is when we have received a log record via legacy syslog and
+ * now would like to send out the same one via syslog-protocol.
+ */
+static void tryEmulateAPPNAME(msg_t *pM)
+{
+	assert(pM != NULL);
+	if(pM->pCSAPPNAME != NULL)
+		return; /* we are already done */
+
+	if(getProtocolVersion(pM) == 0) {
+		/* only then it makes sense to emulate */
+		MsgSetAPPNAME(pM, getProgramName(pM));
+	}
+}
+
+
+/* rgerhards, 2005-11-24
+ */
+static int getAPPNAMELen(msg_t *pM)
+{
+	assert(pM != NULL);
+	if(pM->pCSAPPNAME == NULL)
+		tryEmulateAPPNAME(pM);
+	return (pM->pCSAPPNAME == NULL) ? 0 : rsCStrLen(pM->pCSAPPNAME);
 }
 
 
@@ -1255,7 +1502,7 @@ static uchar *getNOW(eNOWType eNow)
 		return NULL;
 	}
 
-	getCurrTime(&t);
+	datetime.getCurrTime(&t);
 	switch(eNow) {
 	case NOW_NOW:
 		snprintf((char*) pBuf, tmpBUFSIZE, "%4.4d-%2.2d-%2.2d", t.year, t.month, t.day);
@@ -1326,7 +1573,7 @@ static uchar *getNOW(eNOWType eNow)
  * rgerhards 2005-09-15
  */
 char *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
-                 rsCStrObj *pCSPropName, unsigned short *pbMustBeFreed)
+                 cstr_t *pCSPropName, unsigned short *pbMustBeFreed)
 {
 	uchar *pName;
 	char *pRes; /* result pointer */
@@ -1336,8 +1583,8 @@ char *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 
 #ifdef	FEATURE_REGEXP
 	/* Variables necessary for regular expression matching */
-	size_t nmatch = 2;
-	regmatch_t pmatch[2];
+	size_t nmatch = 1;
+	regmatch_t pmatch[1];
 #endif
 
 	assert(pMsg != NULL);
@@ -1359,9 +1606,11 @@ char *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 		pRes = getRawMsg(pMsg);
 	} else if(!strcmp((char*) pName, "UxTradMsg")) {
 		pRes = getUxTradMsg(pMsg);
-	} else if(!strcmp((char*) pName, "FROMHOST")) {
+	} else if(   !strcmp((char*) pName, "FROMHOST")
+		  || !strcmp((char*) pName, "fromhost")) {
 		pRes = getRcvFrom(pMsg);
 	} else if(!strcmp((char*) pName, "source")
+		  || !strcmp((char*) pName, "hostname")
 		  || !strcmp((char*) pName, "HOSTNAME")) {
 		pRes = getHOSTNAME(pMsg);
 	} else if(!strcmp((char*) pName, "syslogtag")) {
@@ -1484,7 +1733,7 @@ char *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 				++iCurrFld;
 			}
 		}
-		dbgprintf("field requested %d, field found %d\n", pTpe->data.field.iToPos, iCurrFld);
+		dbgprintf("field requested %d, field found %d\n", pTpe->data.field.iToPos, (int) iCurrFld);
 		
 		if(iCurrFld == pTpe->data.field.iToPos) {
 			/* field found, now extract it */
@@ -1566,40 +1815,54 @@ char *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 		if (pTpe->data.field.has_regex != 0) {
 			if (pTpe->data.field.has_regex == 2)
 				/* Could not compile regex before! */
-				return
-				    "**NO MATCH** **BAD REGULAR EXPRESSION**";
+				return "**NO MATCH** **BAD REGULAR EXPRESSION**";
 
-			dbgprintf("debug: String to match for regex is: %s\n",
-			        pRes);
+			dbgprintf("debug: String to match for regex is: %s\n", pRes);
 
-			if (0 != regexec(&pTpe->data.field.re, pRes, nmatch,
-				    pmatch, 0)) {
-				/* we got no match! */
-				return "**NO MATCH**";
-			} else {
-				/* Match! */
-				/* I need to malloc pB */
-				int iLenBuf;
-				char *pB;
+			if(objUse(regexp, LM_REGEXP_FILENAME) == RS_RET_OK) {
+				if (0 != regexp.regexec(&pTpe->data.field.re, pRes, nmatch, pmatch, 0)) {
+					/* we got no match! */
+					if (*pbMustBeFreed == 1) {
+						free(pRes);
+						*pbMustBeFreed = 0;
+					}
+					return "**NO MATCH**";
+				} else {
+					/* Match! */
+					/* I need to malloc pB */
+					int iLenBuf;
+					char *pB;
 
-				iLenBuf = pmatch[1].rm_eo - pmatch[1].rm_so;
-				pB = (char *) malloc((iLenBuf + 1) * sizeof(char));
+					iLenBuf = pmatch[0].rm_eo - pmatch[0].rm_so;
+					pB = (char *) malloc((iLenBuf + 1) * sizeof(char));
 
-				if (pB == NULL) {
+					if (pB == NULL) {
+						if (*pbMustBeFreed == 1)
+							free(pRes);
+						*pbMustBeFreed = 0;
+						return "**OUT OF MEMORY ALLOCATING pBuf**";
+					}
+
+					/* Lets copy the matched substring to the buffer */
+					memcpy(pB, pRes + pmatch[0].rm_so, iLenBuf);
+					pB[iLenBuf] = '\0';/* terminate string, did not happen before */
+
 					if (*pbMustBeFreed == 1)
 						free(pRes);
-					*pbMustBeFreed = 0;
-					return "**OUT OF MEMORY ALLOCATING pBuf**";
+					pRes = pB;
+					*pbMustBeFreed = 1;
 				}
-
-				/* Lets copy the matched substring to the buffer */
-				memcpy(pB, pRes + pmatch[1].rm_so, iLenBuf);
-				pB[iLenBuf] = '\0';/* terminate string, did not happen before */
-
-				if (*pbMustBeFreed == 1)
+			} else {
+				/* we could not load regular expression support. This is quite unexpected at
+				 * this stage of processing (after all, the config parser found it), but so
+				 * it is. We return an error in that case. -- rgerhards, 2008-03-07
+				 */
+				dbgprintf("could not get regexp object pointer, so regexp can not be evaluated\n");
+				if (*pbMustBeFreed == 1) {
 					free(pRes);
-				pRes = pB;
-				*pbMustBeFreed = 1;
+					*pbMustBeFreed = 0;
+				}
+				return "***REGEXP NOT AVAILABLE***";
 			}
 		}
 #endif /* #ifdef FEATURE_REGEXP */
@@ -1883,6 +2146,149 @@ char *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 	return(pRes);
 }
 
+
+/* The returns a message variable suitable for use with RainerScript. Most importantly, this means
+ * that the value is returned in a var_t object. The var_t is constructed inside this function and
+ * MUST be freed by the caller.
+ * rgerhards, 2008-02-25
+ */
+rsRetVal
+msgGetMsgVar(msg_t *pThis, cstr_t *pstrPropName, var_t **ppVar)
+{
+	DEFiRet;
+	var_t *pVar;
+	uchar *pszProp = NULL;
+	cstr_t *pstrProp;
+	unsigned short bMustBeFreed = 0;
+
+	ISOBJ_TYPE_assert(pThis, msg);
+	ASSERT(pstrPropName != NULL);
+	ASSERT(ppVar != NULL);
+
+	/* make sure we have a var_t instance */
+	CHKiRet(var.Construct(&pVar));
+	CHKiRet(var.ConstructFinalize(pVar));
+
+	/* always call MsgGetProp() without a template specifier */
+	pszProp = (uchar*) MsgGetProp(pThis, NULL, pstrPropName, &bMustBeFreed);
+
+	/* now create a string object out of it and hand that over to the var */
+	CHKiRet(rsCStrConstructFromszStr(&pstrProp, pszProp));
+	CHKiRet(var.SetString(pVar, pstrProp));
+
+	/* finally store var */
+	*ppVar = pVar;
+
+finalize_it:
+	if(bMustBeFreed)
+		free(pszProp);
+
+	RETiRet;
+}
+
+
+/* This function can be used as a generic way to set properties.
+ * We have to handle a lot of legacy, so our return value is not always
+ * 100% correct (called functions do not always provide one, should
+ * change over time).
+ * rgerhards, 2008-01-07
+ */
+#define isProp(name) !rsCStrSzStrCmp(pProp->pcsName, (uchar*) name, sizeof(name) - 1)
+rsRetVal MsgSetProperty(msg_t *pThis, var_t *pProp)
+{
+	DEFiRet;
+
+	ISOBJ_TYPE_assert(pThis, msg);
+	assert(pProp != NULL);
+
+ 	if(isProp("iProtocolVersion")) {
+		setProtocolVersion(pThis, pProp->val.num);
+ 	} else if(isProp("iSeverity")) {
+		pThis->iSeverity = pProp->val.num;
+ 	} else if(isProp("iFacility")) {
+		pThis->iFacility = pProp->val.num;
+ 	} else if(isProp("msgFlags")) {
+		pThis->msgFlags = pProp->val.num;
+	} else if(isProp("pszRawMsg")) {
+		MsgSetRawMsg(pThis, (char*) rsCStrGetSzStrNoNULL(pProp->val.pStr));
+	} else if(isProp("pszMSG")) {
+		MsgSetMSG(pThis, (char*) rsCStrGetSzStrNoNULL(pProp->val.pStr));
+	} else if(isProp("pszUxTradMsg")) {
+		MsgSetUxTradMsg(pThis, (char*) rsCStrGetSzStrNoNULL(pProp->val.pStr));
+	} else if(isProp("pszTAG")) {
+		MsgSetTAG(pThis, (char*) rsCStrGetSzStrNoNULL(pProp->val.pStr));
+	} else if(isProp("pszRcvFrom")) {
+		MsgSetHOSTNAME(pThis, (char*) rsCStrGetSzStrNoNULL(pProp->val.pStr));
+	} else if(isProp("pszHOSTNAME")) {
+		MsgSetRcvFrom(pThis, (char*) rsCStrGetSzStrNoNULL(pProp->val.pStr));
+	} else if(isProp("pCSStrucData")) {
+		MsgSetStructuredData(pThis, (char*) rsCStrGetSzStrNoNULL(pProp->val.pStr));
+	} else if(isProp("pCSAPPNAME")) {
+		MsgSetAPPNAME(pThis, (char*) rsCStrGetSzStrNoNULL(pProp->val.pStr));
+	} else if(isProp("pCSPROCID")) {
+		MsgSetPROCID(pThis, (char*) rsCStrGetSzStrNoNULL(pProp->val.pStr));
+	} else if(isProp("pCSMSGID")) {
+		MsgSetMSGID(pThis, (char*) rsCStrGetSzStrNoNULL(pProp->val.pStr));
+	} else if(isProp("tRcvdAt")) {
+		memcpy(&pThis->tRcvdAt, &pProp->val.vSyslogTime, sizeof(struct syslogTime));
+	} else if(isProp("tTIMESTAMP")) {
+		memcpy(&pThis->tTIMESTAMP, &pProp->val.vSyslogTime, sizeof(struct syslogTime));
+	}
+
+	RETiRet;
+}
+#undef	isProp
+
+
+/* This is a construction finalizer that must be called after all properties
+ * have been set. It does some final work on the message object. After this
+ * is done, the object is considered ready for full processing.
+ * rgerhards, 2008-07-08
+ */
+static rsRetVal msgConstructFinalizer(msg_t *pThis)
+{
+	MsgPrepareEnqueue(pThis);
+	return RS_RET_OK;
+}
+
+
+/* get the severity - this is an entry point that
+ * satisfies the base object class getSeverity semantics.
+ * rgerhards, 2008-01-14
+ */
+static rsRetVal
+MsgGetSeverity(obj_t *pThis, int *piSeverity)
+{
+	ISOBJ_TYPE_assert(pThis, msg);
+	assert(piSeverity != NULL);
+	*piSeverity = ((msg_t*) pThis)->iSeverity;
+	return RS_RET_OK;
+}
+
+
+/* dummy */
+rsRetVal msgQueryInterface(void) { return RS_RET_NOT_IMPLEMENTED; }
+
+/* Initialize the message class. Must be called as the very first method
+ * before anything else is called inside this class.
+ * rgerhards, 2008-01-04
+ */
+BEGINObjClassInit(msg, 1, OBJ_IS_CORE_MODULE)
+	/* request objects we use */
+	CHKiRet(objUse(var, CORE_COMPONENT));
+	CHKiRet(objUse(datetime, CORE_COMPONENT));
+
+	/* set our own handlers */
+	OBJSetMethodHandler(objMethod_SERIALIZE, MsgSerialize);
+	OBJSetMethodHandler(objMethod_SETPROPERTY, MsgSetProperty);
+	OBJSetMethodHandler(objMethod_CONSTRUCTION_FINALIZER, msgConstructFinalizer);
+	OBJSetMethodHandler(objMethod_GETSEVERITY, MsgGetSeverity);
+	/* initially, we have no need to lock message objects */
+	funcLock = MsgLockingDummy;
+	funcUnlock = MsgLockingDummy;
+	funcDeleteMutex = MsgLockingDummy;
+	funcMsgPrepareEnqueue = MsgLockingDummy;
+ENDObjClassInit(msg)
 
 /*
  * vi:set ai:

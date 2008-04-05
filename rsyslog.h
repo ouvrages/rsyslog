@@ -2,6 +2,25 @@
  * rsyslog project (including all subprojects like
  * rfc3195d).
  * Begun 2005-09-15 RGerhards
+ *
+ * Copyright (C) 2005 by Rainer Gerhards and Adiscon GmbH
+ *
+ * This file is part of rsyslog.
+ *
+ * Rsyslog is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Rsyslog is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Rsyslog.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * A copy of the GPL can be found in the file "COPYING" in this distribution.
 */
 #ifndef INCLUDED_RSYSLOG_H
 #define INCLUDED_RSYSLOG_H
@@ -24,6 +43,27 @@
 #	define _FILE_OFFSET_BITS 64
 #endif
 
+
+/* some universal 64 bit define... */
+typedef long long int64;
+typedef long long unsigned uint64;
+typedef int64 number_t; /* type to use for numbers - TODO: maybe an autoconf option? */
+
+#ifdef __hpux
+typedef unsigned int u_int32_t; /* TODO: is this correct? */
+typedef int socklen_t;
+#endif
+
+/* settings for flow control
+ * TODO: is there a better place for them? -- rgerhards, 2008-03-14
+ */
+typedef enum {
+	eFLOWCTL_NO_DELAY = 0,		/**< UDP and other non-delayable sources */
+	eFLOWCTL_LIGHT_DELAY = 1,	/**< some light delay possible, but no extended period of time */
+	eFLOWCTL_FULL_DELAY = 2	/**< delay possible for extended period of time */
+} flowControl_t;
+
+
 /* The error codes below are orginally "borrowed" from
  * liblogging. As such, we reserve values up to -2999
  * just in case we need to borrow something more ;)
@@ -33,8 +73,9 @@ enum rsRetVal_				/** return value. All methods return this if not specified oth
 	RS_RET_NOT_IMPLEMENTED = -7,	/**< implementation is missing (probably internal error or lazyness ;)) */
 	RS_RET_OUT_OF_MEMORY = -6,	/**< memory allocation failed */
 	RS_RET_PROVIDED_BUFFER_TOO_SMALL = -50,/**< the caller provided a buffer, but the called function sees the size of this buffer is too small - operation not carried out */
-	RS_RET_TRUE = -1,
-	RS_RET_FALSE = -2,
+	RS_RET_TRUE = -1,		/**< to indicate a true state (can be used as TRUE, legacy) */
+	RS_RET_FALSE = -2,		/**< to indicate a false state (can be used as FALSE, legacy) */
+	RS_RET_NO_IRET = -8,	/**< This is a trick for the debuging system - it means no iRet is provided  */
 	RS_RET_ERR = -3000,	/**< generic failure */
 	RS_TRUNCAT_TOO_LARGE = -3001, /**< truncation operation where too many chars should be truncated */
 	RS_RET_FOUND_AT_STRING_END = -3002, /**< some value found, but at the last pos of string */
@@ -46,6 +87,14 @@ enum rsRetVal_				/** return value. All methods return this if not specified oth
 	RS_RET_OBJ_CREATION_FAILED = - 3008, /**< the creation of an object failed (no details available) */
 	RS_RET_PARAM_ERROR = -1000,	/**< invalid parameter in call to function */
 	RS_RET_MISSING_INTERFACE = -1001,/**< interface version mismatch, required missing */
+	RS_RET_INVALID_CORE_INTERFACE = -1002,/**< interface provided by host invalid, can not be used */
+	RS_RET_ENTRY_POINT_NOT_FOUND = -1003,/**< a requested entry point was not found */
+	RS_RET_MODULE_ENTRY_POINT_NOT_FOUND = -1004,/**< a entry point requested from a module was not present in it */
+	RS_RET_OBJ_NOT_AVAILABLE = -1005,/**< something could not be completed because the required object is not available*/
+	RS_RET_LOAD_ERROR = -1006,/**< we had an error loading the object/interface and can not continue */
+	RS_RET_MODULE_STILL_REFERENCED = -1007,/**< module could not be unloaded because it still is referenced by someone */
+	RS_RET_OBJ_UNKNOWN = -1008,/**< object is unknown where required */
+	RS_RET_OBJ_NOT_REGISTERED = -1009,/**< tried to unregister an object that is not registered */
 	/* return states for config file processing */
 	RS_RET_NONE = -2000,		/**< some value is not available - not necessarily an error */
 	RS_RET_CONFLINE_UNPROCESSED = -2001,/**< config line was not processed, pass to other module */
@@ -69,11 +118,58 @@ enum rsRetVal_				/** return value. All methods return this if not specified oth
 	RS_RET_INVALID_SOURCE = -2019, /**< source (address) invalid for some reason */
 	RS_RET_ADDRESS_UNKNOWN = -2020, /**< an address is unknown - not necessarily an error */
 	RS_RET_MALICIOUS_ENTITY = -2021, /**< there is an malicious entity involved */
+	RS_RET_NO_KERNEL_LOGSRC = -2022, /**< no source for kernel logs can be obtained */
 	RS_RET_TCP_SEND_ERROR = -2023, /**< error during TCP send process */
 	RS_RET_GSS_SEND_ERROR = -2024, /**< error during GSS (via TCP) send process */
 	RS_RET_TCP_SOCKCREATE_ERR = -2025, /**< error during creation of TCP socket */
 	RS_RET_GSS_SENDINIT_ERROR = -2024, /**< error during GSS (via TCP) send initialization process */
+	RS_RET_QUEUE_FULL = -2025, /**< queue is full, operation could not be completed */
+	RS_RET_EOF = -2026, /**< end of file reached, not necessarily an error */
+	RS_RET_IO_ERROR = -2027, /**< some kind of IO error happened */
+	RS_RET_INVALID_OID = -2028, /**< invalid object ID */
+	RS_RET_INVALID_HEADER = -2029, /**< invalid header */
+	RS_RET_INVALID_HEADER_VERS = -2030, /**< invalid header version */
+	RS_RET_INVALID_DELIMITER = -2031, /**< invalid delimiter, e.g. between params */
+	RS_RET_INVALID_PROPFRAME = -2032, /**< invalid framing in serialized property */
+	RS_RET_NO_PROPLINE = -2033, /**< line is not a property line */
+	RS_RET_INVALID_TRAILER = -2034, /**< invalid trailer */
+	RS_RET_VALUE_TOO_LOW = -2035, /**< a provided value is too low */
+	RS_RET_FILE_PREFIX_MISSING = -2036, /**< a required file prefix (parameter?) is missing */
+	RS_RET_INVALID_HEADER_RECTYPE = -2037, /**< invalid record type in header or invalid header */
+	RS_RET_QTYPE_MISMATCH = -2038, /**< different qType when reading back a property type */
+	RS_RET_NO_FILE_ACCESS = -2039, /**< covers EACCES error on file open() */
+	RS_RET_FILE_NOT_FOUND = -2040, /**< file not found */
+	RS_RET_TIMED_OUT = -2041, /**< timeout occured (not necessarily an error) */
+	RS_RET_QSIZE_ZERO = -2042, /**< queue size is zero where this is not supported */
+	RS_RET_ALREADY_STARTING = -2043, /**< something (a thread?) is already starting - not necessarily an error */
+	RS_RET_NO_MORE_THREADS = -2044, /**< no more threads available, not necessarily an error */
+	RS_RET_NO_FILEPREFIX = -2045, /**< file prefix is not specified where one is needed */
+	RS_RET_CONFIG_ERROR = -2046, /**< there is a problem with the user-provided config settigs */
+	RS_RET_OUT_OF_DESRIPTORS = -2047, /**< a descriptor table's space has been exhausted */
+	RS_RET_NO_DRIVERS = -2048, /**< a required drivers missing */
+	RS_RET_NO_DRIVERNAME = -2049, /**< driver name missing where one was required */
+	RS_RET_EOS = -2050, /**< end of stream (of whatever) */
+	RS_RET_SYNTAX_ERROR = -2051, /**< syntax error, eg. during parsing */
+	RS_RET_INVALID_OCTAL_DIGIT = -2052, /**< invalid octal digit during parsing */
+	RS_RET_INVALID_HEX_DIGIT = -2053, /**< invalid hex digit during parsing */
+	RS_RET_INTERFACE_NOT_SUPPORTED = -2054, /**< interface not supported */
+	RS_RET_OUT_OF_STACKSPACE = -2055, /**< a stack data structure is exhausted and can not be grown */
+	RS_RET_STACK_EMPTY = -2056, /**< a pop was requested on a stack, but the stack was already empty */
+	RS_RET_INVALID_VMOP = -2057, /**< invalid virtual machine instruction */
+	RS_RET_INVALID_VAR = -2058, /**< a var_t or its content is unsuitable, eg. VARTYPE_NONE */
+	RS_RET_INVALID_NUMBER = -2059, /**< number invalid during parsing */
+	RS_RET_NOT_A_NUMBER = -2060, /**< e.g. conversion impossible because the string is not a number */
+	RS_RET_OBJ_ALREADY_REGISTERED = -2061, /**< object (name) is already registered */
+	RS_RET_OBJ_REGISTRY_OUT_OF_SPACE = -2062, /**< the object registry has run out of space */
+	RS_RET_HOST_NOT_PERMITTED = -2063, /**< a host is not permitted to perform an action it requested */
+
+	/* RainerScript error messages (range 1000.. 1999) */
+	RS_RET_SYSVAR_NOT_FOUND = 1001, /**< system variable could not be found (maybe misspelled) */
+
+	/* some generic error/status codes */
 	RS_RET_OK_DELETE_LISTENTRY = 1,	/**< operation successful, but callee requested the deletion of an entry (special state) */
+	RS_RET_TERMINATE_NOW = 2,	/**< operation successful, function is requested to terminate (mostly used with threads) */
+	RS_RET_NO_RUN = 3,		/**< operation successful, but function does not like to be executed */
 	RS_RET_OK = 0			/**< operation successful */
 };
 typedef enum rsRetVal_ rsRetVal; /**< friendly type for global return value */
@@ -87,7 +183,9 @@ typedef enum rsRetVal_ rsRetVal; /**< friendly type for global return value */
 #define CHKiRet_Hdlr(code) if((iRet = code) != RS_RET_OK)
 /* macro below is used in conjunction with CHKiRet_Hdlr, else use ABORT_FINALIZE */
 #define FINALIZE goto finalize_it;
-#define DEFiRet rsRetVal iRet = RS_RET_OK
+#define DEFiRet BEGINfunc rsRetVal iRet = RS_RET_OK
+#define RETiRet do{ ENDfuncIRet return iRet; }while(0)
+
 #define ABORT_FINALIZE(errCode)			\
 	do {					\
 		iRet = errCode;			\
@@ -108,13 +206,13 @@ enum rsObjectID
 				 *   invalid object pointer!
 				 */
 	OIDrsInvalid = 0,	/**< value created by calloc(), so do not use ;) */
-	/* The 0xEFCD is a debug aid. It helps us find object IDs in memory
-	 * dumps (on X86, this is CDEF in the dump ;)
+	/* The 0x3412 is a debug aid. It helps us find object IDs in memory
+	 * dumps (on X86, this is 1234 in the dump ;)
 	 * If you are on an embedded device and you would like to save space
 	 * make them 1 byte only.
 	 */
-	OIDrsCStr = 0xEFCD0001,
-	OIDrsPars = 0xEFCD0002
+	OIDrsCStr = 0x34120001,
+	OIDrsPars = 0x34120002
 };
 typedef enum rsObjectID rsObjID;
 
@@ -148,6 +246,11 @@ typedef unsigned char uchar;
 #ifndef __GNUC__
 #  define  __attribute__(x)  /*NOTHING*/
 #endif
+
+/* The following prototype is convenient, even though it may not be the 100% correct place.. -- rgerhards 2008-01-07 */
+void dbgprintf(char *, ...) __attribute__((format(printf, 1, 2)));
+
+#include "debug.h"
 
 #endif /* multi-include protection */
 /*

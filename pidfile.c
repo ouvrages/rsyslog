@@ -2,21 +2,22 @@
     pidfile.c - interact with pidfiles
     Copyright (c) 1995  Martin Schulze <Martin.Schulze@Linux.DE>
 
-    This file is part of the sysklogd package, a kernel and system log daemon.
-
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111, USA
+ * This file is part of rsyslog.
+ *
+ * Rsyslog is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Rsyslog is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Rsyslog.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * A copy of the GPL can be found in the file "COPYING" in this distribution.
 */
 #include "config.h"
 
@@ -39,20 +40,7 @@
 #include <fcntl.h>
 #endif
 
-
-static char *rs_strerror_r(int errnum, char *buf, size_t buflen) {
-#ifdef STRERROR_R_CHAR_P
-	char *p = strerror_r(errnum, buf, buflen);
-	if (p != buf) {
-		strncpy(buf, p, buflen);
-		buf[buflen - 1] = '\0';
-	}
-#else
-	strerror_r(errnum, buf, buflen);
-#endif
-	return buf;
-}
-
+#include "srUtils.h"
 
 /* read_pid
  *
@@ -123,7 +111,7 @@ int write_pid (char *pidfile)
   * 2006-02-16 rgerhards
   */
 
-#ifndef	__sun
+#if HAVE_FLOCK
   if (flock(fd, LOCK_EX|LOCK_NB) == -1) {
       fscanf(f, "%d", &pid);
       fclose(f);
@@ -142,7 +130,7 @@ int write_pid (char *pidfile)
   }
   fflush(f);
 
-#ifndef	__sun
+#if HAVE_FLOCK
   if (flock(fd, LOCK_UN) == -1) {
       char errStr[1024];
       rs_strerror_r(errno, errStr, sizeof(errStr));

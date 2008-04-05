@@ -6,12 +6,27 @@
  * Please see syslogd.c for license information.
  * This code is placed under the GPL.
  * begun 2005-06-21 rgerhards
+ *
+ * Copyright (C) 2005 by Rainer Gerhards and Adiscon GmbH
+ *
+ * This file is part of rsyslog.
+ *
+ * Rsyslog is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Rsyslog is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Rsyslog.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * A copy of the GPL can be found in the file "COPYING" in this distribution.
  */
 #include "config.h"
-
-#ifdef __FreeBSD__
-#define	BSD
-#endif
 
 #include "rsyslog.h"
 #include <stdio.h>
@@ -81,7 +96,7 @@ static void skip_Comma(char **pp)
 static int get_Field(uchar **pp, uchar **pField)
 {
 	register uchar *p;
-	rsCStrObj *pStrB;
+	cstr_t *pStrB;
 
 	assert(pp != NULL);
 	assert(*pp != NULL);
@@ -90,7 +105,7 @@ static int get_Field(uchar **pp, uchar **pField)
 	skip_Comma((char**)pp);
 	p = *pp;
 
-	if((pStrB = rsCStrConstruct()) == NULL)
+	if(rsCStrConstruct(&pStrB) != RS_RET_OK)
 		 return 1;
 	rsCStrSetAllocIncrement(pStrB, 32);
 
@@ -146,7 +161,7 @@ static int get_off_t(uchar **pp, off_t *pOff_t)
 static inline int get_restOfLine(uchar **pp, uchar **pBuf)
 {
 	register uchar *p;
-	rsCStrObj *pStrB;
+	cstr_t *pStrB;
 
 	assert(pp != NULL);
 	assert(*pp != NULL);
@@ -155,7 +170,7 @@ static inline int get_restOfLine(uchar **pp, uchar **pBuf)
 	skip_Comma((char**)pp);
 	p = *pp;
 
-	if((pStrB = rsCStrConstruct()) == NULL)
+	if(rsCStrConstruct(&pStrB) != RS_RET_OK)
 		 return 1;
 	rsCStrSetAllocIncrement(pStrB, 32);
 
@@ -271,7 +286,7 @@ void ochPrintList(void)
 	while(pOch != NULL) {
 		dbgprintf("Outchannel: Name='%s'\n", pOch->pszName == NULL? "NULL" : pOch->pszName);
 		dbgprintf("\tFile Template: '%s'\n", pOch->pszFileTemplate == NULL ? "NULL" : (char*) pOch->pszFileTemplate);
-		dbgprintf("\tMax Size.....: %lu\n", pOch->uSizeLimit);
+		dbgprintf("\tMax Size.....: %lu\n", (long unsigned) pOch->uSizeLimit);
 		dbgprintf("\tOnSizeLimtCmd: '%s'\n", pOch->cmdOnSizeLimit == NULL ? "NULL" : (char*) pOch->cmdOnSizeLimit);
 		pOch = pOch->pNext; /* done, go next */
 	}

@@ -5,80 +5,33 @@
  *
  * Copyright 2007 Rainer Gerhards and Adiscon GmbH.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This file is part of rsyslog.
  *
- * This program is distributed in the hope that it will be useful,
+ * Rsyslog is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Rsyslog is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * along with Rsyslog.  If not, see <http://www.gnu.org/licenses/>.
  *
  * A copy of the GPL can be found in the file "COPYING" in this distribution.
  */
 #ifndef	TCPSYSLOG_H_INCLUDED
 #define	TCPSYSLOG_H_INCLUDED 1
 
-#if defined(SYSLOG_INET) && defined(USE_GSSAPI)
-#include <gssapi/gssapi.h>
-#endif
+#include <netdb.h>
 
-struct TCPSession {
-	int sock;
-	int iMsg; /* index of next char to store in msg */
-	int bAtStrtOfFram;	/* are we at the very beginning of a new frame? */
-	int iOctetsRemain;	/* Number of Octets remaining in message */
-	TCPFRAMINGMODE eFraming;
-	char msg[MAXLINE+1];
-	char *fromHost;
-#if defined(SYSLOG_INET) && defined(USE_GSSAPI)
-	OM_uint32 gss_flags;
-	gss_ctx_id_t gss_context;
-	char allowedMethods;
-#endif
-};
+typedef enum _TCPFRAMINGMODE {
+		TCP_FRAMING_OCTET_STUFFING = 0, /* traditional LF-delimited */
+		TCP_FRAMING_OCTET_COUNTING = 1  /* -transport-tls like octet count */
+	} TCPFRAMINGMODE;
 
-/* static data */
-extern int  *sockTCPLstn;
-extern char *TCPLstnPort;
-extern int bEnableTCP;
-extern struct TCPSession *pTCPSessions;
-#if defined(SYSLOG_INET) && defined(USE_GSSAPI)
-extern char *gss_listen_service_name;
-
-#define ALLOWEDMETHOD_GSS 2
-#endif
-
-#define ALLOWEDMETHOD_TCP 1
-
-/* prototypes */
-void deinit_tcp_listener(void);
-int *create_tcp_socket(void);
-int TCPSessGetNxtSess(int iCurr);
-int TCPSessAccept(int fd);
-void TCPSessPrepareClose(int iTCPSess);
-void TCPSessClose(int iSess);
-int TCPSessDataRcvd(int iTCPSess, char *pData, int iLen);
-void configureTCPListen(char *cOptarg);
-#if defined(SYSLOG_INET) && defined(USE_GSSAPI)
-int TCPSessGSSInit(void);
-int TCPSessGSSAccept(int fd);
-int TCPSessGSSRecv(int fd, void *buf, size_t buf_len);
-void TCPSessGSSClose(int sess);
-void TCPSessGSSDeinit(void);
-#endif
-
-/* TCP Send support (shall go into its own module later) */
-int TCPSendCreateSocket(struct addrinfo *addrDest);
-int TCPSend(void *pData, char *msg, size_t len, TCPFRAMINGMODE rqdFraming,
-	    rsRetVal (*initFunc)(void*),
-	    rsRetVal (*sendFunc)(void*, char*, size_t),
-	    rsRetVal (*prepRetryFunc)(void*));
 #endif /* #ifndef TCPSYSLOG_H_INCLUDED */
 /*
  * vi:set ai:
