@@ -3,6 +3,11 @@ rsyslog (3.14.1-1) unstable; urgency=low
   * First upstream release of the new stable v3 series.
   * debian/copyright
     - Update copyright notice as rsyslog has been relicensed under GPL3+.
+  * debian/rsyslog.init
+    - The kernel logging functionality is now implemented via an input plugin
+      and has replaced the separate rklogd binary. Remove all traces of rklogd
+      from the init script.
+    - General cleanup and simplification.
 
  -- Michael Biebl <biebl@debian.org>  Sun, 06 Apr 2008 16:54:08 +0200
 

@@ -13,6 +13,7 @@
 #                    used as a drop-in replacement.
 ### END INIT INFO
 
+#
 # Author: Michael Biebl <biebl@debian.org>
 #
 
@@ -25,19 +26,13 @@ NAME=rsyslog
 
 RSYSLOGD=rsyslogd
 RSYSLOGD_BIN=/usr/sbin/rsyslogd
-RSYSLOGD_OPTIONS="-m 0"
+RSYSLOGD_OPTIONS="-c3"
 RSYSLOGD_PIDFILE=/var/run/rsyslogd.pid
-
-RKLOGD=rklogd
-RKLOGD_BIN=/usr/sbin/rklogd
-RKLOGD_OPTIONS="-2"
-RKLOGD_PIDFILE=/var/run/rklogd.pid
 
 SCRIPTNAME=/etc/init.d/$NAME
 
 # Exit if the package is not installed
 [ -x "$RSYSLOGD_BIN" ] || exit 0
-[ -x "$RKLOGD_BIN" ] || exit 0
 
 # Read configuration variable file if it is present
 [ -r /etc/default/$NAME ] && . /etc/default/$NAME
@@ -46,53 +41,39 @@ SCRIPTNAME=/etc/init.d/$NAME
 # Depend on lsb-base (>= 3.0-6) to ensure that this file is present.
 . /lib/lsb/init-functions
 
-#
-# Function that starts the daemon/service
-#
 do_start()
 {
-	DAEMON=$1
-	DAEMON_ARGS=$2
-	PIDFILE=$3
+	DAEMON="$RSYSLOGD_BIN"
+	DAEMON_ARGS="$RSYSLOGD_OPTIONS"
+	PIDFILE="$RSYSLOGD_PIDFILE"
 
 	# Return
 	#   0 if daemon has been started
 	#   1 if daemon was already running
-	#   2 if daemon could not be started
-	start-stop-daemon --start --quiet --pidfile $PIDFILE --exec $DAEMON --test > /dev/null \
-		|| return 1
-	start-stop-daemon --start --quiet --pidfile $PIDFILE --exec $DAEMON -- \
-		$DAEMON_ARGS \
-		|| return 2
+	#   other if daemon could not be started or a failure occured
+	start-stop-daemon --start --quiet --pidfile $PIDFILE --exec $DAEMON -- $DAEMON_ARGS
 }
 
-#
-# Function that stops the daemon/service
-#
 do_stop()
 {
-	NAME=$1
-	PIDFILE=$2
+	NAME="$RSYSLOGD"
+	PIDFILE="$RSYSLOGD_PIDFILE"
 
 	# Return
 	#   0 if daemon has been stopped
 	#   1 if daemon was already stopped
-	#   2 if daemon could not be stopped
-	#   other if a failure occurred
+	#   other if daemon could not be stopped or a failure occurred
 	start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile $PIDFILE --name $NAME
-	RETVAL="$?"
-	return "$RETVAL"
 }
 
 #
-# Function that sends a SIGHUP to the daemon/service
+# Tell rsyslogd to reload its configuration
 #
 do_reload() {
-	NAME=$1
-	PIDFILE=$2
+	NAME="$RSYSLOGD"
+	PIDFILE="$RSYSLOGD_PIDFILE"
 
 	start-stop-daemon --stop --signal HUP --quiet --pidfile $PIDFILE --name $NAME
-	return 0
 }
 
 create_xconsole() {
@@ -107,35 +88,29 @@ case "$1" in
   start)
 	log_daemon_msg "Starting $DESC" "$RSYSLOGD"
 	create_xconsole
-	do_start "$RSYSLOGD_BIN" "$RSYSLOGD_OPTIONS" "$RSYSLOGD_PIDFILE"
+	do_start
 	case "$?" in
-		2) log_end_msg 1 ;;
+		0) log_end_msg 0 ;;
+		1) log_progress_msg "already started"
+		   log_end_msg 0 ;;
+		*) log_end_msg $? ;;
 	esac
 
-	log_progress_msg "$RKLOGD"
-	do_start "$RKLOGD_BIN" "$RKLOGD_OPTIONS" "$RKLOGD_PIDFILE"
-	case "$?" in
-		0|1) log_end_msg 0 ;;
-		2) log_end_msg 1 ;;
-	esac
 	;;
   stop)
-	log_daemon_msg "Stopping $DESC" "$RKLOGD"
-	do_stop "$RKLOGD" "$RKLOGD_PIDFILE"
+	log_daemon_msg "Stopping $DESC" "$RSYSLOGD"
+	do_stop
 	case "$?" in
-		2) log_end_msg 1 ;;
-	esac
-	log_progress_msg "$RSYSLOGD"
-	do_stop "$RSYSLOGD" "$RSYSLOGD_PIDFILE"
-	case "$?" in
-		0|1) log_end_msg 0 ;;
-		2) log_end_msg 1 ;;
+		0) log_end_msg 0 ;;
+		1) log_progress_msg "already stopped"
+		   log_end_msg 0 ;;
+		*) log_end_msg $? ;;
 	esac
 
 	;;
   reload|force-reload)
 	log_daemon_msg "Reloading $DESC" "$RSYSLOGD"
-	do_reload "$RSYSLOGD" "$RSYSLOGD_PIDFILE"
+	do_reload
 	log_end_msg $?
 	;;
   restart)
