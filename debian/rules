@@ -71,10 +71,6 @@ install: build
 	# Add here commands to install the package into debian/rsyslog.
 	$(MAKE) DESTDIR=$(CURDIR)/debian/tmp install
 
-	# rfc3195d is only a dummy binary atm. So don't install it.
-	rm -f debian/tmp/usr/sbin/rfc3195d
-	rm -f debian/tmp/usr/share/man/man8/rfc3195d.8
-
 	install --mode=644 -D plugins/ommysql/createDB.sql debian/rsyslog-mysql/usr/share/dbconfig-common/data/rsyslog-mysql/install/mysql
 	install --mode=644 -D plugins/ompgsql/createDB.sql debian/rsyslog-pgsql/usr/share/dbconfig-common/data/rsyslog-pgsql/install/pgsql
 
