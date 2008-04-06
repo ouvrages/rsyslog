@@ -12,6 +12,9 @@ rsyslog (3.14.1-1) unstable; urgency=low
     - Remove obsolete RKLOGD_OPTIONS configuration variable.
     - Document deprecated command line options.
     - Start rsyslogd in v3 compat mode, its native interface.
+  * debian/rsyslog.conf
+    - Load the input modules imuxsock (local system logging) and imklog
+      (kernel logging) by default.
 
  -- Michael Biebl <biebl@debian.org>  Sun, 06 Apr 2008 16:54:08 +0200
 
