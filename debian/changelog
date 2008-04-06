@@ -21,6 +21,10 @@ rsyslog (3.14.1-1) unstable; urgency=low
     - Install input modules (im*.so) and library plugins (lm*.so).
   * debian/rules
     - Enable imfile input plugin.
+    - Use dh_installinit "-r" (no-restart-on-upgrade) option.
+  * debian/rsyslog.postinst
+    - Minimize downtime by restarting rsyslog in postinst instead of stop in
+      prerm and start in postinst. Closes: #471051
 
  -- Michael Biebl <biebl@debian.org>  Sun, 06 Apr 2008 16:54:08 +0200
 

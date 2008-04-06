@@ -88,7 +88,7 @@ binary-arch: build install
 	dh_installexamples debian/sample.conf
 	dh_install
 	dh_installlogrotate
-	dh_installinit -- start 10 2 3 4 5 . stop 90 0 1 6 .
+	dh_installinit -r -- start 10 2 3 4 5 . stop 90 0 1 6 .
 	dh_installman
 	dh_installdebconf
 	dh_link
