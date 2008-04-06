@@ -1,8 +1,10 @@
 rsyslog (3.14.1-1) unstable; urgency=low
 
   * First upstream release of the new stable v3 series.
+  * debian/copyright
+    - Update copyright notice as rsyslog has been relicensed under GPL3+.
 
- -- Michael Biebl <biebl@debian.org>  Sat, 05 Apr 2008 19:13:55 +0200
+ -- Michael Biebl <biebl@debian.org>  Sun, 06 Apr 2008 16:54:08 +0200
 
 rsyslog (2.0.4-1) unstable; urgency=low
 
