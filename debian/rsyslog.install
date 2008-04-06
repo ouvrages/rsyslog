@@ -1,3 +1,5 @@
 debian/rsyslog.conf /etc/
 debian/tmp/usr/sbin/
 debian/tmp/usr/share/man/
+debian/tmp/usr/lib/rsyslog/im*.so
+debian/tmp/usr/lib/rsyslog/lm*.so
