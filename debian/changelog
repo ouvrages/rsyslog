@@ -19,6 +19,8 @@ rsyslog (3.14.1-1) unstable; urgency=low
     - Install jpeg images and dia files.
   * debian/rsyslog.install
     - Install input modules (im*.so) and library plugins (lm*.so).
+  * debian/rules
+    - Enable imfile input plugin.
 
  -- Michael Biebl <biebl@debian.org>  Sun, 06 Apr 2008 16:54:08 +0200
 

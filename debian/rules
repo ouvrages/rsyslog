@@ -37,6 +37,7 @@ endif
 		--infodir=\$${prefix}/share/info \
 		--enable-mysql \
 		--enable-pgsql \
+		--enable-imfile \
 		CFLAGS="$(CFLAGS)"
 
 
