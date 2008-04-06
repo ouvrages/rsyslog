@@ -15,6 +15,8 @@ rsyslog (3.14.1-1) unstable; urgency=low
   * debian/rsyslog.conf
     - Load the input modules imuxsock (local system logging) and imklog
       (kernel logging) by default.
+  * debian/rsyslog-doc.install
+    - Install jpeg images and dia files.
 
  -- Michael Biebl <biebl@debian.org>  Sun, 06 Apr 2008 16:54:08 +0200
 
