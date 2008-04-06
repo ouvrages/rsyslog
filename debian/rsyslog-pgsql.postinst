@@ -40,7 +40,7 @@ case "$1" in
 	### Configuration file for rsyslog-pgsql
 	### Changes are preserved 
 
-	\$ModLoad ompgsql.so
+	\$ModLoad ompgsql
 	*.* :ompgsql:$HOST,$DATABASE,$USER,$PASS
 	EOF
 

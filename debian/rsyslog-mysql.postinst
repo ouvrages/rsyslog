@@ -40,7 +40,7 @@ case "$1" in
 	### Configuration file for rsyslog-mysql
 	### Changes are preserved 
 
-	\$ModLoad MySQL
+	\$ModLoad ommysql
 	*.* :ommysql:$HOST,$DATABASE,$USER,$PASS
 	EOF
 
