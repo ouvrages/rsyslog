@@ -25,6 +25,11 @@ rsyslog (3.14.1-1) unstable; urgency=low
   * debian/rsyslog.postinst
     - Minimize downtime by restarting rsyslog in postinst instead of stop in
       prerm and start in postinst. Closes: #471051
+  * debian/rsyslog.logrotate
+    - Group together related log files.
+    - Rotate daemon.log and kern.log weekly, to match sysklogd behaviour.
+    - Add options "missingok", "delaycompress" and "sharedscripts" as
+      suggested by Paul Slootman. Closes: #473546
 
  -- Michael Biebl <biebl@debian.org>  Sun, 06 Apr 2008 16:54:08 +0200
 
