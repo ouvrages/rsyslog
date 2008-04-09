@@ -1053,10 +1053,11 @@ static rsRetVal shouldProcessThisMessage(selector_t *f, msg_t *pMsg, int *bProce
 
 finalize_it:
 	/* destruct in any case, not just on error, but it makes error handling much easier */
-	if(pVM != NULL) {
-		var.Destruct(&pResult);
+	if(pVM != NULL)
 		vm.Destruct(&pVM);
-	}
+
+	if(pResult != NULL)
+		var.Destruct(&pResult);
 
 	*bProcessMsg = bRet;
 	RETiRet;
@@ -1740,6 +1741,7 @@ void legacyOptsHook(void)
 
 	while(pThis != NULL) {
 		if(pThis->line != NULL) {
+			errno = 0;
 			errmsg.LogError(NO_ERRCODE, "Warning: backward compatibility layer added to following "
 				        "directive to rsyslog.conf: %s", pThis->line);
 			conf.cfsysline(pThis->line);
@@ -2837,12 +2839,11 @@ InitGlobalClasses(void)
 	/* the following classes were intialized by objClassInit() */
 	CHKiRet(objUse(errmsg,   CORE_COMPONENT));
 	CHKiRet(objUse(module,   CORE_COMPONENT));
+	CHKiRet(objUse(var,      CORE_COMPONENT));
 
 	/* initialize and use classes. We must be very careful with the order of events. Some
 	 * classes use others and if we do not initialize them in the right order, we may end
 	 * up with an invalid call. The most important thing that can happen is that an error
-	pErrObj = "var";
-	CHKiRet(objUse(var,      CORE_COMPONENT));
 	 * is detected and needs to be logged, wich in turn requires a broader number of classes
 	 * to be available. The solution is that we take care in the order of calls AND use a
 	 * class immediately after it is initialized. And, of course, we load those classes
@@ -2899,6 +2900,7 @@ GlobalClassExit(void)
 	objRelease(conf,     CORE_COMPONENT);
 	objRelease(expr,     CORE_COMPONENT);
 	objRelease(vm,       CORE_COMPONENT);
+	objRelease(var,      CORE_COMPONENT);
 	objRelease(datetime, CORE_COMPONENT);
 
 	/* TODO: implement the rest of the deinit */
@@ -2924,10 +2926,7 @@ GlobalClassExit(void)
 	CHKiRet(templateInit());
 #endif
 	/* dummy "classes */
-dbgprintf("pre strExit()\n");
 	strExit();
-dbgprintf("post strExit()\n");
-
 
 #if 0
 	CHKiRet(objGetObjInterface(&obj)); /* this provides the root pointer for all other queries */
@@ -3024,7 +3023,7 @@ int realMain(int argc, char **argv)
 
 	/* END core initializations */
 
-	while ((ch = getopt(argc, argv, "46Ac:dehi:f:g:l:m:M:nqQr::s:t:u:vwx")) != EOF) {
+	while ((ch = getopt(argc, argv, "46aAc:def:g:hi:l:m:M:nopqQr::s:t:u:vwx")) != EOF) {
 		switch((char)ch) {
                 case '4':
 	                family = PF_INET;
@@ -3111,7 +3110,7 @@ int realMain(int argc, char **argv)
 					legacyOptsEnq((uchar *) "ModLoad imuxsock");
 					bImUxSockLoaded = 1;
 				}
-				legacyOptsEnq((uchar *) "OmitLocaLogging");
+				legacyOptsEnq((uchar *) "OmitLocalLogging");
 			} else {
 				fprintf(stderr, "error -o is no longer supported, use module imuxsock instead");
 			}
