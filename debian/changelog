@@ -1,3 +1,11 @@
+rsyslog (3.14.2-2) unstable; urgency=low
+
+  * debian/rsyslog.conf
+    - Disable high precision timestamps until other affected packages have
+      been updated to support them. See bug #475303 for details.
+
+ -- Michael Biebl <biebl@debian.org>  Tue, 22 Apr 2008 20:02:28 +0200
+
 rsyslog (3.14.2-1) unstable; urgency=low
 
   * New upstream release.
