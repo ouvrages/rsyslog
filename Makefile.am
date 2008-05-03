@@ -167,12 +167,6 @@ lmgssutil_la_LDFLAGS = -module -avoid-version
 lmgssutil_la_LIBADD = $(gss_libs)
 endif
 
-#
-# relp support
-# 
-if ENABLE_RELP
-endif
-
 EXTRA_DIST = \
 	redhat/rsyslog.conf \
 	redhat/rsyslog.init \
@@ -182,6 +176,7 @@ EXTRA_DIST = \
 	slackware/rc.rsyslogd \
 	contrib/README \
 	rsyslog.conf \
+	COPYING.LESSER \
 	$(man_MANS)
 
 SUBDIRS = . doc

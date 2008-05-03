@@ -63,9 +63,9 @@ sbin_PROGRAMS = $(am__EXEEXT_1) $(am__EXEEXT_2)
 subdir = .
 DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
-	$(top_srcdir)/configure AUTHORS COPYING ChangeLog INSTALL NEWS \
-	compile config.guess config.sub depcomp install-sh ltmain.sh \
-	missing
+	$(top_srcdir)/configure AUTHORS COPYING COPYING.LESSER \
+	ChangeLog INSTALL NEWS compile config.guess config.sub depcomp \
+	install-sh ltmain.sh missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
@@ -304,7 +304,10 @@ PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
+PKG_CONFIG = @PKG_CONFIG@
 RANLIB = @RANLIB@
+RELP_CFLAGS = @RELP_CFLAGS@
+RELP_LIBS = @RELP_LIBS@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
@@ -364,8 +367,6 @@ program_transform_name = @program_transform_name@
 psdir = @psdir@
 pthreads_cflags = @pthreads_cflags@
 pthreads_libs = @pthreads_libs@
-relp_cflags = @relp_cflags@
-relp_libs = @relp_libs@
 rfc3195_cflags = @rfc3195_cflags@
 rfc3195_libs = @rfc3195_libs@
 rt_libs = @rt_libs@
@@ -514,10 +515,6 @@ pkglib_LTLIBRARIES = $(am__append_5) $(am__append_6) $(am__append_7)
 @ENABLE_GSSAPI_TRUE@lmgssutil_la_CPPFLAGS = $(pthreads_cflags)
 @ENABLE_GSSAPI_TRUE@lmgssutil_la_LDFLAGS = -module -avoid-version
 @ENABLE_GSSAPI_TRUE@lmgssutil_la_LIBADD = $(gss_libs)
-
-#
-# relp support
-# 
 EXTRA_DIST = \
 	redhat/rsyslog.conf \
 	redhat/rsyslog.init \
@@ -527,6 +524,7 @@ EXTRA_DIST = \
 	slackware/rc.rsyslogd \
 	contrib/README \
 	rsyslog.conf \
+	COPYING.LESSER \
 	$(man_MANS)
 
 SUBDIRS = . doc plugins/immark plugins/imuxsock plugins/imtcp \
