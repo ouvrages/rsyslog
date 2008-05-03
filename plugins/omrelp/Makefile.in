@@ -125,7 +125,10 @@ PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
+PKG_CONFIG = @PKG_CONFIG@
 RANLIB = @RANLIB@
+RELP_CFLAGS = @RELP_CFLAGS@
+RELP_LIBS = @RELP_LIBS@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
@@ -185,8 +188,6 @@ program_transform_name = @program_transform_name@
 psdir = @psdir@
 pthreads_cflags = @pthreads_cflags@
 pthreads_libs = @pthreads_libs@
-relp_cflags = @relp_cflags@
-relp_libs = @relp_libs@
 rfc3195_cflags = @rfc3195_cflags@
 rfc3195_libs = @rfc3195_libs@
 rt_libs = @rt_libs@
@@ -202,9 +203,9 @@ top_srcdir = @top_srcdir@
 zlib_libs = @zlib_libs@
 pkglib_LTLIBRARIES = omrelp.la
 omrelp_la_SOURCES = omrelp.c
-omrelp_la_CPPFLAGS = -I$(top_srcdir) $(pthreads_cflags) $(relp_cflags)
+omrelp_la_CPPFLAGS = -I$(top_srcdir) $(pthreads_cflags) $(RELP_CFLAGS)
 omrelp_la_LDFLAGS = -module -avoid-version
-omrelp_la_LIBADD = $(relp_libs)
+omrelp_la_LIBADD = $(RELP_LIBS)
 all: all-am
 
 .SUFFIXES:

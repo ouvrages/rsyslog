@@ -70,9 +70,6 @@
 /* Define to 1 if you have the <libgen.h> header file. */
 #undef HAVE_LIBGEN_H
 
-/* Define to 1 if you have the <librelp.h> header file. */
-#undef HAVE_LIBRELP_H
-
 /* Define to 1 if you have the <librfc3195.h> header file. */
 #undef HAVE_LIBRFC3195_H
 

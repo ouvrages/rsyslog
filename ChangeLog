@@ -1,5 +1,47 @@
 ---------------------------------------------------------------------------
-Version 3.14.2 (rgerhards), 2008-04-??
+Version 3.16.1 (rgerhards), 2008-05-02
+- fixed a bug in imklog which lead to startup problems (including
+  segfault) on some platforms under some circumsances. Thanks to
+  Vieri for reporting this bug and helping to troubleshoot it.
+---------------------------------------------------------------------------
+Version 3.16.0 (rgerhards), 2008-04-24
+- new v3-stable (3.16.x) based on beta 3.15.x (RELP support)
+- bugfix: omsnmp had a too-small sized buffer for hostname+port. This
+  could not lead to a segfault, as snprintf() was used, but could cause
+  some trouble with extensively long hostnames.
+- applied patch from Tiziano Müller to remove some compiler warnings
+- added gssapi overview/howto thanks to Peter Vrabec
+- changed some files to grant LGPLv3 extended persmissions on top of GPLv3
+  this also is the first sign of something that will evolve into a
+  well-defined "rsyslog runtime library"
+---------------------------------------------------------------------------
+Version 3.15.1 (rgerhards), 2008-04-11
+- bugfix: some messages were emited without hostname
+- disabled atomic operations for the time being because they introduce some
+  cross-platform trouble - need to see how to fix this in the best 
+  possible way
+- bugfix: zero-length strings were not supported in object
+  deserializer
+- added librelp check via PKG_CHECK thanks to Michael Biebl's patch
+- file relputil.c deleted, is not actually needed
+- added more meaningful error messages to rsyslogd (when some errors
+  happens during startup)
+- bugfix: memory leaks in script engine
+- bugfix: $hostname and $fromhost in RainerScript did not work
+This release also includes all changes applied to the stable versions
+up to today.
+---------------------------------------------------------------------------
+Version 3.15.0 (rgerhards), 2008-04-01
+- major new feature: imrelp/omrelp support reliable delivery of syslog
+  messages via the RELP protocol and librelp (http://www.librelp.com).
+  Plain tcp syslog, so far the best reliability solution, can lose
+  messages when something goes wrong or a peer goes down. With RELP,
+  this can no longer happen. See imrelp.html for more details.
+- bugfix: rsyslogd was no longer build by default; man pages are 
+  only installed if corresponding option is selected. Thanks to
+  Michael Biebl for pointing these problems out.
+---------------------------------------------------------------------------
+Version 3.14.2 (rgerhards), 2008-04-09
 - bugfix: segfault with expression-based filters
 - bugfix: omsnmp did not deref errmsg object on exit (no bad effects caused)
 - some cleanup
@@ -38,6 +80,7 @@ Version 3.14.1 (rgerhards), 2008-04-04
   the full size, but will modify the outputs so that only 32 characters
   max are used by default. If you need large tags in the output, you need
   to provide custom templates.
+- bugfix: some memory leak when queue is runing in disk mode
 ---------------------------------------------------------------------------
 Version 3.14.0 (rgerhards), 2008-04-02
 An interim version was accidently released to the web. It was named 3.14.0.
