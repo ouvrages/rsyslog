@@ -1,3 +1,10 @@
+rsyslog (3.16.1-2) unstable; urgency=low
+
+  * debian/rules
+    - Build the doc package in binary-indep.
+
+ -- Michael Biebl <biebl@debian.org>  Fri, 20 Jun 2008 07:11:24 +0200
+
 rsyslog (3.16.1-1) unstable; urgency=low
 
   * New upstream release.

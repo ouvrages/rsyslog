@@ -6,6 +6,10 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
+# This has to be exported to make some magic below work.
+export DH_OPTIONS
+
+# For quilt patch management.
 include /usr/share/quilt/quilt.make
 
 # These are used for cross-compiling and for saving the configure script
@@ -76,16 +80,30 @@ install: build
 	install --mode=644 -D plugins/ompgsql/createDB.sql debian/rsyslog-pgsql/usr/share/dbconfig-common/data/rsyslog-pgsql/install/pgsql
 
 # Build architecture-independent files here.
+binary-indep: DH_OPTIONS=-i
 binary-indep: build install
-# We have nothing to do by default.
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs
+	dh_installdocs
+	dh_installexamples
+	dh_install
+	dh_link
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
 
 # Build architecture-dependent files here.
+binary-arch: DH_OPTIONS=-a
 binary-arch: build install
 	dh_testdir
 	dh_testroot
-	dh_installchangelogs ChangeLog
+	dh_installchangelogs
 	dh_installdocs
-	dh_installexamples debian/sample.conf
+	dh_installexamples
 	dh_install
 	dh_installlogrotate
 	dh_installinit -r -- start 10 2 3 4 5 . stop 90 0 1 6 .
