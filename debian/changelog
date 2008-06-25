@@ -1,3 +1,9 @@
+rsyslog (3.16.2-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Michael Biebl <biebl@debian.org>  Wed, 25 Jun 2008 15:41:21 +0200
+
 rsyslog (3.16.1-2) unstable; urgency=low
 
   * debian/rules
