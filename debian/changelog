@@ -2,6 +2,8 @@ rsyslog (3.18.1-1) unstable; urgency=low
 
   * New upstream release. Closes: #490445
     - List Debian in doc/rsyslog_packages.html. Closes: #488870
+  * debian/rsyslog-doc.install
+    - Install the example config file. Closes: #488860
 
  -- Michael Biebl <biebl@debian.org>  Wed, 23 Jul 2008 02:22:32 +0200
 
