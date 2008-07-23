@@ -11,6 +11,10 @@ rsyslog (3.18.1-1) unstable; urgency=low
       binary-arch and binary-indep. Closes: #491459
   * debian/rsyslog.install
     - Install mail output plugin (ommail.so).
+  * debian/control
+    - Add Suggests www-browser to rsyslog-doc as the package contains mostly
+      html documents.
+    - Update feature list.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 23 Jul 2008 02:22:32 +0200
 
