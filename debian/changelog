@@ -4,6 +4,10 @@ rsyslog (3.18.1-1) unstable; urgency=low
     - List Debian in doc/rsyslog_packages.html. Closes: #488870
   * debian/rsyslog-doc.install
     - Install the example config file. Closes: #488860
+  * debian/rules
+    - Enable mail output plugin.
+  * debian/rsyslog.install
+    - Install mail output plugin (ommail.so).
 
  -- Michael Biebl <biebl@debian.org>  Wed, 23 Jul 2008 02:22:32 +0200
 
