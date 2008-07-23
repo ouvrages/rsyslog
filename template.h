@@ -80,6 +80,7 @@ struct templateEntry {
 				unsigned bDropLastLF: 1;	/* drop last LF char in msg (PIX!) */
 				unsigned bSecPathDrop: 1;		/* drop slashes, replace dots, empty string */
 				unsigned bSecPathReplace: 1;		/* replace slashes, replace dots, empty string */
+				unsigned bSPIffNo1stSP: 1;		/* replace slashes, replace dots, empty string */
 			} options;		/* options as bit fields */
 		} field;
 	} data;
@@ -109,7 +110,7 @@ void tplLastStaticInit(struct template *tpl);
  * rgerhards, 2007-08-06
  */
 rsRetVal tplToString(struct template *pTpl, msg_t *pMsg, uchar** ppSz);
-void doSQLEscape(uchar **pp, size_t *pLen, unsigned short *pbMustBeFreed, int escapeMode);
+rsRetVal doSQLEscape(uchar **pp, size_t *pLen, unsigned short *pbMustBeFreed, int escapeMode);
 
 rsRetVal templateInit();
 

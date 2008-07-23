@@ -1,8 +1,5 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
-/* Description */
-#undef BSD
-
 /* Defined if debug mode is enabled (its easier to check). */
 #undef DEBUG
 
@@ -248,6 +245,9 @@
    slash. */
 #undef LSTAT_FOLLOWS_SLASHED_SYMLINK
 
+/* Define with a value if your <sys/param.h> does not define MAXHOSTNAMELEN */
+#undef MAXHOSTNAMELEN
+
 /* Defined if debug mode is disabled. */
 #undef NDEBUG
 
@@ -256,6 +256,9 @@
 
 /* Define to 1 if your C compiler doesn't accept -c and -o together. */
 #undef NO_MINUS_C_MINUS_O
+
+/* Indicator for a BSD OS */
+#undef OS_BSD
 
 /* Name of package */
 #undef PACKAGE

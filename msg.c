@@ -159,13 +159,39 @@ static void MsgLockingDummy(msg_t __attribute__((unused)) *pMsg)
  * where a message may be accessed by multiple threads. This implementation here
  * is the version for multiple concurrent acces. It initializes the locking
  * structures.
+ * TODO: change to an iRet interface! -- rgerhards, 2008-07-14
  */
 static void MsgPrepareEnqueueLockingCase(msg_t *pThis)
 {
+	int iErr;
+	BEGINfunc
 	assert(pThis != NULL);
-	pthread_mutexattr_settype(&pThis->mutAttr, PTHREAD_MUTEX_RECURSIVE);
+	iErr = pthread_mutexattr_init(&pThis->mutAttr);
+	if(iErr != 0) {
+		dbgprintf("error initializing mutex attribute in %s:%d, trying to continue\n",
+		  	  __FILE__, __LINE__);
+	}
+	iErr = pthread_mutexattr_settype(&pThis->mutAttr, PTHREAD_MUTEX_RECURSIVE);
+	if(iErr != 0) {
+		dbgprintf("ERROR setting mutex attribute to recursive in %s:%d, trying to continue "
+			 "but we will probably either abort or hang soon\n",
+		  	  __FILE__, __LINE__);
+		/* TODO: it makes very little sense to continue here,
+		 * but it requires an iRet interface to gracefully shut
+		 * down. We should do that over time. -- rgerhards, 2008-07-14
+		 */
+	}
 	pthread_mutex_init(&pThis->mut, &pThis->mutAttr);
+
+	/* we do no longer need the attribute. According to the
+	 * POSIX spec, we can destroy it without affecting the
+	 * initialized mutex (that used the attribute).
+	 * rgerhards, 2008-07-14
+	 */
+	pthread_mutexattr_destroy(&pThis->mutAttr);
+	ENDfunc
 }
+
 
 /* ... and now the locking and unlocking implementations: */
 static void MsgLockLockingCase(msg_t *pThis)
@@ -201,11 +227,12 @@ static void MsgDeleteMutexLockingCase(msg_t *pThis)
  */
 rsRetVal MsgEnableThreadSafety(void)
 {
+	DEFiRet;
 	funcLock = MsgLockLockingCase;
 	funcUnlock = MsgUnlockLockingCase;
 	funcMsgPrepareEnqueue = MsgPrepareEnqueueLockingCase;
 	funcDeleteMutex = MsgDeleteMutexLockingCase;
-	return RS_RET_OK;
+	RETiRet;
 }
 
 /* end locking functions */
@@ -646,19 +673,23 @@ char *getMSG(msg_t *pM)
 /* Get PRI value in text form */
 char *getPRI(msg_t *pM)
 {
+	int pri;
+
 	if(pM == NULL)
 		return "";
 
 	MsgLock(pM);
 	if(pM->pszPRI == NULL) {
-		/* OK, we need to construct it... 
-		 * we use a 5 byte buffer - as of 
-		 * RFC 3164, it can't be longer. Should it
-		 * still be, snprintf will truncate...
+		/* OK, we need to construct it...  we use a 5 byte buffer - as of 
+		 * RFC 3164, it can't be longer. Should it still be, snprintf will truncate...
+		 * Note that we do not use the LOG_MAKEPRI macro. This macro
+		 * is a simple add of the two values under FreeBSD 7. So we implement
+		 * the logic in our own code. This is a change from a bug
+		 * report. -- rgerhards, 2008-07-14
 		 */
+		pri = pM->iFacility * 8 + pM->iSeverity;
 		if((pM->pszPRI = malloc(5)) == NULL) return "";
-		pM->iLenPRI = snprintf((char*)pM->pszPRI, 5, "%d",
-			LOG_MAKEPRI(pM->iFacility, pM->iSeverity));
+		pM->iLenPRI = snprintf((char*)pM->pszPRI, 5, "%d", pri);
 	}
 	MsgUnlock(pM);
 
@@ -1604,20 +1635,17 @@ char *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 		pRes = getMSG(pMsg);
 	} else if(!strcmp((char*) pName, "rawmsg")) {
 		pRes = getRawMsg(pMsg);
-	} else if(!strcmp((char*) pName, "UxTradMsg")) {
+	} else if(!strcmp((char*) pName, "uxtradmsg")) {
 		pRes = getUxTradMsg(pMsg);
-	} else if(   !strcmp((char*) pName, "FROMHOST")
-		  || !strcmp((char*) pName, "fromhost")) {
+	} else if(!strcmp((char*) pName, "fromhost")) {
 		pRes = getRcvFrom(pMsg);
-	} else if(!strcmp((char*) pName, "source")
-		  || !strcmp((char*) pName, "hostname")
-		  || !strcmp((char*) pName, "HOSTNAME")) {
+	} else if(!strcmp((char*) pName, "source") || !strcmp((char*) pName, "hostname")) {
 		pRes = getHOSTNAME(pMsg);
 	} else if(!strcmp((char*) pName, "syslogtag")) {
 		pRes = getTAG(pMsg);
-	} else if(!strcmp((char*) pName, "PRI")) {
+	} else if(!strcmp((char*) pName, "pri")) {
 		pRes = getPRI(pMsg);
-	} else if(!strcmp((char*) pName, "PRI-text")) {
+	} else if(!strcmp((char*) pName, "pri-text")) {
 		pBuf = malloc(20 * sizeof(char));
 		if(pBuf == NULL) {
 			*pbMustBeFreed = 0;
@@ -1639,57 +1667,57 @@ char *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 	} else if(!strcmp((char*) pName, "timegenerated")) {
 		pRes = getTimeGenerated(pMsg, pTpe->data.field.eDateFormat);
 	} else if(!strcmp((char*) pName, "timereported")
-		  || !strcmp((char*) pName, "TIMESTAMP")) {
+		  || !strcmp((char*) pName, "timestamp")) {
 		pRes = getTimeReported(pMsg, pTpe->data.field.eDateFormat);
 	} else if(!strcmp((char*) pName, "programname")) {
 		pRes = getProgramName(pMsg);
-	} else if(!strcmp((char*) pName, "PROTOCOL-VERSION")) {
+	} else if(!strcmp((char*) pName, "protocol-version")) {
 		pRes = getProtocolVersionString(pMsg);
-	} else if(!strcmp((char*) pName, "STRUCTURED-DATA")) {
+	} else if(!strcmp((char*) pName, "structured-data")) {
 		pRes = getStructuredData(pMsg);
-	} else if(!strcmp((char*) pName, "APP-NAME")) {
+	} else if(!strcmp((char*) pName, "app-name")) {
 		pRes = getAPPNAME(pMsg);
-	} else if(!strcmp((char*) pName, "PROCID")) {
+	} else if(!strcmp((char*) pName, "procid")) {
 		pRes = getPROCID(pMsg);
-	} else if(!strcmp((char*) pName, "MSGID")) {
+	} else if(!strcmp((char*) pName, "msgid")) {
 		pRes = getMSGID(pMsg);
 	/* here start system properties (those, that do not relate to the message itself */
-	} else if(!strcmp((char*) pName, "$NOW")) {
+	} else if(!strcmp((char*) pName, "$now")) {
 		if((pRes = (char*) getNOW(NOW_NOW)) == NULL) {
 			return "***OUT OF MEMORY***";
 		} else
 			*pbMustBeFreed = 1;	/* all of these functions allocate dyn. memory */
-	} else if(!strcmp((char*) pName, "$YEAR")) {
+	} else if(!strcmp((char*) pName, "$year")) {
 		if((pRes = (char*) getNOW(NOW_YEAR)) == NULL) {
 			return "***OUT OF MEMORY***";
 		} else
 			*pbMustBeFreed = 1;	/* all of these functions allocate dyn. memory */
-	} else if(!strcmp((char*) pName, "$MONTH")) {
+	} else if(!strcmp((char*) pName, "$month")) {
 		if((pRes = (char*) getNOW(NOW_MONTH)) == NULL) {
 			return "***OUT OF MEMORY***";
 		} else
 			*pbMustBeFreed = 1;	/* all of these functions allocate dyn. memory */
-	} else if(!strcmp((char*) pName, "$DAY")) {
+	} else if(!strcmp((char*) pName, "$day")) {
 		if((pRes = (char*) getNOW(NOW_DAY)) == NULL) {
 			return "***OUT OF MEMORY***";
 		} else
 			*pbMustBeFreed = 1;	/* all of these functions allocate dyn. memory */
-	} else if(!strcmp((char*) pName, "$HOUR")) {
+	} else if(!strcmp((char*) pName, "$hour")) {
 		if((pRes = (char*) getNOW(NOW_HOUR)) == NULL) {
 			return "***OUT OF MEMORY***";
 		} else
 			*pbMustBeFreed = 1;	/* all of these functions allocate dyn. memory */
-	} else if(!strcmp((char*) pName, "$HHOUR")) {
+	} else if(!strcmp((char*) pName, "$hhour")) {
 		if((pRes = (char*) getNOW(NOW_HHOUR)) == NULL) {
 			return "***OUT OF MEMORY***";
 		} else
 			*pbMustBeFreed = 1;	/* all of these functions allocate dyn. memory */
-	} else if(!strcmp((char*) pName, "$QHOUR")) {
+	} else if(!strcmp((char*) pName, "$qhour")) {
 		if((pRes = (char*) getNOW(NOW_QHOUR)) == NULL) {
 			return "***OUT OF MEMORY***";
 		} else
 			*pbMustBeFreed = 1;	/* all of these functions allocate dyn. memory */
-	} else if(!strcmp((char*) pName, "$MINUTE")) {
+	} else if(!strcmp((char*) pName, "$minute")) {
 		if((pRes = (char*) getNOW(NOW_MINUTE)) == NULL) {
 			return "***OUT OF MEMORY***";
 		} else
@@ -1698,6 +1726,7 @@ char *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 		/* there is no point in continuing, we may even otherwise render the
 		 * error message unreadable. rgerhards, 2007-07-10
 		 */
+		dbgprintf("invalid property name: '%s'\n", pName);
 		return "**INVALID PROPERTY NAME**";
 	}
 
@@ -1866,6 +1895,32 @@ char *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			}
 		}
 #endif /* #ifdef FEATURE_REGEXP */
+	}
+
+	/* now check if we need to do our "SP if first char is non-space" hack logic */
+	if(*pRes && pTpe->data.field.options.bSPIffNo1stSP) {
+		char *pB;
+		uchar cFirst = *pRes;
+
+		/* here, we always destruct the buffer and return a new one */
+		pB = (char *) malloc(2 * sizeof(char));
+		if(pB == NULL) {
+			if(*pbMustBeFreed == 1)
+				free(pRes);
+			*pbMustBeFreed = 0;
+			return "**OUT OF MEMORY**";
+		}
+		pRes = pB;
+		*pbMustBeFreed = 1;
+
+		if(cFirst == ' ') {
+			/* if we have a SP, we must return an empty string */
+			*pRes = '\0'; /* empty */
+		} else {
+			/* if it is no SP, we need to return one */
+			*pRes = ' ';
+			*(pRes+1) = '\0';
+		}
 	}
 
 	if(*pRes) {

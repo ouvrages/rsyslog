@@ -51,7 +51,7 @@ sbin_PROGRAMS = $(am__EXEEXT_1) $(am__EXEEXT_2)
 # gssapi support
 # 
 @ENABLE_GSSAPI_TRUE@am__append_7 = lmgssutil.la
-@ENABLE_IMKLOGD_TRUE@am__append_8 = plugins/imklog
+@ENABLE_IMKLOG_TRUE@am__append_8 = plugins/imklog
 @ENABLE_GSSAPI_TRUE@am__append_9 = plugins/omgssapi plugins/imgssapi
 @ENABLE_RELP_TRUE@am__append_10 = plugins/omrelp plugins/imrelp
 @ENABLE_MYSQL_TRUE@am__append_11 = plugins/ommysql
@@ -60,6 +60,7 @@ sbin_PROGRAMS = $(am__EXEEXT_1) $(am__EXEEXT_2)
 @ENABLE_SNMP_TRUE@am__append_14 = plugins/omsnmp
 @ENABLE_IMTEMPLATE_TRUE@am__append_15 = plugins/imtemplate
 @ENABLE_IMFILE_TRUE@am__append_16 = plugins/imfile
+@ENABLE_MAIL_TRUE@am__append_17 = plugins/ommail
 subdir = .
 DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
@@ -241,7 +242,7 @@ DIST_SUBDIRS = . doc plugins/immark plugins/imuxsock plugins/imtcp \
 	plugins/omgssapi plugins/imgssapi plugins/omrelp \
 	plugins/imrelp plugins/ommysql plugins/omlibdbi \
 	plugins/ompgsql plugins/omsnmp plugins/imtemplate \
-	plugins/imfile
+	plugins/imfile plugins/ommail
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)
@@ -531,7 +532,7 @@ SUBDIRS = . doc plugins/immark plugins/imuxsock plugins/imtcp \
 	plugins/imudp plugins/omtesting $(am__append_8) \
 	$(am__append_9) $(am__append_10) $(am__append_11) \
 	$(am__append_12) $(am__append_13) $(am__append_14) \
-	$(am__append_15) $(am__append_16)
+	$(am__append_15) $(am__append_16) $(am__append_17)
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 

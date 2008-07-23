@@ -188,11 +188,13 @@ static void doSQLEmergencyEscape(register uchar *p, int escapeMode)
  * new parameter escapeMode is 0 - standard sql, 1 - "smart" engines
  * 2005-09-22 rgerhards
  */
-void doSQLEscape(uchar **pp, size_t *pLen, unsigned short *pbMustBeFreed, int escapeMode)
+rsRetVal
+doSQLEscape(uchar **pp, size_t *pLen, unsigned short *pbMustBeFreed, int escapeMode)
 {
+	DEFiRet;
 	uchar *p;
 	int iLen;
-	cstr_t *pStrB;
+	cstr_t *pStrB = NULL;
 	uchar *pszGenerated;
 
 	assert(pp != NULL);
@@ -210,44 +212,25 @@ void doSQLEscape(uchar **pp, size_t *pLen, unsigned short *pbMustBeFreed, int es
 	/* when we get out of the loop, we are either at the
 	 * string terminator or the first \'. */
 	if(*p == '\0')
-		return; /* nothing to do in this case! */
+		FINALIZE; /* nothing to do in this case! */
 
 	p = *pp;
 	iLen = *pLen;
-	if(rsCStrConstruct(&pStrB) != RS_RET_OK) {
-		/* oops - no mem ... Do emergency... */
-		doSQLEmergencyEscape(p, escapeMode);
-		return;
-	}
+	CHKiRet(rsCStrConstruct(&pStrB));
 	
 	while(*p) {
 		if(*p == '\'') {
-			if(rsCStrAppendChar(pStrB, (escapeMode == 0) ? '\'' : '\\') != RS_RET_OK) {
-				doSQLEmergencyEscape(*pp, escapeMode);
-				rsCStrDestruct(&pStrB);
-				return;
-				}
+			CHKiRet(rsCStrAppendChar(pStrB, (escapeMode == 0) ? '\'' : '\\'));
 			iLen++;	/* reflect the extra character */
 		} else if((escapeMode == 1) && (*p == '\\')) {
-			if(rsCStrAppendChar(pStrB, '\\') != RS_RET_OK) {
-				doSQLEmergencyEscape(*pp, escapeMode);
-				rsCStrDestruct(&pStrB);
-				return;
-				}
+			CHKiRet(rsCStrAppendChar(pStrB, '\\'));
 			iLen++;	/* reflect the extra character */
 		}
-		if(rsCStrAppendChar(pStrB, *p) != RS_RET_OK) {
-			doSQLEmergencyEscape(*pp, escapeMode);
-			rsCStrDestruct(&pStrB);
-			return;
-		}
+		CHKiRet(rsCStrAppendChar(pStrB, *p));
 		++p;
 	}
-	rsCStrFinish(pStrB);
-	if(rsCStrConvSzStrAndDestruct(pStrB, &pszGenerated, 0) != RS_RET_OK) {
-		doSQLEmergencyEscape(*pp, escapeMode);
-		return;
-	}
+	CHKiRet(rsCStrFinish(pStrB));
+	CHKiRet(rsCStrConvSzStrAndDestruct(pStrB, &pszGenerated, 0));
 
 	if(*pbMustBeFreed)
 		free(*pp); /* discard previous value */
@@ -255,6 +238,15 @@ void doSQLEscape(uchar **pp, size_t *pLen, unsigned short *pbMustBeFreed, int es
 	*pp = pszGenerated;
 	*pLen = iLen;
 	*pbMustBeFreed = 1;
+
+finalize_it:
+	if(iRet != RS_RET_OK) {
+		doSQLEmergencyEscape(*pp, escapeMode);
+		if(pStrB != NULL)
+			rsCStrDestruct(&pStrB);
+	}
+
+	RETiRet;
 }
 
 
@@ -385,7 +377,6 @@ static int do_Constant(unsigned char **pp, struct template *pTpl)
 	if((pTpe = tpeConstruct(pTpl)) == NULL) {
 		/* OK, we are out of luck. Let's invalidate the
 		 * entry and that's it.
-		 * TODO: add panic message once we have a mechanism for this
 		 */
 		pTpe->eEntryType = UNDEFINED;
 		return 1;
@@ -453,6 +444,8 @@ static void doOptions(unsigned char **pp, struct templateEntry *pTpe)
 			pTpe->data.field.eCaseConv = tplCaseConvLower;
 		 } else if(!strcmp((char*)Buf, "uppercase")) {
 			pTpe->data.field.eCaseConv = tplCaseConvUpper;
+		 } else if(!strcmp((char*)Buf, "sp-if-no-1st-sp")) {
+			pTpe->data.field.options.bSPIffNo1stSP = 1;
 		 } else if(!strcmp((char*)Buf, "escape-cc")) {
 			pTpe->data.field.options.bEscapeCC = 1;
 		 } else if(!strcmp((char*)Buf, "drop-cc")) {
@@ -510,7 +503,8 @@ static int do_Parameter(unsigned char **pp, struct template *pTpl)
 	pTpe->eEntryType = FIELD;
 
 	while(*p && *p != '%' && *p != ':') {
-		rsCStrAppendChar(pStrB, *p++);
+		rsCStrAppendChar(pStrB, tolower(*p));
+		++p; /* do NOT do this in tolower()! */
 	}
 
 	/* got the name*/
@@ -1020,6 +1014,15 @@ void tplPrintList(void)
 				}
 				if(pTpe->data.field.options.bSpaceCC) {
 				  	dbgprintf("[replace control-characters with space] ");
+				}
+				if(pTpe->data.field.options.bSecPathDrop) {
+				  	dbgprintf("[slashes are dropped] ");
+				}
+				if(pTpe->data.field.options.bSecPathReplace) {
+				  	dbgprintf("[slashes are replaced by '_'] ");
+				}
+				if(pTpe->data.field.options.bSPIffNo1stSP) {
+				  	dbgprintf("[SP iff no first SP] ");
 				}
 				if(pTpe->data.field.options.bDropLastLF) {
 				  	dbgprintf("[drop last LF in msg] ");

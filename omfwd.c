@@ -71,7 +71,7 @@ DEFobjCurrIf(net)
 DEFobjCurrIf(tcpclt)
 
 typedef struct _instanceData {
-	char	f_hname[MAXHOSTNAMELEN+1];
+	char	*f_hname;
 	short	sock;			/* file descriptor */
 	int *pSockArray;		/* sockets to use for UDP */
 	enum { /* TODO: we shoud revisit these definitions */
@@ -144,6 +144,9 @@ CODESTARTfreeInstance
 	if(pData->protocol == FORW_TCP) {
 		tcpclt.Destruct(&pData->pTCPClt);
 	}
+
+	if(pData->f_hname != NULL)
+		free(pData->f_hname);
 
 ENDfreeInstance
 
@@ -499,7 +502,7 @@ CODE_STD_STRING_REQUESTparseSelectorAct(1)
 		/* extract the host first (we do a trick - we replace the ';' or ':' with a '\0')
 		 * now skip to port and then template name. rgerhards 2005-07-06
 		 */
-		for(q = p ; *p && *p != ';' && *p != ':' ; ++p)
+		for(q = p ; *p && *p != ';' && *p != ':' && *p != '#' ; ++p)
 		 	/* JUST SKIP */;
 
 		pData->port = NULL;
@@ -525,29 +528,22 @@ CODE_STD_STRING_REQUESTparseSelectorAct(1)
 		
 		/* now skip to template */
 		bErr = 0;
-		while(*p && *p != ';') {
-			if(*p && *p != ';' && !isspace((int) *p)) {
-				if(bErr == 0) { /* only 1 error msg! */
-					bErr = 1;
-					errno = 0;
-					errmsg.LogError(NO_ERRCODE, "invalid selector line (port), probably not doing "
-					         "what was intended");
-				}
-			}
-			++p;
-		}
-	
+		while(*p && *p != ';'  && *p != '#' && !isspace((int) *p))
+			++p; /*JUST SKIP*/
+
 		/* TODO: make this if go away! */
-		if(*p == ';') {
+		if(*p == ';' || *p == '#' || isspace(*p)) {
+			uchar cTmp = *p;
 			*p = '\0'; /* trick to obtain hostname (later)! */
-			strcpy(pData->f_hname, (char*) q);
-			*p = ';';
-		} else
-			strcpy(pData->f_hname, (char*) q);
+			CHKmalloc(pData->f_hname = strdup((char*) q));
+			*p = cTmp;
+		} else {
+			CHKmalloc(pData->f_hname = strdup((char*) q));
+		}
 
 		/* process template */
 		CHKiRet(cflineParseTemplateName(&p, *ppOMSR, 0, OMSR_NO_RQD_TPL_OPTS,
-		       		(pszTplName == NULL) ? (uchar*)"RSYSLOG_TraditionalForwardFormat" : pszTplName));
+				(pszTplName == NULL) ? (uchar*)"RSYSLOG_TraditionalForwardFormat" : pszTplName));
 
 		/* first set the pData->eDestState */
 		memset(&hints, 0, sizeof(hints));
@@ -562,8 +558,7 @@ CODE_STD_STRING_REQUESTparseSelectorAct(1)
 			pData->eDestState = eDestFORW;
 			pData->f_addr = res;
 		}
-		/*
-		 * Otherwise the host might be unknown due to an
+		/* Otherwise the host might be unknown due to an
 		 * inaccessible nameserver (perhaps on the same
 		 * host). We try to get the ip number later, like
 		 * FORW_SUSP.

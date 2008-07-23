@@ -193,6 +193,7 @@ html_files = \
 	rsyslog_high_database_rate.html \
 	rsyslog_php_syslog_ng.html \
 	rsyslog_recording_pri.html \
+	rsyslog_reliable_forwarding.html \
 	rsyslog_stunnel.html \
 	syslog-protocol.html \
 	version_naming.html \
@@ -203,6 +204,9 @@ html_files = \
 	imfile.html \
 	imtcp.html \
 	imgssapi.html \
+	imrelp.html \
+	imuxsock.html \
+	imklog.html \
 	professional_support.html \
 	queues.html \
 	queueWorkerLogic.dia \
@@ -240,6 +244,12 @@ html_files = \
 	rsconf1_resetconfigvariables.html \
 	rsconf1_umask.html \
 	v3compatibility.html \
+	gssapi.html \
+	licensing.html \
+	ommail.html \
+	omrelp.html \
+	status.html \
+	troubleshoot.html \
 	src/classes.dia
 
 EXTRA_DIST = $(html_files)

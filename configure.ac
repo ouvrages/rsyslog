@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[3.16.2],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[3.18.1],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([syslogd.c])
 AC_CONFIG_HEADERS([config.h])
@@ -21,9 +21,16 @@ AC_CANONICAL_HOST
 
 case "${host}" in
   *-*-linux*)
+    os_type="linux"
   ;;
   *-*-*darwin*|*-*-freebsd*|*-*-netbsd*|*-*-openbsd*)
-    AC_DEFINE([BSD], [1], [Description])
+    AC_DEFINE([OS_BSD], [1], [Indicator for a BSD OS])
+    os_type="bsd"
+  ;;
+  *-*-kfreebsd*)
+    # kernel is FreeBSD, but userspace is glibc - i.e. like linux
+    # do not DEFINE OS_BSD
+    os_type="bsd"
   ;;
 esac
 
@@ -83,6 +90,22 @@ AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([flock basename alarm clock_gettime gethostbyname gethostname gettimeofday localtime_r memset mkdir regcomp select setid socket strcasecmp strchr strdup strerror strndup strnlen strrchr strstr strtol strtoul uname ttyname_r])
 
+# Check for MAXHOSTNAMELEN
+AC_MSG_CHECKING(for MAXHOSTNAMELEN)
+AC_TRY_COMPILE([
+	#include <sys/param.h>
+	], [
+	return MAXHOSTNAMELEN;
+	]
+	,
+	AC_MSG_RESULT(yes)
+	,
+	# note: we use 1024 here, which should be far more than needed by any system. If that's too low, we simply
+	# life with the need to change it. Most of the code doesn't need it anyways, but there are a few places 
+	# where it actually is needed and it makes no sense to change them.
+	AC_DEFINE(MAXHOSTNAMELEN, 1024, [Define with a value if your <sys/param.h> does not define MAXHOSTNAMELEN])
+	AC_MSG_RESULT(no; defined as 64)
+)
 
 # Large file support
 AC_ARG_ENABLE(largefile,
@@ -202,7 +225,9 @@ AC_ARG_ENABLE(klog,
          esac],
         [enable_klog="yes"]
 )
-AM_CONDITIONAL(ENABLE_IMKLOGD, test x$enable_klog = xyes)
+AM_CONDITIONAL(ENABLE_IMKLOG, test x$enable_klog = xyes)
+AM_CONDITIONAL(ENABLE_IMKLOG_BSD, test x$os_type = xbsd)
+AM_CONDITIONAL(ENABLE_IMKLOG_LINUX, test x$os_type = xlinux)
 
 #
 # SYSLOG_UNIXAF
@@ -455,6 +480,19 @@ AC_ARG_ENABLE(rsyslogd,
 AM_CONDITIONAL(ENABLE_RSYSLOGD, test x$enable_rsyslogd = xyes)
 
 
+# Mail support (so far we do not need a library, but we need to turn this on and off)
+AC_ARG_ENABLE(mail,
+        [AS_HELP_STRING([--enable-mail],[Enable mail support @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_mail="yes" ;;
+          no) enable_mail="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-mail) ;;
+         esac],
+        [enable_mail=no]
+)
+AM_CONDITIONAL(ENABLE_MAIL, test x$enable_mail = xyes)
+
+
 # RELP support
 AC_ARG_ENABLE(relp,
         [AS_HELP_STRING([--enable-relp],[Enable RELP support @<:@default=no@:>@])],
@@ -466,7 +504,7 @@ AC_ARG_ENABLE(relp,
         [enable_relp=no]
 )
 if test "x$enable_relp" = "xyes"; then
-	PKG_CHECK_MODULES(RELP, relp)
+	PKG_CHECK_MODULES(RELP, relp >= 0.1.1)
 fi
 AM_CONDITIONAL(ENABLE_RELP, test x$enable_relp = xyes)
 AC_SUBST(RELP_CFLAGS)
@@ -562,6 +600,7 @@ AC_CONFIG_FILES([Makefile \
 		plugins/ompgsql/Makefile \
 		plugins/omrelp/Makefile \
 		plugins/omlibdbi/Makefile \
+		plugins/ommail/Makefile \
 		plugins/omsnmp/Makefile])
 AC_OUTPUT
 
@@ -569,13 +608,14 @@ echo "****************************************************"
 echo "rsyslog will be compiled with the following settings:"
 echo
 echo "Multithreading support enabled:           $enable_pthreads"
-echo "Klog functionality enabled:               $enable_klog"
+echo "Klog functionality enabled:               $enable_klog ($os_type)"
 echo "Regular expressions support enabled:      $enable_regexp"
 echo "Zlib compression support enabled:         $enable_zlib"
 echo "MySql support enabled:                    $enable_mysql"
 echo "libdbi support enabled:                   $enable_libdbi"
 echo "PostgreSQL support enabled:               $enable_pgsql"
 echo "SNMP support enabled:                     $enable_snmp"
+echo "Mail support enabled:                     $enable_mail"
 echo "RELP support enabled:                     $enable_relp"
 echo "file input module enabled:                $enable_imfile"
 echo "input template module will be compiled:   $enable_imtemplate"
