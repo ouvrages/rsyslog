@@ -2,6 +2,7 @@ rsyslog (3.18.1-1) unstable; urgency=low
 
   * New upstream release. Closes: #490445
     - List Debian in doc/rsyslog_packages.html. Closes: #488870
+    - Fix compilation of imklog module on GNU/kFreeBSD. Closes: #491193
   * debian/rsyslog-doc.install
     - Install the example config file. Closes: #488860
   * debian/rules
