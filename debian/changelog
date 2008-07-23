@@ -7,6 +7,8 @@ rsyslog (3.18.1-1) unstable; urgency=low
     - Install the example config file. Closes: #488860
   * debian/rules
     - Enable mail output plugin.
+    - Make sure all directories are created by calling dh_installdirs for both
+      binary-arch and binary-indep. Closes: #491459
   * debian/rsyslog.install
     - Install mail output plugin (ommail.so).
 

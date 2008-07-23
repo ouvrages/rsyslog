@@ -72,7 +72,6 @@ install: build
 	dh_testdir
 	dh_testroot
 	dh_clean -k 
-	dh_installdirs
 
 	# Add here commands to install the package into debian/rsyslog.
 	$(MAKE) DESTDIR=$(CURDIR)/debian/tmp install
@@ -85,6 +84,7 @@ binary-indep: DH_OPTIONS=-i
 binary-indep: build install
 	dh_testdir
 	dh_testroot
+	dh_installdirs
 	dh_installchangelogs
 	dh_installdocs
 	dh_installexamples
@@ -102,6 +102,7 @@ binary-arch: DH_OPTIONS=-a
 binary-arch: build install
 	dh_testdir
 	dh_testroot
+	dh_installdirs
 	dh_installchangelogs
 	dh_installdocs
 	dh_installexamples
