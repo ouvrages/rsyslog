@@ -473,28 +473,26 @@ rsRetVal cflineParseTemplateName(uchar** pp, omodStringRequest_t *pOMSR, int iEn
 {
 	uchar *p;
 	uchar *tplName;
-	DEFiRet;
 	cstr_t *pStrB;
+	DEFiRet;
 
 	ASSERT(pp != NULL);
 	ASSERT(*pp != NULL);
 	ASSERT(pOMSR != NULL);
 
 	p =*pp;
-	/* a template must follow - search it and complain, if not found
-	 */
+	/* a template must follow - search it and complain, if not found */
 	skipWhiteSpace(&p);
 	if(*p == ';')
 		++p; /* eat it */
 	else if(*p != '\0' && *p != '#') {
 		errmsg.LogError(NO_ERRCODE, "invalid character in selector line - ';template' expected");
-		iRet = RS_RET_ERR;
-		goto finalize_it;
+		ABORT_FINALIZE(RS_RET_ERR);
 	}
 
 	skipWhiteSpace(&p); /* go to begin of template name */
 
-	if(*p == '\0') {
+	if(*p == '\0' || *p == '#') {
 		/* no template specified, use the default */
 		/* TODO: check NULL ptr */
 		tplName = (uchar*) strdup((char*)dfltTplName);
@@ -817,7 +815,7 @@ static rsRetVal cflineProcessPropFilter(uchar **pline, register selector_t *f)
 	}
 
 	/* read property */
-	iRet = parsDelimCStr(pPars, &f->f_filterData.prop.pCSPropName, ',', 1, 1);
+	iRet = parsDelimCStr(pPars, &f->f_filterData.prop.pCSPropName, ',', 1, 1, 1);
 	if(iRet != RS_RET_OK) {
 		errmsg.LogError(NO_ERRCODE, "error %d parsing filter property - ignoring selector", iRet);
 		rsParsDestruct(pPars);
@@ -825,7 +823,7 @@ static rsRetVal cflineProcessPropFilter(uchar **pline, register selector_t *f)
 	}
 
 	/* read operation */
-	iRet = parsDelimCStr(pPars, &pCSCompOp, ',', 1, 1);
+	iRet = parsDelimCStr(pPars, &pCSCompOp, ',', 1, 1, 1);
 	if(iRet != RS_RET_OK) {
 		errmsg.LogError(NO_ERRCODE, "error %d compare operation property - ignoring selector", iRet);
 		rsParsDestruct(pPars);

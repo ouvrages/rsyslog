@@ -32,11 +32,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-
-# select klog "driver"
-@ENABLE_IMKLOG_BSD_TRUE@am__append_1 = bsd.c
-@ENABLE_IMKLOG_LINUX_TRUE@am__append_2 = linux.c module.h ksym.c ksyms.h ksym_mod.c
-subdir = plugins/imklog
+subdir = plugins/ommail
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -54,19 +50,12 @@ am__strip_dir = `echo $$p | sed -e 's|^.*/||'`;
 am__installdirs = "$(DESTDIR)$(pkglibdir)"
 pkglibLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(pkglib_LTLIBRARIES)
-imklog_la_DEPENDENCIES =
-am__imklog_la_SOURCES_DIST = imklog.c imklog.h bsd.c linux.c module.h \
-	ksym.c ksyms.h ksym_mod.c
-@ENABLE_IMKLOG_BSD_TRUE@am__objects_1 = imklog_la-bsd.lo
-@ENABLE_IMKLOG_LINUX_TRUE@am__objects_2 = imklog_la-linux.lo \
-@ENABLE_IMKLOG_LINUX_TRUE@	imklog_la-ksym.lo \
-@ENABLE_IMKLOG_LINUX_TRUE@	imklog_la-ksym_mod.lo
-am_imklog_la_OBJECTS = imklog_la-imklog.lo $(am__objects_1) \
-	$(am__objects_2)
-imklog_la_OBJECTS = $(am_imklog_la_OBJECTS)
-imklog_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
+ommail_la_DEPENDENCIES =
+am_ommail_la_OBJECTS = ommail_la-ommail.lo
+ommail_la_OBJECTS = $(am_ommail_la_OBJECTS)
+ommail_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
-	$(imklog_la_LDFLAGS) $(LDFLAGS) -o $@
+	$(ommail_la_LDFLAGS) $(LDFLAGS) -o $@
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -79,8 +68,8 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-SOURCES = $(imklog_la_SOURCES)
-DIST_SOURCES = $(am__imklog_la_SOURCES_DIST)
+SOURCES = $(ommail_la_SOURCES)
+DIST_SOURCES = $(ommail_la_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -211,11 +200,11 @@ target_alias = @target_alias@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 zlib_libs = @zlib_libs@
-pkglib_LTLIBRARIES = imklog.la
-imklog_la_SOURCES = imklog.c imklog.h $(am__append_1) $(am__append_2)
-imklog_la_CPPFLAGS = -I$(top_srcdir) $(pthreads_cflags)
-imklog_la_LDFLAGS = -module -avoid-version
-imklog_la_LIBADD = 
+pkglib_LTLIBRARIES = ommail.la
+ommail_la_SOURCES = ommail.c
+ommail_la_CPPFLAGS = -I$(top_srcdir) $(pthreads_cflags)
+ommail_la_LDFLAGS = -module -avoid-version
+ommail_la_LIBADD = 
 all: all-am
 
 .SUFFIXES:
@@ -229,9 +218,9 @@ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu  plugins/imklog/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu  plugins/ommail/Makefile'; \
 	cd $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu  plugins/imklog/Makefile
+	  $(AUTOMAKE) --gnu  plugins/ommail/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -276,8 +265,8 @@ clean-pkglibLTLIBRARIES:
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
-imklog.la: $(imklog_la_OBJECTS) $(imklog_la_DEPENDENCIES) 
-	$(imklog_la_LINK) -rpath $(pkglibdir) $(imklog_la_OBJECTS) $(imklog_la_LIBADD) $(LIBS)
+ommail.la: $(ommail_la_OBJECTS) $(ommail_la_DEPENDENCIES) 
+	$(ommail_la_LINK) -rpath $(pkglibdir) $(ommail_la_OBJECTS) $(ommail_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -285,11 +274,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/imklog_la-bsd.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/imklog_la-imklog.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/imklog_la-ksym.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/imklog_la-ksym_mod.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/imklog_la-linux.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ommail_la-ommail.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -312,40 +297,12 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LTCOMPILE) -c -o $@ $<
 
-imklog_la-imklog.lo: imklog.c
-@am__fastdepCC_TRUE@	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(imklog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT imklog_la-imklog.lo -MD -MP -MF $(DEPDIR)/imklog_la-imklog.Tpo -c -o imklog_la-imklog.lo `test -f 'imklog.c' || echo '$(srcdir)/'`imklog.c
-@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/imklog_la-imklog.Tpo $(DEPDIR)/imklog_la-imklog.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='imklog.c' object='imklog_la-imklog.lo' libtool=yes @AMDEPBACKSLASH@
+ommail_la-ommail.lo: ommail.c
+@am__fastdepCC_TRUE@	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(ommail_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ommail_la-ommail.lo -MD -MP -MF $(DEPDIR)/ommail_la-ommail.Tpo -c -o ommail_la-ommail.lo `test -f 'ommail.c' || echo '$(srcdir)/'`ommail.c
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/ommail_la-ommail.Tpo $(DEPDIR)/ommail_la-ommail.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='ommail.c' object='ommail_la-ommail.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(imklog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o imklog_la-imklog.lo `test -f 'imklog.c' || echo '$(srcdir)/'`imklog.c
-
-imklog_la-bsd.lo: bsd.c
-@am__fastdepCC_TRUE@	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(imklog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT imklog_la-bsd.lo -MD -MP -MF $(DEPDIR)/imklog_la-bsd.Tpo -c -o imklog_la-bsd.lo `test -f 'bsd.c' || echo '$(srcdir)/'`bsd.c
-@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/imklog_la-bsd.Tpo $(DEPDIR)/imklog_la-bsd.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='bsd.c' object='imklog_la-bsd.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(imklog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o imklog_la-bsd.lo `test -f 'bsd.c' || echo '$(srcdir)/'`bsd.c
-
-imklog_la-linux.lo: linux.c
-@am__fastdepCC_TRUE@	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(imklog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT imklog_la-linux.lo -MD -MP -MF $(DEPDIR)/imklog_la-linux.Tpo -c -o imklog_la-linux.lo `test -f 'linux.c' || echo '$(srcdir)/'`linux.c
-@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/imklog_la-linux.Tpo $(DEPDIR)/imklog_la-linux.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='linux.c' object='imklog_la-linux.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(imklog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o imklog_la-linux.lo `test -f 'linux.c' || echo '$(srcdir)/'`linux.c
-
-imklog_la-ksym.lo: ksym.c
-@am__fastdepCC_TRUE@	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(imklog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT imklog_la-ksym.lo -MD -MP -MF $(DEPDIR)/imklog_la-ksym.Tpo -c -o imklog_la-ksym.lo `test -f 'ksym.c' || echo '$(srcdir)/'`ksym.c
-@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/imklog_la-ksym.Tpo $(DEPDIR)/imklog_la-ksym.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='ksym.c' object='imklog_la-ksym.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(imklog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o imklog_la-ksym.lo `test -f 'ksym.c' || echo '$(srcdir)/'`ksym.c
-
-imklog_la-ksym_mod.lo: ksym_mod.c
-@am__fastdepCC_TRUE@	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(imklog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT imklog_la-ksym_mod.lo -MD -MP -MF $(DEPDIR)/imklog_la-ksym_mod.Tpo -c -o imklog_la-ksym_mod.lo `test -f 'ksym_mod.c' || echo '$(srcdir)/'`ksym_mod.c
-@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/imklog_la-ksym_mod.Tpo $(DEPDIR)/imklog_la-ksym_mod.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='ksym_mod.c' object='imklog_la-ksym_mod.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(imklog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o imklog_la-ksym_mod.lo `test -f 'ksym_mod.c' || echo '$(srcdir)/'`ksym_mod.c
+@am__fastdepCC_FALSE@	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(ommail_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ommail_la-ommail.lo `test -f 'ommail.c' || echo '$(srcdir)/'`ommail.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

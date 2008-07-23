@@ -1,4 +1,126 @@
 ---------------------------------------------------------------------------
+Version 3.18.1 (rgerhards), 2008-07-21
+- bugfix: potential segfault in creating message mutex in non-direct queue
+  mode. rsyslogd segfaults on freeeBSD 7.0 (an potentially other platforms)
+  if an action queue is running in any other mode than non-direct. The
+  same problem can potentially be triggered by some main message queue
+  settings. In any case, it will manifest during rsylog's startup. It is
+  unlikely to happen after a successful startup (the only window of
+  exposure may be a relatively seldom executed action running in queued
+  mode). This has been corrected. Thank to HKS for point out the problem.
+- bugfix: priority was incorrectly calculated on FreeBSD 7,
+  because the LOG_MAKEPRI() C macro has a different meaning there (it
+  is just a simple addition of faciltity and severity). I have changed
+  this to use own, consistent, code for PRI calculation. [Backport from
+  3.19.10]
+- bugfix: remove PRI part from kernel message if it is present
+  Thanks to Michael Biebl for reporting this bug
+- bugfix: mark messages were not correctly written to text log files
+  the markmessageinterval was not correctly propagated to all places
+  where it was needed. This resulted in rsyslog using the default
+  (20 minutes) in some code pathes, what looked to the user like mark
+  messages were never written.
+- added a new property replacer option "sp-if-no-1st-sp" to cover
+  a problem with RFC 3164 based interpreation of tag separation. While
+  it is a generic approach, it fixes a format problem introduced in
+  3.18.0, where kernel messages no longer had a space after the tag.
+  This is done by a modifcation of the default templates.
+  Please note that this may affect some messages where there intentionally
+  is no space between the tag and the first character of the message
+  content. If so, this needs to be worked around via a specific
+  template. However, we consider this scenario to be quite remote and,
+  even if it exists, it is not expected that it will actually cause
+  problems with log parsers (instead, we assume the new default template
+  behaviour may fix previous problems with log parsers due to the 
+  missing space).
+- bugfix: imklog module was not correctly compiled for GNU/kFreeBSD.
+  Thanks to Petr Salinger for the patch
+- doc bugfix: property replacer options secpath-replace and
+  secpath-drop were not documented
+- doc bugfix: fixed some typos in rsyslog.conf man page
+- fixed typo in source comment  - thanks to Rio Fujita
+- some general cleanup (thanks to Michael Biebl)
+---------------------------------------------------------------------------
+Version 3.18.0 (rgerhards), 2008-07-11
+- begun a new v3-stable based on former 3.17.4 beta plus patches to
+  previous v3-stable
+- bugfix in RainerScript: syntax error was not always detected
+---------------------------------------------------------------------------
+Version 3.17.5 (rgerhards), 2008-06-27
+- added doc: howto set up a reliable connection to remote server via
+  queued mode (and plain tcp protocol)
+- bugfix: comments after actions were not properly treated. For some
+  actions (e.g. forwarding), this could also lead to invalid configuration
+---------------------------------------------------------------------------
+Version 3.17.4 (rgerhards), 2008-06-16
+- changed default for $KlogSymbolLookup to "off". The directive is
+  also scheduled for removal in a later version. This was necessary
+  because on kernels >= 2.6, the kernel does the symbol lookup itself. The
+  imklog lookup logic then breaks the log message and makes it unusable.
+---------------------------------------------------------------------------
+Version 3.17.3 (rgerhards), 2008-05-28
+- bugfix: imklog went into an endless loop if a PRI value was inside
+  a kernel log message (unusual case under Linux, frequent under BSD)
+---------------------------------------------------------------------------
+Version 3.17.2 (rgerhards), 2008-05-04
+- this version is the new beta, based on 3.17.1 devel feature set
+- merged in imklog bug fix from v3-stable (3.16.1)
+---------------------------------------------------------------------------
+Version 3.17.1 (rgerhards), 2008-04-15
+- removed dependency on MAXHOSTNAMELEN as much as it made sense.
+  GNU/Hurd does not define it (because it has no limit), and we have taken
+  care for cases where it is undefined now. However, some very few places
+  remain where IMHO it currently is not worth fixing the code. If it is
+  not defined, we have used a generous value of 1K, which is above IETF
+  RFC's on hostname length at all. The memory consumption is no issue, as
+  there are only a handful of this buffers allocated *per run* -- that's
+  also the main reason why we consider it not worth to be fixed any further.
+- enhanced legacy syslog parser to handle slightly malformed messages
+  (with a space in front of the timestamp) - at least HP procurve is
+  known to do that and I won't outrule that others also do it. The 
+  change looks quite unintrusive and so we added it to the parser.
+- implemented klogd functionality for BSD
+- implemented high precision timestamps for the kernel log. Thanks to
+  Michael Biebl for pointing out that the kernel log did not have them.
+- provided ability to discard non-kernel messages if they are present
+  in the kernel log (seems to happen on BSD)
+- implemented $KLogInternalMsgFacility config directive
+- implemented $KLogPermitNonKernelFacility config directive
+Plus a number of bugfixes that were applied to v3-stable and beta
+branches (not mentioned here in detail).
+---------------------------------------------------------------------------
+Version 3.17.0 (rgerhards), 2008-04-08
+- added native ability to send mail messages
+- removed no longer needed file relptuil.c/.h
+- added $ActionExecOnlyOnceEveryInterval config directive
+- bugfix: memory leaks in script engine
+- bugfix: zero-length strings were not supported in object
+  deserializer
+- properties are now case-insensitive everywhere (script, filters,
+  templates)
+- added the capability to specify a processing (actually dequeue)
+  timeframe with queues - so things can be configured to be done
+  at off-peak hours
+- We have removed the 32 character size limit (from RFC3164) on the
+  tag. This had bad effects on existing envrionments, as sysklogd didn't
+  obey it either (probably another bug in RFC3164...). We now receive
+  the full size, but will modify the outputs so that only 32 characters
+  max are used by default. If you need large tags in the output, you need
+  to provide custom templates.
+- changed command line processing. -v, -M, -c options are now parsed
+  and processed before all other options. Inter-option dependencies
+  have been relieved. Among others, permits to specify intial module
+  load path via -M only (not the environment) which makes it much
+  easier to work with non-standard module library locations. Thanks
+  to varmojfekoj for suggesting this change. Matches bugzilla bug 55.
+- bugfix: some messages were emited without hostname
+Plus a number of bugfixes that were applied to v3-stable and beta
+branches (not mentioned here in detail).
+---------------------------------------------------------------------------
+Version 3.16.3 (rgerhards), 2008-07-11
+- updated information on rsyslog packages
+- bugfix: memory leak in disk-based queue modes
+---------------------------------------------------------------------------
 Version 3.16.2 (rgerhards), 2008-06-25
 - fixed potential segfault due to invalid call to cfsysline
   thanks to varmojfekoj for the patch
@@ -486,6 +608,37 @@ Version 2.0.4 STABLE (rgerhards), 2008-03-27
 - bugfix: internally generated messages had "FROMHOST" property not set
 - bugfix: continue parsing if tag is oversize (discard oversize part) - thanks
   to mclaughlin77@gmail.com for the patch
+- added $HHOUR and $QHOUR system properties - can be used for half- and
+  quarter-hour logfile rotation
+---------------------------------------------------------------------------
+Version 2.0.3 STABLE (rgerhards), 2008-03-12
+- bugfix: setting for $EscapeCopntrolCharactersOnReceive was not 
+  properly initialized
+- bugfix: resolved potential segfault condition on HUP (extremely
+  unlikely to happen in practice), for details see tracker:
+  http://bugzilla.adiscon.com/show_bug.cgi?id=38
+- improved the man pages a bit - thanks to Michael Biebl for the patch
+- bugfix: not properly initialized data could cause several segfaults if
+  there were errors in the config file - thanks to varmojfekoj for the patch
+---------------------------------------------------------------------------
+Version 2.0.2 STABLE (rgerhards), 2008-02-12
+- fixed a bug that could cause invalid string handling via strerror_r
+  varmojfekoj provided the patch - many thanks!
+- added x-info field to rsyslogd startup/shutdown message. Hopefully
+  points users to right location for further info (many don't even know
+  they run rsyslog ;))
+- bugfix: suspended actions were not always properly resumed
+  varmojfekoj provided the patch - many thanks!
+- bugfix: errno could be changed during mark processing, leading to
+  invalid error messages when processing inputs. Thank to varmojfekoj for
+  pointing out this problem.
+- bugfix: trailing ":" of tag was lost while parsing legacy syslog messages
+  without timestamp - thanks to Anders Blomdell for providing a patch!
+- bugfix (doc): misspelled config directive, invalid signal info
+- applied some doc fixes from Michel Biebl and cleaned up some no longer
+  needed files suggested by him
+- cleaned up stringbuf.c to fix an annoyance reported by Anders Blomdell
+- fixed bug that caused invalid treatment of tabs (HT) in rsyslog.conf
 ---------------------------------------------------------------------------
 Version 2.0.1 STABLE (rgerhards), 2008-01-24
 - fixed a bug in integer conversion - but this function was never called,
