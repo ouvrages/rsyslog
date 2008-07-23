@@ -1,6 +1,6 @@
 Source: rsyslog
 Section: admin
-Priority: extra
+Priority: important
 Maintainer: Michael Biebl <biebl@debian.org>
 Build-Depends: debhelper (>= 5), quilt, autotools-dev, zlib1g-dev, libmysqlclient15-dev, libpq-dev
 Standards-Version: 3.8.0
@@ -10,6 +10,7 @@ Homepage: http://www.rsyslog.com/
 
 Package: rsyslog
 Architecture: any
+Priority: important
 Conflicts: system-log-daemon, linux-kernel-log-daemon
 Provides: system-log-daemon, linux-kernel-log-daemon
 Depends: ${shlibs:Depends}, ${misc:Depends}, lsb-base (>= 3.0-6)
@@ -34,6 +35,7 @@ Description: enhanced multi-threaded syslogd
 
 Package: rsyslog-doc
 Section: doc
+Priority: extra
 Architecture: all
 Conflicts: rsyslog (<< 2.0.1-2)
 Replaces: rsyslog (<< 2.0.1-2)
@@ -47,6 +49,7 @@ Description: documentation for rsyslog
 
 Package: rsyslog-mysql
 Architecture: any
+Priority: extra
 Depends: ${shlibs:Depends}, ${misc:Depends}, rsyslog (= ${binary:Version}), dbconfig-common, ucf
 Recommends: mysql-server
 Description: MySQL output plugin for rsyslog
@@ -54,6 +57,7 @@ Description: MySQL output plugin for rsyslog
 
 Package: rsyslog-pgsql
 Architecture: any
+Priority: extra
 Depends: ${shlibs:Depends}, ${misc:Depends}, rsyslog (= ${binary:Version}), dbconfig-common, ucf
 Recommends: postgresql
 Description: PostgreSQL output plugin for rsyslog
