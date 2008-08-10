@@ -81,6 +81,7 @@ create_xconsole() {
 	then
 		mknod -m 640 /dev/xconsole p
 		chown root:adm /dev/xconsole
+		[ -x /sbin/restorecon ] && /sbin/restorecon /dev/xconsole
 	fi
 }
 
