@@ -38,7 +38,6 @@ SCRIPTNAME=/etc/init.d/$NAME
 [ -r /etc/default/$NAME ] && . /etc/default/$NAME
 
 # Define LSB log_* functions.
-# Depend on lsb-base (>= 3.0-6) to ensure that this file is present.
 . /lib/lsb/init-functions
 
 do_start()
@@ -118,8 +117,11 @@ case "$1" in
 	$0 stop
 	$0 start
 	;;
+  status)
+	status_of_proc -p $RSYSLOGD_PIDFILE $RSYSLOGD_BIN $RSYSLOGD && exit 0 || exit $?
+	;;
   *)
-	echo "Usage: $SCRIPTNAME {start|stop|restart|reload|force-reload}" >&2
+	echo "Usage: $SCRIPTNAME {start|stop|restart|reload|force-reload|status}" >&2
 	exit 3
 	;;
 esac

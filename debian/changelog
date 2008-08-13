@@ -4,6 +4,9 @@ rsyslog (3.18.2-1) unstable; urgency=low
   * debian/rsyslog.init
     - Restore default SELinux security context when creating /dev/xconsole.
       Closes: #493171
+    - Add "status" action.
+  * debian/control
+    - Bump dependency on lsb-base to >= 3.2-14, which provides status_of_proc.
 
  -- Michael Biebl <biebl@debian.org>  Mon, 11 Aug 2008 00:25:33 +0200
 
