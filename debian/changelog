@@ -7,6 +7,8 @@ rsyslog (3.18.5-1) UNRELEASED; urgency=low
       service. Closes: #505991
   * debian/rsyslog-{mysql,pgsql}.config
     - Do not ignore errors in config maintainer scripts.
+  * debian/rsyslog.postinst
+    - Rotate old .0 log files when migrating from sysklogd. Closes: #491672
 
  -- Michael Biebl <biebl@debian.org>  Thu, 20 Nov 2008 12:49:25 +0100
 
