@@ -1,4 +1,71 @@
 ---------------------------------------------------------------------------
+Version 3.18.5 (rgerhards), 2008-10-09
+- bugfix: imudp input module could cause segfault on HUP
+  It did not properly de-init a variable acting as a linked list head.
+  That resulted in trying to access freed memory blocks after the HUP.
+- bugfix:  rsyslogd could hang on HUP
+  because getnameinfo() is not cancel-safe, but was not guarded against
+  being cancelled. pthread_cancel() is routinely being called during
+  HUP processing.
+- bugfix[minor]: if queue size reached light_delay mark, enqueuing
+  could potentially be blocked for a longer period of time, which
+  was not the behaviour desired.
+- doc bugfix: $ActionExecOnlyWhenPreviousIsSuspended was still misspelled
+  as $...OnlyIfPrev... in some parts of the documentation. Thanks to 
+  Lorenzo M. Catucci for reporting this bug.
+- added doc on malformed messages, cause and how to work-around, to the
+  doc set
+- added doc on how to build from source repository
+---------------------------------------------------------------------------
+Version 3.18.4 (rgerhards), 2008-09-18
+- bugfix: order-of magnitude issue with base-10 size definitions
+  in config file parser. Could lead to invalid sizes, constraints
+  etc for e.g. queue files and any other object whose size was specified
+  in base-10 entities. Did not apply to binary entities. Thanks to
+  RB for finding this bug and providing a patch.
+- bugfix: action was not called when system time was set backwards
+  (until the previous time was reached again). There are still some
+  side-effects when time is rolled back (A time rollback is really a bad
+  thing to do, ideally the OS should issue pseudo time (like NetWare did)
+  when the user tries to roll back time). Thanks to varmojfekoj for this
+  patch.
+- doc bugfix: rsyslog.conf man page improved and minor nit fixed
+  thanks to Lukas Kuklinek for the patch.
+- bugfix: error code -2025 was used for two different errors. queue full
+  is now -2074 and -2025 is unique again. (did cause no real problem
+  except for troubleshooting)
+- bugfix: default discard severity was incorrectly set to 4, which lead
+  to discard-on-queue-full to be enabled by default. That could cause
+  message loss where non was expected.  The default has now been changed
+  to the correct value of 8, which disables the functionality. This
+  problem applied both to the main message queue and the action queues.
+  Thanks to Raoul Bhatia for pointing out this problem.
+- bugfix: option value for legacy -a option could not be specified,
+  resulting in strange operations. Thanks to Marius Tomaschewski
+  for the patch.
+- bugfix: colon after date should be ignored, but was not. This has
+  now been corrected. Required change to the internal ParseTIMESTAMP3164()
+  interface.
+---------------------------------------------------------------------------
+Version 3.18.3 (rgerhards), 2008-08-18
+- bugfix: imfile could cause a segfault upon rsyslogd HUP and termination
+  Thanks to lperr for an excellent bug report that helped detect this
+  problem.
+- enhanced ommysql to support custom port to connect to server
+  Port can be set via new $ActionOmmysqlServerPort config directive
+  Note: this was a very minor change and thus deemed appropriate to be
+  done in the stable release.
+- bugfix: misspelled config directive, previously was
+  $MainMsgQueueWorkeTimeoutrThreadShutdown, is now
+  $MainMsgQueueWorkerTimeoutThreadShutdown. Note that the misspelled
+  directive is not preserved - if the misspelled directive was used
+  (which I consider highly unlikely), the config file must be changed.
+  Thanks to lperr for reporting the bug.
+- disabled flow control for imuxsock, as it could cause system hangs
+  under some circumstances. The devel (3.21.3 and above) will
+  re-enable it and provide enhanced configurability to overcome the
+  problems if they occur.
+---------------------------------------------------------------------------
 Version 3.18.2 (rgerhards), 2008-08-08
 - merged in IPv6 forwarding address bugfix from v2-stable
 ---------------------------------------------------------------------------
@@ -601,6 +668,16 @@ Version 3.10.0 (rgerhards), 2008-01-07
 - compilation without pthreads is no longer supported
 - much cleaner code due to new objects and removal of single-threading
   mode
+---------------------------------------------------------------------------
+Version 2.0.6 V2-STABLE (rgerhards), 2008-??-??
+- bugfix: memory leaks in rsyslogd, primarily in singlethread mode
+  Thanks to Frederico Nunez for providing the fix
+- bugfix: copy&paste error lead to dangling if - this caused a very minor
+  issue with re-formatting a RFC3164 date when the message was invalidly
+  formatted and had a colon immediately after the date. This was in the
+  code for some years (even v1 had it) and I think it never had any
+  effect at all in practice. Though, it should be fixed - but definitely
+  nothing to worry about.
 ---------------------------------------------------------------------------
 Version 2.0.6 V2-STABLE (rgerhards), 2008-08-07
 - bugfix: IPv6 addresses could not be specified in forwarding actions
