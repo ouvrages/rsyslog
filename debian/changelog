@@ -9,6 +9,9 @@ rsyslog (3.18.5-1) UNRELEASED; urgency=low
     - Do not ignore errors in config maintainer scripts.
   * debian/rsyslog.postinst
     - Rotate old .0 log files when migrating from sysklogd. Closes: #491672
+  * debian/rules
+    - Exclude sample conf file from being compressed as it is referenced in
+      the html documentation with the non-compressed file name.
 
  -- Michael Biebl <biebl@debian.org>  Thu, 20 Nov 2008 12:49:25 +0100
 
