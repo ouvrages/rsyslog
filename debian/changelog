@@ -18,6 +18,8 @@ rsyslog (3.18.5-1) UNRELEASED; urgency=low
       issues with parallel make.
   * debian/rsyslog-doc.links
     - Add a symlink index.html pointing at manual.html. Closes: #494634
+  * debian/rsyslog.default
+    - Fix a few spelling errors.
 
  -- Michael Biebl <biebl@debian.org>  Thu, 20 Nov 2008 12:49:25 +0100
 
