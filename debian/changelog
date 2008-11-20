@@ -12,6 +12,10 @@ rsyslog (3.18.5-1) UNRELEASED; urgency=low
   * debian/rules
     - Exclude sample conf file from being compressed as it is referenced in
       the html documentation with the non-compressed file name.
+    - Depend on $(QUILT_STAMPFN) instead of patch; patch is a phony target and
+      thus always out of date.
+    - Move $(QUILT_STAMPFN) dependency to config.status to avoid potential
+      issues with parallel make.
   * debian/rsyslog-doc.links
     - Add a symlink index.html pointing at manual.html. Closes: #494634
 

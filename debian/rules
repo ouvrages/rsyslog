@@ -26,7 +26,7 @@ else
 	CFLAGS += -O2
 endif
 
-config.status: configure
+config.status: $(QUILT_STAMPFN) configure
 	dh_testdir
 	# Add here commands to configure the package.
 ifneq "$(wildcard /usr/share/misc/config.sub)" ""
@@ -48,7 +48,7 @@ endif
 
 build: build-stamp
 
-build-stamp: patch config.status
+build-stamp: config.status
 	dh_testdir
 
 	# Add here commands to compile the package.
