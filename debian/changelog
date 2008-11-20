@@ -1,3 +1,13 @@
+rsyslog (3.18.5-1) UNRELEASED; urgency=low
+
+  * New upstream bugfix release.
+    - Fix potential segfault in imfile on rsyslogd HUP (reload) and
+      termination (stop). Closes: #503940
+    - Disable input throttling for imuxsock as this can lead to denial of
+      service. Closes: #505991
+
+ -- Michael Biebl <biebl@debian.org>  Thu, 20 Nov 2008 12:49:25 +0100
+
 rsyslog (3.18.2-1) unstable; urgency=low
 
   * New upstream release.
