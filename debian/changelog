@@ -20,6 +20,17 @@ rsyslog (3.18.5-1) UNRELEASED; urgency=low
     - Add a symlink index.html pointing at manual.html. Closes: #494634
   * debian/rsyslog.default
     - Fix a few spelling errors.
+  * Disable the logrotate file when removing the package to avoid log
+    rotation failures. Closes: #500569
+    Thanks to Kobayashi Noritada for the patch
+  * debian/rsyslog.postrm
+    - Rename /etc/logrotate.d/rsyslog to /etc/logrotate.d/rsyslog.disabled
+      when removing the package.
+    - Remove /etc/logrotate.d/rsyslog.disabled when purging and replacing
+      the package.
+  * debian/rsyslog.preinst
+    - Rename /etc/logrotate.d/rsyslog.disabled to /etc/logrotate.d/rsyslog
+      when reinstalling.
 
  -- Michael Biebl <biebl@debian.org>  Thu, 20 Nov 2008 12:49:25 +0100
 
