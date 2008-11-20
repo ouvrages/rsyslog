@@ -105,7 +105,7 @@ actionResetQueueParams(void)
 	iActionQHighWtrMark = 800;			/* high water mark for disk-assisted queues */
 	iActionQLowWtrMark = 200;			/* low water mark for disk-assisted queues */
 	iActionQDiscardMark = 9800;			/* begin to discard messages */
-	iActionQDiscardSeverity = 4;			/* discard warning and above */
+	iActionQDiscardSeverity = 8;			/* discard warning and above */
 	iActionQueueNumWorkers = 1;			/* number of worker threads for the mm queue above */
 	iActionQueMaxFileSize = 1024*1024;
 	iActionQPersistUpdCnt = 0;			/* persist queue info every n updates */
@@ -544,6 +544,10 @@ actionWriteToAction(action_t *pAction)
 	dbgprintf("Called action, logging to %s", module.GetStateName(pAction->pMod));
 
 	time(&now); /* we need this for message repeation processing AND $ActionExecOnlyOnceEveryInterval */
+	if(pAction->tLastExec > now) {
+		/* if we are traveling back in time, reset tLastExec */
+		pAction->tLastExec = (time_t) 0;
+	}
 	/* now check if we need to drop the message because otherwise the action would be too
 	 * frequently called. -- rgerhards, 2008-04-08
 	 */
