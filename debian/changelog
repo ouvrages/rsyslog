@@ -4,7 +4,7 @@ rsyslog (3.18.6-1) UNRELEASED; urgency=high
     - Fix "$AllowedSender" security bypass vulnerability. The "$AllowedSender"
       configuration directive was not respected, allowing unrestricted network
       access to the application. Closes: #508027
-      Fixes: SA32857
+      No CVE id yet.
   * Urgency high for the security fix.
   * debian/patches/manpage_fixes.patch
     - Fix typos in rsyslogd man page. Closes: #506925
