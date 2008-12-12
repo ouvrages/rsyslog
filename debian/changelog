@@ -6,6 +6,9 @@ rsyslog (3.18.6-1) UNRELEASED; urgency=high
       access to the application. Closes: #508027
       Fixes: SA32857
   * Urgency high for the security fix.
+  * debian/patches/manpage_fixes.patch
+    - Fix typos in rsyslogd man page. Closes: #506925
+      Thanks to Geoff Simmons for the patch.
 
  -- Michael Biebl <biebl@debian.org>  Thu, 11 Dec 2008 19:41:41 +0100
 
