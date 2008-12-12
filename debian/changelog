@@ -1,10 +1,11 @@
-rsyslog (3.18.6-1) UNRELEASED; urgency=low
+rsyslog (3.18.6-1) UNRELEASED; urgency=high
 
   * New upstream bugfix release.
     - Fix "$AllowedSender" security bypass vulnerability. The "$AllowedSender"
       configuration directive was not respected, allowing unrestricted network
       access to the application. Closes: #508027
       Fixes: SA32857
+  * Urgency high for the security fix.
 
  -- Michael Biebl <biebl@debian.org>  Thu, 11 Dec 2008 19:41:41 +0100
 
