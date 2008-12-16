@@ -36,7 +36,7 @@ rotate_old_log_files()
 			if [ "$rotate" = "yes" ] ; then
 				for s in $(seq 9 -1 1) ; do
 					if [ -e $dir/$f.$s.gz ]; then
-						mv $dir/$f.$s.gz $dir/$f.$((s+1)).gz
+						mv $dir/$f.$s.gz $dir/$f.$(($s+1)).gz
 					fi
 				done
 				mv $dir/$f.0 $dir/$f.1
