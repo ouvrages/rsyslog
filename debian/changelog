@@ -2,8 +2,13 @@ rsyslog (3.20.2-1) UNRELEASED; urgency=low
 
   * New upstream release.
   * Refresh all patches for the new upstream stable branch.
+  * Enable GSSAPI support
+    - Add libkrb5-dev to Build-Depends.
+    - Split files into a separate package rsyslog-gssapi.
+    - Add --enable-gssapi-krb5 to configure flags.
+    Thanks to Ben Poliakoff for the patch. Closes: #493044
 
- -- Michael Biebl <biebl@debian.org>  Thu, 15 Jan 2009 23:58:42 +0100
+ -- Michael Biebl <biebl@debian.org>  Fri, 16 Jan 2009 00:30:38 +0100
 
 rsyslog (3.18.6-3) unstable; urgency=medium
 

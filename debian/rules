@@ -43,6 +43,7 @@ endif
 		--enable-pgsql \
 		--enable-mail \
 		--enable-imfile \
+		--enable-gssapi-krb5 \
 		CFLAGS="$(CFLAGS)"
 
 

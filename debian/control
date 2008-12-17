@@ -2,7 +2,7 @@ Source: rsyslog
 Section: admin
 Priority: important
 Maintainer: Michael Biebl <biebl@debian.org>
-Build-Depends: debhelper (>= 5), quilt, autotools-dev, zlib1g-dev, libmysqlclient15-dev, libpq-dev
+Build-Depends: debhelper (>= 5), quilt, autotools-dev, zlib1g-dev, libmysqlclient15-dev, libpq-dev, libkrb5-dev
 Standards-Version: 3.8.0
 Vcs-Git: git://git.debian.org/git/users/biebl/rsyslog.git
 Vcs-Browser: http://git.debian.org/?p=users/biebl/rsyslog.git;a=summary
@@ -63,3 +63,12 @@ Recommends: postgresql
 Description: PostgreSQL output plugin for rsyslog
  This plugin allows rsyslog to write the syslog messages into a PostgreSQL 
  database.
+
+Package: rsyslog-gssapi
+Architecture: any
+Priority: extra
+Depends: ${shlibs:Depends}, ${misc:Depends}, rsyslog (= ${binary:Version})
+Suggests: krb5-user
+Description: GSSAPI input and output plugins for rsyslog
+ These plugins allow rsyslog to write and/or receive GSSAPI authenticated and
+ encrypted syslog messages.
