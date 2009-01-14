@@ -1,6 +1,6 @@
 #! /bin/sh
 ### BEGIN INIT INFO
-# Provides:          syslog
+# Provides:          rsyslog
 # Required-Start:    $remote_fs $time
 # Required-Stop:     $remote_fs $time
 # Should-Start:      $network

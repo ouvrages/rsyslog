@@ -2,6 +2,10 @@ rsyslog (3.18.6-3) UNRELEASED; urgency=low
 
   * debian/rsyslog.conf
     - Create new directories with more sane permissions. Closes: #511054
+  * debian/rsyslog.init
+    - Update the LSB header to not provide the reserved 'syslog' facility. Use
+      'rsyslog' instead to avoid clashes. Thanks to Petter Reinholdtsen for
+      the hint.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 14 Jan 2009 07:21:57 +0100
 
