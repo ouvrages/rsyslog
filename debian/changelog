@@ -6,6 +6,9 @@ rsyslog (3.18.6-3) UNRELEASED; urgency=low
     - Update the LSB header to not provide the reserved 'syslog' facility. Use
       'rsyslog' instead to avoid clashes. Thanks to Petter Reinholdtsen for
       the hint.
+  * debian/patches/allowed_sender_reload.patch
+    - Fix segfault on reload when using $AllowedSender. Closes: #511562
+      Patch cherry picked from upstream git.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 14 Jan 2009 07:21:57 +0100
 
