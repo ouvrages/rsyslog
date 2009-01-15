@@ -8,6 +8,8 @@ debian/tmp/usr/lib/rsyslog/imtcp.so
 debian/tmp/usr/lib/rsyslog/imudp.so
 debian/tmp/usr/lib/rsyslog/imuxsock.so
 debian/tmp/usr/lib/rsyslog/lmnet.so
+debian/tmp/usr/lib/rsyslog/lmnetstrms.so
+debian/tmp/usr/lib/rsyslog/lmnsd_ptcp.so
 debian/tmp/usr/lib/rsyslog/lmregexp.so
 debian/tmp/usr/lib/rsyslog/lmtcpclt.so
 debian/tmp/usr/lib/rsyslog/lmtcpsrv.so
