@@ -33,12 +33,13 @@
 #include <unistd.h>
 #include <netdb.h>
 #include "rsyslog.h"
-#include "syslogd.h"
+#include "dirty.h"
 #include "net.h"
 #include "cfsysline.h"
 #include "module-template.h"
 #include "srUtils.h"
 #include "errmsg.h"
+#include "glbl.h"
 
 MODULE_TYPE_INPUT
 
@@ -47,6 +48,7 @@ MODULE_TYPE_INPUT
 /* Module static data */
 DEF_IMOD_STATIC_DATA
 DEFobjCurrIf(errmsg)
+DEFobjCurrIf(glbl)
 DEFobjCurrIf(net)
 
 static time_t ttLastDiscard = 0;	/* timestamp when a message from a non-permitted sender was last discarded
@@ -137,6 +139,7 @@ BEGINrunInput
 	struct sockaddr_storage frominet;
 	socklen_t socklen;
 	uchar fromHost[NI_MAXHOST];
+	uchar fromHostIP[NI_MAXHOST];
 	uchar fromHostFQDN[NI_MAXHOST];
 	ssize_t l;
 CODESTARTrunInput
@@ -184,7 +187,7 @@ CODESTARTrunInput
 				       l = recvfrom(udpLstnSocks[i+1], (char*) pRcvBuf, MAXLINE - 1, 0,
 						    (struct sockaddr *)&frominet, &socklen);
 				       if (l > 0) {
-					       if(net.cvthname(&frominet, fromHost, fromHostFQDN) == RS_RET_OK) {
+					       if(net.cvthname(&frominet, fromHost, fromHostFQDN, fromHostIP) == RS_RET_OK) {
 						       dbgprintf("Message from inetd socket: #%d, host: %s\n",
 							       udpLstnSocks[i+1], fromHost);
 						       /* Here we check if a host is permitted to send us
@@ -195,20 +198,20 @@ CODESTARTrunInput
 							*/
 						       if(net.isAllowedSender((uchar*) "UDP",
 							  (struct sockaddr *)&frominet, (char*)fromHostFQDN)) {
-							       parseAndSubmitMessage((char*)fromHost, (char*) pRcvBuf, l,
+							       parseAndSubmitMessage(fromHost, fromHostIP, pRcvBuf, l,
 							       MSG_PARSE_HOSTNAME, NOFLAG, eFLOWCTL_NO_DELAY);
 						       } else {
 							       dbgprintf("%s is not an allowed sender\n", (char*)fromHostFQDN);
-							       if(option_DisallowWarning) {
- 							       		time_t tt;
+							       if(glbl.GetOption_DisallowWarning) {
+							       		time_t tt;
 
- 									time(&tt);
- 									if(tt > ttLastDiscard + 60) {
- 										ttLastDiscard = tt;
- 										errmsg.LogError(NO_ERRCODE,
- 										"UDP message from disallowed sender %s discarded",
- 										(char*)fromHost);
- 									}
+									time(&tt);
+									if(tt > ttLastDiscard + 60) {
+										ttLastDiscard = tt;
+										errmsg.LogError(0, NO_ERRCODE,
+										"UDP message from disallowed sender %s discarded",
+										(char*)fromHost);
+									}
 							       }	
 						       }
 					       }
@@ -216,7 +219,7 @@ CODESTARTrunInput
 						char errStr[1024];
 						rs_strerror_r(errno, errStr, sizeof(errStr));
 						dbgprintf("INET socket error: %d = %s.\n", errno, errStr);
-						       errmsg.LogError(NO_ERRCODE, "recvfrom inet");
+						       errmsg.LogError(errno, NO_ERRCODE, "recvfrom inet");
 						       /* should be harmless */
 						       sleep(1);
 					       }
@@ -265,6 +268,7 @@ BEGINmodExit
 CODESTARTmodExit
 	/* release what we no longer need */
 	objRelease(errmsg, CORE_COMPONENT);
+	objRelease(glbl, CORE_COMPONENT);
 	objRelease(net, LM_NET_FILENAME);
 ENDmodExit
 
@@ -293,6 +297,7 @@ CODESTARTmodInit
 	*ipIFVersProvided = CURR_MOD_IF_VERSION; /* we only support the current interface specification */
 CODEmodInit_QueryRegCFSLineHdlr
 	CHKiRet(objUse(errmsg, CORE_COMPONENT));
+	CHKiRet(objUse(glbl, CORE_COMPONENT));
 	CHKiRet(objUse(net, LM_NET_FILENAME));
 
 	/* register config file handlers */
