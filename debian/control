@@ -39,6 +39,7 @@ Priority: extra
 Architecture: all
 Conflicts: rsyslog (<< 2.0.1-2)
 Replaces: rsyslog (<< 2.0.1-2)
+Depends: ${misc:Depends}
 Suggests: doc-base, www-browser
 Description: documentation for rsyslog
  This package contains detailed HTML documentation of rsyslog.

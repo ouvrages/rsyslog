@@ -7,6 +7,8 @@ rsyslog (3.20.2-1) UNRELEASED; urgency=low
     - Split files into a separate package rsyslog-gssapi.
     - Add --enable-gssapi-krb5 to configure flags.
     Thanks to Ben Poliakoff for the patch. Closes: #493044
+  * debian/control
+    - Add ${misc:Depends} to rsyslog-doc.
 
  -- Michael Biebl <biebl@debian.org>  Fri, 16 Jan 2009 00:30:38 +0100
 
