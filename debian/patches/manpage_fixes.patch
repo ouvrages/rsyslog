@@ -1,5 +1,7 @@
---- rsyslog-3.18.5.orig/rsyslogd.8
-+++ rsyslog-3.18.5/rsyslogd.8
+Index: rsyslog/tools/rsyslogd.8
+===================================================================
+--- rsyslog.orig/tools/rsyslogd.8	2009-01-16 00:06:21.000000000 +0100
++++ rsyslog/tools/rsyslogd.8	2009-01-16 00:07:07.000000000 +0100
 @@ -68,7 +68,7 @@
  ensure that rsyslogd follows its default, standard BSD behavior. Of course,
  some configuration file changes are necessary in order to support the
@@ -53,7 +55,7 @@
  machines (those, that are in no AllowedSender list).
  .TP
  .B "\-x"
-@@ -336,7 +336,7 @@
+@@ -344,7 +344,7 @@
  
  .TP
  .B RSYSLOG_DEBUGLOG
@@ -62,7 +64,7 @@
  in addition to stdout.
  .TP
  .B RSYSLOG_MODDIR
-@@ -344,7 +344,7 @@
+@@ -352,7 +352,7 @@
  .PD
  .SH BUGS
  Please review the file BUGS for up-to-date information on known

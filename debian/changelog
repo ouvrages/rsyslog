@@ -1,6 +1,7 @@
 rsyslog (3.20.2-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * Refresh all patches for the new upstream stable branch.
 
  -- Michael Biebl <biebl@debian.org>  Thu, 15 Jan 2009 23:58:42 +0100
 

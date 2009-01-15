@@ -10,11 +10,11 @@ Michael Biebel, olgoat, and Juha Koho for reporting and analyzing
 the bug.
 ---
 
-diff --git a/net.c b/net.c
-index 54d162b..788d541 100644
---- a/net.c
-+++ b/net.c
-@@ -105,6 +105,30 @@ setAllowRoot(struct AllowedSenders **ppAllowRoot, uchar *pszType)
+Index: rsyslog/runtime/net.c
+===================================================================
+--- rsyslog.orig/runtime/net.c	2009-01-16 00:06:21.000000000 +0100
++++ rsyslog/runtime/net.c	2009-01-16 00:07:23.000000000 +0100
+@@ -116,6 +116,30 @@
  finalize_it:
  	RETiRet;
  }
@@ -44,8 +44,8 @@ index 54d162b..788d541 100644
 +}
  
  
- /* Code for handling allowed/disallowed senders
-@@ -214,6 +238,11 @@ clearAllowedSenders(uchar *pszType)
+ /* add a wildcard entry to this permitted peer. Entries are always
+@@ -556,6 +580,11 @@
  			free(pPrev->allowedSender.addr.NetAddr);
  		free(pPrev);
  	}
