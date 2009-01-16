@@ -4,9 +4,13 @@ rsyslog (3.20.2-1) UNRELEASED; urgency=low
   * Refresh all patches for the new upstream stable branch.
   * Enable GSSAPI support
     - Add libkrb5-dev to Build-Depends.
-    - Split files into a separate package rsyslog-gssapi.
+    - Split files into a separate package named rsyslog-gssapi.
     - Add --enable-gssapi-krb5 to configure flags.
     Thanks to Ben Poliakoff for the patch. Closes: #493044
+  * Enable GnuTLS support
+    - Add libgnutls-dev to Build-Depends.
+    - Split files into a separate package named rsyslog-gnutls.
+    - Add --enable-gnutls to configure flags.
   * debian/control
     - Add ${misc:Depends} to rsyslog-doc.
 

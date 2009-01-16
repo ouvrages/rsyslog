@@ -44,6 +44,7 @@ endif
 		--enable-mail \
 		--enable-imfile \
 		--enable-gssapi-krb5 \
+		--enable-gnutls \
 		CFLAGS="$(CFLAGS)"
 
 
