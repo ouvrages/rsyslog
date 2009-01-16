@@ -21,8 +21,11 @@ rsyslog (3.20.2-1) UNRELEASED; urgency=low
     - Update LSB header to stop after sendsigs and before umountnfs.
     - Use the sendsigs process omission interface to avoid being killed by
       killall5.
+  * debian/rsyslog-doc.links
+    - There is an upstream index.html file now, so we no longer need to create
+      a symlink.
 
- -- Michael Biebl <biebl@debian.org>  Fri, 16 Jan 2009 00:30:38 +0100
+ -- Michael Biebl <biebl@debian.org>  Fri, 16 Jan 2009 22:08:08 +0100
 
 rsyslog (3.18.6-3) unstable; urgency=medium
 
