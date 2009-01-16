@@ -13,6 +13,14 @@ rsyslog (3.20.2-1) UNRELEASED; urgency=low
     - Add --enable-gnutls to configure flags.
   * debian/control
     - Add ${misc:Depends} to rsyslog-doc.
+  * Let rsyslog collect messages as long as possible during shutdown or
+    reboot. As /usr may be mounted via NFS, the latest possible point is just
+    before umountnfs. Closes: #474498
+    - Update the stop priorities for runlevel 0 and 6 from K90 to S30 for
+      sysv-rc and migrate existing symlinks.
+    - Update LSB header to stop after sendsigs and before umountnfs.
+    - Use the sendsigs process omission interface to avoid being killed by
+      killall5.
 
  -- Michael Biebl <biebl@debian.org>  Fri, 16 Jan 2009 00:30:38 +0100
 
