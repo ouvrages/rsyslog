@@ -1,4 +1,4 @@
-rsyslog (3.20.3-1) UNRELEASED; urgency=low
+rsyslog (3.20.3-1) experimental; urgency=low
 
   * New upstream release.
   * debian/patches/allowed_sender_reload.patch
@@ -6,7 +6,7 @@ rsyslog (3.20.3-1) UNRELEASED; urgency=low
   * debian/patches/manpage_fixes.patch
     - Removed, merged upstream.
 
- -- Michael Biebl <biebl@debian.org>  Mon, 19 Jan 2009 13:35:02 +0100
+ -- Michael Biebl <biebl@debian.org>  Mon, 19 Jan 2009 13:52:31 +0100
 
 rsyslog (3.20.2-1) experimental; urgency=low
 
