@@ -1,3 +1,12 @@
+rsyslog (3.18.6-4) UNRELEASED; urgency=low
+
+  * debian/patches/message_locking_fix.patch
+     - Proper message locking on message destruct to avoid a race condition
+       which could lead to a segfault. Closes: #509292
+       Patch cherry-picked from upstream git.
+
+ -- Michael Biebl <biebl@debian.org>  Thu, 29 Jan 2009 01:13:37 +0100
+
 rsyslog (3.18.6-3) unstable; urgency=medium
 
   * debian/rsyslog.conf

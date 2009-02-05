@@ -1,3 +1,4 @@
 no_create_db.patch
 manpage_fixes.patch
 allowed_sender_reload.patch
+message_locking_fix.patch
