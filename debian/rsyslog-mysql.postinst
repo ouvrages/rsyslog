@@ -15,7 +15,7 @@ set -e
 # the debian-policy package
 
 . /usr/share/debconf/confmodule
-. /usr/share/dbconfig-common/dpkg/postinst
+. /usr/share/dbconfig-common/dpkg/postinst.mysql
 
 
 db_get rsyslog-mysql/db/dbname
