@@ -1,4 +1,4 @@
-rsyslog (3.18.6-4) UNRELEASED; urgency=medium
+rsyslog (3.18.6-4) unstable; urgency=medium
 
   * debian/patches/message_locking_fix.patch
     - Proper message locking on message destruct to avoid a race condition
@@ -16,7 +16,7 @@ rsyslog (3.18.6-4) UNRELEASED; urgency=medium
     - Add instructions how to avoid doubled hostname entries when sending
       syslog messages from rsyslog to a sysklogd server. Closes: #512663
 
- -- Michael Biebl <biebl@debian.org>  Sun, 08 Feb 2009 00:18:49 +0100
+ -- Michael Biebl <biebl@debian.org>  Sun, 08 Feb 2009 00:54:39 +0100
 
 rsyslog (3.18.6-3) unstable; urgency=medium
 
