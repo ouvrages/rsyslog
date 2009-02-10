@@ -45,6 +45,7 @@ endif
 		--enable-imfile \
 		--enable-gssapi-krb5 \
 		--enable-gnutls \
+		--enable-relp \
 		CFLAGS="$(CFLAGS)"
 
 

@@ -2,7 +2,7 @@ Source: rsyslog
 Section: admin
 Priority: important
 Maintainer: Michael Biebl <biebl@debian.org>
-Build-Depends: debhelper (>= 7.0.9), quilt, autotools-dev, zlib1g-dev, libmysqlclient15-dev, libpq-dev, libkrb5-dev, libgnutls-dev
+Build-Depends: debhelper (>= 7.0.9), quilt, autotools-dev, zlib1g-dev, libmysqlclient15-dev, libpq-dev, libkrb5-dev, libgnutls-dev, librelp-dev, pkg-config
 Standards-Version: 3.8.0
 Vcs-Git: git://git.debian.org/git/users/biebl/rsyslog.git
 Vcs-Browser: http://git.debian.org/?p=users/biebl/rsyslog.git;a=summary
@@ -15,7 +15,7 @@ Conflicts: system-log-daemon, linux-kernel-log-daemon
 Provides: system-log-daemon, linux-kernel-log-daemon
 Depends: ${shlibs:Depends}, ${misc:Depends}, lsb-base (>= 3.2-14)
 Recommends: logrotate
-Suggests: rsyslog-mysql | rsyslog-pgsql, rsyslog-doc, rsyslog-gnutls, rsyslog-gssapi
+Suggests: rsyslog-mysql | rsyslog-pgsql, rsyslog-doc, rsyslog-gnutls, rsyslog-gssapi, rsyslog-relp
 Description: enhanced multi-threaded syslogd
  Rsyslog is an enhanced syslogd supporting, amongst others:
   * reliable syslog over TCP and SSL/TLS
@@ -83,3 +83,12 @@ Suggests: gnutls-bin
 Description: TLS protocol support for rsyslog
  This netstream plugin allows rsyslog to send and receive encrypted syslog
  messages via the upcoming syslog-transport-tls IETF standard protocol.
+
+Package: rsyslog-relp
+Architecture: any
+Priority: extra
+Depends: ${shlibs:Depends}, ${misc:Depends}, rsyslog (= ${binary:Version})
+Description: RELP protocol support for rsyslog
+ These plugins allows rsyslog to send and receive syslog messages via the
+ RELP protocol. RELP ensures the reliable transport over the network even on
+ connection loss or if a peer becomes unavailable.
