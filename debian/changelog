@@ -4,6 +4,11 @@ rsyslog (3.20.4-1) UNRELEASED; urgency=low
   * Merge changes from unstable branch.
   * debian/patches/message_locking_fix.patch
     - Removed, fixed upstream.
+  * debian/compat
+    - Bump to debhelper v7 compat mode.
+  * debian/control
+    - Bump debhelper build dependency to (>= 7.0.9).
+
 
  -- Michael Biebl <biebl@debian.org>  Tue, 10 Feb 2009 01:52:32 +0100
 
