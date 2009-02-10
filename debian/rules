@@ -73,7 +73,7 @@ clean-source:
 install: build
 	dh_testdir
 	dh_testroot
-	dh_clean -k 
+	dh_prep
 
 	# Add here commands to install the package into debian/rsyslog.
 	$(MAKE) DESTDIR=$(CURDIR)/debian/tmp install

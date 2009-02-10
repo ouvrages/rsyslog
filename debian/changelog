@@ -10,6 +10,7 @@ rsyslog (3.20.4-1) UNRELEASED; urgency=low
     - Bump debhelper build dependency to (>= 7.0.9).
   * debian/rules
     - Use new dh_installinit "-R" (restart-after-upgrade) option.
+    - Replace "dh_clean -k" with "dh_prep".
   * debian/rsyslog.postinst
     - Remove our custom code to stop/start rsyslog on upgrades. This is done
       now automatically by dh_installinit.
