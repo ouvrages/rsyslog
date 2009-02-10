@@ -1,6 +1,9 @@
 rsyslog (3.20.4-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * Merge changes from unstable branch.
+  * debian/patches/message_locking_fix.patch
+    - Removed, fixed upstream.
 
  -- Michael Biebl <biebl@debian.org>  Tue, 10 Feb 2009 01:52:32 +0100
 
