@@ -66,14 +66,6 @@ case "$1" in
 			fi
 		done
 	fi
-
-	# Stop the service on upgrades before it is started again.
-	# dh_installinit -r will create the start code.
-	if [ -n "$2" ]; then
-		if [ -x "/etc/init.d/rsyslog" ]; then
-			invoke-rc.d rsyslog stop || true
-		fi
-	fi
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

@@ -8,7 +8,11 @@ rsyslog (3.20.4-1) UNRELEASED; urgency=low
     - Bump to debhelper v7 compat mode.
   * debian/control
     - Bump debhelper build dependency to (>= 7.0.9).
-
+  * debian/rules
+    - Use new dh_installinit "-R" (restart-after-upgrade) option.
+  * debian/rsyslog.postinst
+    - Remove our custom code to stop/start rsyslog on upgrades. This is done
+      now automatically by dh_installinit.
 
  -- Michael Biebl <biebl@debian.org>  Tue, 10 Feb 2009 01:52:32 +0100
 
