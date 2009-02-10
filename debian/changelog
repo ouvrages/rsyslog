@@ -14,6 +14,8 @@ rsyslog (3.20.4-1) UNRELEASED; urgency=low
   * debian/rsyslog.postinst
     - Remove our custom code to stop/start rsyslog on upgrades. This is done
       now automatically by dh_installinit.
+  * debian/rsyslog.docs
+    - Install AUTHORS file.
 
  -- Michael Biebl <biebl@debian.org>  Tue, 10 Feb 2009 01:52:32 +0100
 
