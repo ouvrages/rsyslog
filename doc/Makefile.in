@@ -103,8 +103,6 @@ PKG_CONFIG = @PKG_CONFIG@
 RANLIB = @RANLIB@
 RELP_CFLAGS = @RELP_CFLAGS@
 RELP_LIBS = @RELP_LIBS@
-RFC3195_CFLAGS = @RFC3195_CFLAGS@
-RFC3195_LIBS = @RFC3195_LIBS@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
@@ -213,6 +211,7 @@ html_files = \
 	contributors.html \
 	dev_queue.html \
 	omsnmp.html \
+	ommysql.html \
 	omlibdbi.html \
 	imfile.html \
 	imtcp.html \
@@ -278,7 +277,7 @@ html_files = \
 	licensing.html \
 	ommail.html \
 	omrelp.html \
-	status.html \
+	syslog_parsing.html \
 	troubleshoot.html \
 	src/classes.dia
 

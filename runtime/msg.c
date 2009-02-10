@@ -188,6 +188,7 @@ static void MsgPrepareEnqueueLockingCase(msg_t *pThis)
 	 * rgerhards, 2008-07-14
 	 */
 	pthread_mutexattr_destroy(&pThis->mutAttr);
+	pThis->bDoLock = 1;
 	ENDfunc
 }
 
@@ -197,14 +198,16 @@ static void MsgLockLockingCase(msg_t *pThis)
 {
 	/* DEV debug only! dbgprintf("MsgLock(0x%lx)\n", (unsigned long) pThis); */
 	assert(pThis != NULL);
-	pthread_mutex_lock(&pThis->mut);
+	if(pThis->bDoLock == 1) /* TODO: this is a testing hack, we should find a way with better performance! -- rgerhards, 2009-01-27 */
+		pthread_mutex_lock(&pThis->mut);
 }
 
 static void MsgUnlockLockingCase(msg_t *pThis)
 {
 	/* DEV debug only! dbgprintf("MsgUnlock(0x%lx)\n", (unsigned long) pThis); */
 	assert(pThis != NULL);
-	pthread_mutex_unlock(&pThis->mut);
+	if(pThis->bDoLock == 1) /* TODO: this is a testing hack, we should find a way with better performance! -- rgerhards, 2009-01-27 */
+		pthread_mutex_unlock(&pThis->mut);
 }
 
 /* delete the mutex object on message destruction (locking case)
@@ -271,11 +274,8 @@ BEGINobjDestruct(msg) /* be sure to specify the object type also in END and CODE
 	int currRefCount;
 CODESTARTobjDestruct(msg)
 	/* DEV Debugging only ! dbgprintf("msgDestruct\t0x%lx, Ref now: %d\n", (unsigned long)pM, pM->iRefCount - 1); */
-#	ifdef DO_HAVE_ATOMICS
-		currRefCount = ATOMIC_DEC_AND_FETCH(pThis->iRefCount);
-#	else
-		currRefCount = --pThis->iRefCount;
-# 	endif
+	MsgLock(pThis);
+	currRefCount = --pThis->iRefCount;
 	if(currRefCount == 0)
 	{
 		/* DEV Debugging Only! dbgprintf("msgDestruct\t0x%lx, RefCount now 0, doing DESTROY\n", (unsigned long)pThis); */
@@ -333,8 +333,10 @@ CODESTARTobjDestruct(msg)
 			rsCStrDestruct(&pThis->pCSPROCID);
 		if(pThis->pCSMSGID != NULL)
 			rsCStrDestruct(&pThis->pCSMSGID);
+		MsgUnlock(pThis);
 		funcDeleteMutex(pThis);
 	} else {
+		MsgUnlock(pThis);
 		pThis = NULL; /* tell framework not to destructing the object! */
 	}
 ENDobjDestruct(msg)
@@ -478,13 +480,9 @@ finalize_it:
 msg_t *MsgAddRef(msg_t *pM)
 {
 	assert(pM != NULL);
-#	ifdef DO_HAVE_ATOMICS
-		ATOMIC_INC(pM->iRefCount);
-#	else
-		MsgLock(pM);
-		pM->iRefCount++;
-		MsgUnlock(pM);
-#	endif
+	MsgLock(pM);
+	pM->iRefCount++;
+	MsgUnlock(pM);
 	/* DEV debugging only! dbgprintf("MsgAddRef\t0x%x done, Ref now: %d\n", (int)pM, pM->iRefCount);*/
 	return(pM);
 }
