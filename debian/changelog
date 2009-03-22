@@ -9,6 +9,7 @@ rsyslog (3.20.4-3) UNRELEASED; urgency=low
     - Add --enable-relp to configure flags.
   * debian/rsyslog-relp.install
     - Install relp input and output plugin.
+  * Bump Standards-Version to 3.8.1. No further changes.
 
  -- Michael Biebl <biebl@debian.org>  Sun, 22 Mar 2009 14:16:37 +0100
 
