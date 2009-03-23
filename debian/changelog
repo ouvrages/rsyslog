@@ -1,4 +1,4 @@
-rsyslog (3.20.4-3) UNRELEASED; urgency=low
+rsyslog (3.20.4-3) unstable; urgency=low
 
   * Enable RELP (reliable event logging protocol) support.
   * debian/control
@@ -11,7 +11,7 @@ rsyslog (3.20.4-3) UNRELEASED; urgency=low
     - Install relp input and output plugin.
   * Bump Standards-Version to 3.8.1. No further changes.
 
- -- Michael Biebl <biebl@debian.org>  Sun, 22 Mar 2009 14:16:37 +0100
+ -- Michael Biebl <biebl@debian.org>  Mon, 23 Mar 2009 09:19:44 +0100
 
 rsyslog (3.20.4-2) unstable; urgency=low
 
