@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[3.20.4],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[3.20.5],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([ChangeLog])
 AC_CONFIG_HEADERS([config.h])
@@ -18,6 +18,8 @@ fi
 AC_DISABLE_STATIC
 AC_PROG_LIBTOOL
 AC_CANONICAL_HOST
+
+PKG_PROG_PKG_CONFIG
 
 case "${host}" in
   *-*-linux*)
