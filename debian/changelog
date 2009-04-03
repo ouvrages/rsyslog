@@ -1,3 +1,9 @@
+rsyslog (3.20.5-1) UNRELEASED; urgency=low
+
+  * New upstream release.
+
+ -- Michael Biebl <biebl@debian.org>  Fri, 03 Apr 2009 16:52:56 +0200
+
 rsyslog (3.20.4-3) unstable; urgency=low
 
   * Enable RELP (reliable event logging protocol) support.
