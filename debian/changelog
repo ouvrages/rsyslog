@@ -1,6 +1,9 @@
 rsyslog (3.20.5-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * debian/rsyslog.logcheck.ignore.server
+    - Install a logcheck ignore file for rsyslog (using dh_installlogcheck).
+      Thanks to Kim Holviala for the patch. Closes: #522164
 
  -- Michael Biebl <biebl@debian.org>  Fri, 03 Apr 2009 16:52:56 +0200
 

@@ -109,6 +109,7 @@ binary-arch: build install
 	dh_installchangelogs
 	dh_installdocs
 	dh_installexamples
+	dh_installlogcheck
 	dh_install
 	dh_installlogrotate
 	dh_installinit -R -- start 10 2 3 4 5 . start 30 0 6 . stop 90 1 .
