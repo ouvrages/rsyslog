@@ -31,26 +31,26 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-check_PROGRAMS = rt_init$(EXEEXT) rscript_parse$(EXEEXT)
+check_PROGRAMS = rt_init$(EXEEXT) rscript$(EXEEXT)
 subdir = tests
 DIST_COMMON = README $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/atomic_operations.m4 \
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
-am__objects_1 = rscript_parse-runtime-dummy.$(OBJEXT)
-am_rscript_parse_OBJECTS = rscript_parse-rscript-parse.$(OBJEXT) \
-	$(am__objects_1)
-rscript_parse_OBJECTS = $(am_rscript_parse_OBJECTS)
+am__objects_1 = rscript-runtime-dummy.$(OBJEXT)
+am_rscript_OBJECTS = rscript-rscript.$(OBJEXT) $(am__objects_1)
+rscript_OBJECTS = $(am_rscript_OBJECTS)
 am__DEPENDENCIES_1 =
-rscript_parse_DEPENDENCIES = $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
-rscript_parse_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
-	$(rscript_parse_LDFLAGS) $(LDFLAGS) -o $@
+rscript_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
+rscript_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
+	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(rscript_LDFLAGS) \
+	$(LDFLAGS) -o $@
 am__objects_2 = rt_init-runtime-dummy.$(OBJEXT)
 am_rt_init_OBJECTS = rt_init-rt-init.$(OBJEXT) $(am__objects_2)
 rt_init_OBJECTS = $(am_rt_init_OBJECTS)
@@ -71,8 +71,8 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-SOURCES = $(rscript_parse_SOURCES) $(rt_init_SOURCES)
-DIST_SOURCES = $(rscript_parse_SOURCES) $(rt_init_SOURCES)
+SOURCES = $(rscript_SOURCES) $(rt_init_SOURCES)
+DIST_SOURCES = $(rscript_SOURCES) $(rt_init_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -95,6 +95,7 @@ CXXFLAGS = @CXXFLAGS@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
+DL_LIBS = @DL_LIBS@
 DSYMUTIL = @DSYMUTIL@
 ECHO = @ECHO@
 ECHO_C = @ECHO_C@
@@ -104,8 +105,10 @@ EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 F77 = @F77@
 FFLAGS = @FFLAGS@
+GNUTLS_CFLAGS = @GNUTLS_CFLAGS@
+GNUTLS_LIBS = @GNUTLS_LIBS@
 GREP = @GREP@
-HAVE_GNUTLS_CONFIG = @HAVE_GNUTLS_CONFIG@
+GSS_LIBS = @GSS_LIBS@
 HAVE_MYSQL_CONFIG = @HAVE_MYSQL_CONFIG@
 HAVE_PGSQL_CONFIG = @HAVE_PGSQL_CONFIG@
 INSTALL = @INSTALL@
@@ -114,6 +117,8 @@ INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LDFLAGS = @LDFLAGS@
+LIBDBI_CFLAGS = @LIBDBI_CFLAGS@
+LIBDBI_LIBS = @LIBDBI_LIBS@
 LIBLOGGING_CFLAGS = @LIBLOGGING_CFLAGS@
 LIBLOGGING_LIBS = @LIBLOGGING_LIBS@
 LIBOBJS = @LIBOBJS@
@@ -123,6 +128,8 @@ LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
+MYSQL_CFLAGS = @MYSQL_CFLAGS@
+MYSQL_LIBS = @MYSQL_LIBS@
 NMEDIT = @NMEDIT@
 OBJEXT = @OBJEXT@
 PACKAGE = @PACKAGE@
@@ -132,15 +139,25 @@ PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
+PGSQL_CFLAGS = @PGSQL_CFLAGS@
+PGSQL_LIBS = @PGSQL_LIBS@
 PKG_CONFIG = @PKG_CONFIG@
+PTHREADS_CFLAGS = @PTHREADS_CFLAGS@
+PTHREADS_LIBS = @PTHREADS_LIBS@
 RANLIB = @RANLIB@
 RELP_CFLAGS = @RELP_CFLAGS@
 RELP_LIBS = @RELP_LIBS@
+RSRT_CFLAGS = @RSRT_CFLAGS@
+RSRT_LIBS = @RSRT_LIBS@
+RT_LIBS = @RT_LIBS@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
+SNMP_CFLAGS = @SNMP_CFLAGS@
+SNMP_LIBS = @SNMP_LIBS@
 STRIP = @STRIP@
 VERSION = @VERSION@
+ZLIB_LIBS = @ZLIB_LIBS@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
@@ -162,13 +179,9 @@ build_vendor = @build_vendor@
 builddir = @builddir@
 datadir = @datadir@
 datarootdir = @datarootdir@
-dl_libs = @dl_libs@
 docdir = @docdir@
 dvidir = @dvidir@
 exec_prefix = @exec_prefix@
-gnutls_cflags = @gnutls_cflags@
-gnutls_libs = @gnutls_libs@
-gss_libs = @gss_libs@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@
@@ -178,49 +191,52 @@ htmldir = @htmldir@
 includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@
-libdbi_cflags = @libdbi_cflags@
-libdbi_libs = @libdbi_libs@
 libdir = @libdir@
 libexecdir = @libexecdir@
 localedir = @localedir@
 localstatedir = @localstatedir@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
-mysql_cflags = @mysql_cflags@
-mysql_libs = @mysql_libs@
+moddirs = @moddirs@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
-pgsql_cflags = @pgsql_cflags@
-pgsql_libs = @pgsql_libs@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
-pthreads_cflags = @pthreads_cflags@
-pthreads_libs = @pthreads_libs@
-rsrt_cflags = @rsrt_cflags@
-rsrt_libs = @rsrt_libs@
-rt_libs = @rt_libs@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
-snmp_cflags = @snmp_cflags@
-snmp_libs = @snmp_libs@
 srcdir = @srcdir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-zlib_libs = @zlib_libs@
-TESTS = $(check_PROGRAMS)
+TESTS = $(check_PROGRAMS) cfg.sh
+TESTS_ENVIRONMENT = RSYSLOG_MODDIR='$(abs_top_builddir)'/runtime/.libs/
+#TESTS = $(check_PROGRAMS)
 test_files = testbench.h runtime-dummy.c
+EXTRA_DIST = 1.rstest 2.rstest err1.rstest \
+	   cfg.sh \
+	   cfg1.cfgtest \
+	   cfg1.testin \
+      	   cfg2.cfgtest \
+	   cfg2.testin \
+	   cfg3.cfgtest \
+	   cfg3.testin \
+	   cfg4.cfgtest \
+	   cfg4.testin \
+	   DevNull.cfgtest \
+	   err1.rstest \
+	   NoExistFile.cfgtest
+
 rt_init_SOURCES = rt-init.c $(test_files)
-rt_init_CPPFLAGS = -I$(top_srcdir) $(pthreads_cflags) $(rsrt_cflags) 
-rt_init_LDADD = $(rsrt_libs) $(zlib_libs) $(pthreads_libs)
+rt_init_CPPFLAGS = -I$(top_srcdir) $(PTHREADS_CFLAGS) $(RSRT_CFLAGS)
+rt_init_LDADD = $(RSRT_LIBS) $(ZLIB_LIBS) $(PTHREADS_LIBS)
 rt_init_LDFLAGS = -export-dynamic
-rscript_parse_SOURCES = rscript-parse.c $(test_files)
-rscript_parse_CPPFLAGS = -I$(top_srcdir) $(pthreads_cflags) $(rsrt_cflags) 
-rscript_parse_LDADD = $(rsrt_libs) $(zlib_libs) $(pthreads_libs)
-rscript_parse_LDFLAGS = -export-dynamic
+rscript_SOURCES = rscript.c $(test_files)
+rscript_CPPFLAGS = -I$(top_srcdir) $(PTHREADS_CFLAGS) $(RSRT_CFLAGS)
+rscript_LDADD = $(RSRT_LIBS) $(ZLIB_LIBS) $(PTHREADS_LIBS)
+rscript_LDFLAGS = -export-dynamic
 all: all-am
 
 .SUFFIXES:
@@ -261,9 +277,9 @@ clean-checkPROGRAMS:
 	  echo " rm -f $$p $$f"; \
 	  rm -f $$p $$f ; \
 	done
-rscript_parse$(EXEEXT): $(rscript_parse_OBJECTS) $(rscript_parse_DEPENDENCIES) 
-	@rm -f rscript_parse$(EXEEXT)
-	$(rscript_parse_LINK) $(rscript_parse_OBJECTS) $(rscript_parse_LDADD) $(LIBS)
+rscript$(EXEEXT): $(rscript_OBJECTS) $(rscript_DEPENDENCIES) 
+	@rm -f rscript$(EXEEXT)
+	$(rscript_LINK) $(rscript_OBJECTS) $(rscript_LDADD) $(LIBS)
 rt_init$(EXEEXT): $(rt_init_OBJECTS) $(rt_init_DEPENDENCIES) 
 	@rm -f rt_init$(EXEEXT)
 	$(rt_init_LINK) $(rt_init_OBJECTS) $(rt_init_LDADD) $(LIBS)
@@ -274,8 +290,8 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rscript_parse-rscript-parse.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rscript_parse-runtime-dummy.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rscript-rscript.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rscript-runtime-dummy.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rt_init-rt-init.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rt_init-runtime-dummy.Po@am__quote@
 
@@ -300,33 +316,33 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LTCOMPILE) -c -o $@ $<
 
-rscript_parse-rscript-parse.o: rscript-parse.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscript_parse_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rscript_parse-rscript-parse.o -MD -MP -MF $(DEPDIR)/rscript_parse-rscript-parse.Tpo -c -o rscript_parse-rscript-parse.o `test -f 'rscript-parse.c' || echo '$(srcdir)/'`rscript-parse.c
-@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/rscript_parse-rscript-parse.Tpo $(DEPDIR)/rscript_parse-rscript-parse.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='rscript-parse.c' object='rscript_parse-rscript-parse.o' libtool=no @AMDEPBACKSLASH@
+rscript-rscript.o: rscript.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscript_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rscript-rscript.o -MD -MP -MF $(DEPDIR)/rscript-rscript.Tpo -c -o rscript-rscript.o `test -f 'rscript.c' || echo '$(srcdir)/'`rscript.c
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/rscript-rscript.Tpo $(DEPDIR)/rscript-rscript.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='rscript.c' object='rscript-rscript.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscript_parse_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rscript_parse-rscript-parse.o `test -f 'rscript-parse.c' || echo '$(srcdir)/'`rscript-parse.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscript_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rscript-rscript.o `test -f 'rscript.c' || echo '$(srcdir)/'`rscript.c
 
-rscript_parse-rscript-parse.obj: rscript-parse.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscript_parse_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rscript_parse-rscript-parse.obj -MD -MP -MF $(DEPDIR)/rscript_parse-rscript-parse.Tpo -c -o rscript_parse-rscript-parse.obj `if test -f 'rscript-parse.c'; then $(CYGPATH_W) 'rscript-parse.c'; else $(CYGPATH_W) '$(srcdir)/rscript-parse.c'; fi`
-@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/rscript_parse-rscript-parse.Tpo $(DEPDIR)/rscript_parse-rscript-parse.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='rscript-parse.c' object='rscript_parse-rscript-parse.obj' libtool=no @AMDEPBACKSLASH@
+rscript-rscript.obj: rscript.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscript_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rscript-rscript.obj -MD -MP -MF $(DEPDIR)/rscript-rscript.Tpo -c -o rscript-rscript.obj `if test -f 'rscript.c'; then $(CYGPATH_W) 'rscript.c'; else $(CYGPATH_W) '$(srcdir)/rscript.c'; fi`
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/rscript-rscript.Tpo $(DEPDIR)/rscript-rscript.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='rscript.c' object='rscript-rscript.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscript_parse_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rscript_parse-rscript-parse.obj `if test -f 'rscript-parse.c'; then $(CYGPATH_W) 'rscript-parse.c'; else $(CYGPATH_W) '$(srcdir)/rscript-parse.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscript_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rscript-rscript.obj `if test -f 'rscript.c'; then $(CYGPATH_W) 'rscript.c'; else $(CYGPATH_W) '$(srcdir)/rscript.c'; fi`
 
-rscript_parse-runtime-dummy.o: runtime-dummy.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscript_parse_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rscript_parse-runtime-dummy.o -MD -MP -MF $(DEPDIR)/rscript_parse-runtime-dummy.Tpo -c -o rscript_parse-runtime-dummy.o `test -f 'runtime-dummy.c' || echo '$(srcdir)/'`runtime-dummy.c
-@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/rscript_parse-runtime-dummy.Tpo $(DEPDIR)/rscript_parse-runtime-dummy.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='runtime-dummy.c' object='rscript_parse-runtime-dummy.o' libtool=no @AMDEPBACKSLASH@
+rscript-runtime-dummy.o: runtime-dummy.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscript_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rscript-runtime-dummy.o -MD -MP -MF $(DEPDIR)/rscript-runtime-dummy.Tpo -c -o rscript-runtime-dummy.o `test -f 'runtime-dummy.c' || echo '$(srcdir)/'`runtime-dummy.c
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/rscript-runtime-dummy.Tpo $(DEPDIR)/rscript-runtime-dummy.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='runtime-dummy.c' object='rscript-runtime-dummy.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscript_parse_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rscript_parse-runtime-dummy.o `test -f 'runtime-dummy.c' || echo '$(srcdir)/'`runtime-dummy.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscript_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rscript-runtime-dummy.o `test -f 'runtime-dummy.c' || echo '$(srcdir)/'`runtime-dummy.c
 
-rscript_parse-runtime-dummy.obj: runtime-dummy.c
-@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscript_parse_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rscript_parse-runtime-dummy.obj -MD -MP -MF $(DEPDIR)/rscript_parse-runtime-dummy.Tpo -c -o rscript_parse-runtime-dummy.obj `if test -f 'runtime-dummy.c'; then $(CYGPATH_W) 'runtime-dummy.c'; else $(CYGPATH_W) '$(srcdir)/runtime-dummy.c'; fi`
-@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/rscript_parse-runtime-dummy.Tpo $(DEPDIR)/rscript_parse-runtime-dummy.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='runtime-dummy.c' object='rscript_parse-runtime-dummy.obj' libtool=no @AMDEPBACKSLASH@
+rscript-runtime-dummy.obj: runtime-dummy.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscript_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rscript-runtime-dummy.obj -MD -MP -MF $(DEPDIR)/rscript-runtime-dummy.Tpo -c -o rscript-runtime-dummy.obj `if test -f 'runtime-dummy.c'; then $(CYGPATH_W) 'runtime-dummy.c'; else $(CYGPATH_W) '$(srcdir)/runtime-dummy.c'; fi`
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/rscript-runtime-dummy.Tpo $(DEPDIR)/rscript-runtime-dummy.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='runtime-dummy.c' object='rscript-runtime-dummy.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscript_parse_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rscript_parse-runtime-dummy.obj `if test -f 'runtime-dummy.c'; then $(CYGPATH_W) 'runtime-dummy.c'; else $(CYGPATH_W) '$(srcdir)/runtime-dummy.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscript_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rscript-runtime-dummy.obj `if test -f 'runtime-dummy.c'; then $(CYGPATH_W) 'runtime-dummy.c'; else $(CYGPATH_W) '$(srcdir)/runtime-dummy.c'; fi`
 
 rt_init-rt-init.o: rt-init.c
 @am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rt_init_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rt_init-rt-init.o -MD -MP -MF $(DEPDIR)/rt_init-rt-init.Tpo -c -o rt_init-rt-init.o `test -f 'rt-init.c' || echo '$(srcdir)/'`rt-init.c

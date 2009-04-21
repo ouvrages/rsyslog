@@ -51,6 +51,7 @@ DEFobjCurrIf(errmsg)
 DEFobjCurrIf(glbl)
 DEFobjCurrIf(net)
 
+static int iMaxLine;			/* maximum UDP message size supported */
 static time_t ttLastDiscard = 0;	/* timestamp when a message from a non-permitted sender was last discarded
 					 * This shall prevent remote DoS when the "discard on disallowed sender"
 					 * message is configured to be logged on occurance of such a case.
@@ -184,7 +185,7 @@ CODESTARTrunInput
 		       for (i = 0; nfds && i < *udpLstnSocks; i++) {
 			       if (FD_ISSET(udpLstnSocks[i+1], &readfds)) {
 				       socklen = sizeof(frominet);
-				       l = recvfrom(udpLstnSocks[i+1], (char*) pRcvBuf, MAXLINE - 1, 0,
+				       l = recvfrom(udpLstnSocks[i+1], (char*) pRcvBuf, iMaxLine, 0,
 						    (struct sockaddr *)&frominet, &socklen);
 				       if (l > 0) {
 					       if(net.cvthname(&frominet, fromHost, fromHostFQDN, fromHostIP) == RS_RET_OK) {
@@ -199,7 +200,7 @@ CODESTARTrunInput
 						       if(net.isAllowedSender((uchar*) "UDP",
 							  (struct sockaddr *)&frominet, (char*)fromHostFQDN)) {
 							       parseAndSubmitMessage(fromHost, fromHostIP, pRcvBuf, l,
-							       MSG_PARSE_HOSTNAME, NOFLAG, eFLOWCTL_NO_DELAY);
+							       MSG_PARSE_HOSTNAME, NOFLAG, eFLOWCTL_NO_DELAY, (uchar*)"imudp");
 						       } else {
 							       dbgprintf("%s is not an allowed sender\n", (char*)fromHostFQDN);
 							       if(glbl.GetOption_DisallowWarning) {
@@ -242,7 +243,9 @@ CODESTARTwillRun
 	if(udpLstnSocks == NULL)
 		ABORT_FINALIZE(RS_RET_NO_RUN);
 
-	if((pRcvBuf = malloc(MAXLINE * sizeof(char))) == NULL) {
+	iMaxLine = glbl.GetMaxLine();
+
+	if((pRcvBuf = malloc((iMaxLine + 1) * sizeof(char))) == NULL) {
 		ABORT_FINALIZE(RS_RET_OUT_OF_MEMORY);
 	}
 finalize_it:
