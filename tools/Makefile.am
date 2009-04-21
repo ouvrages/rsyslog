@@ -21,9 +21,13 @@ rsyslogd_SOURCES = \
 	pidfile.h \
 	\
 	../dirty.h
-
-rsyslogd_CPPFLAGS =  $(pthreads_cflags) $(rsrt_cflags)
-rsyslogd_LDADD = $(zlib_libs) $(pthreads_libs) $(rsrt_libs)
+rsyslogd_CPPFLAGS =  $(PTHREADS_CFLAGS) $(RSRT_CFLAGS)
+rsyslogd_LDADD = $(ZLIB_LIBS) $(PTHREADS_LIBS) $(RSRT_LIBS)
 rsyslogd_LDFLAGS = -export-dynamic
+
+if ENABLE_DIAGTOOLS
+sbin_PROGRAMS += rsyslog_diag_hostname
+rsyslog_diag_hostname_SOURCES = gethostn.c
+endif
 
 EXTRA_DIST = $(man_MANS)

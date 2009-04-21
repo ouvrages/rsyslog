@@ -42,6 +42,7 @@
 #include "msg.h"
 #include "var.h"
 #include "datetime.h"
+#include "glbl.h"
 #include "regexp.h"
 #include "atomic.h"
 
@@ -49,6 +50,7 @@
 DEFobjStaticHelpers
 DEFobjCurrIf(var)
 DEFobjCurrIf(datetime)
+DEFobjCurrIf(glbl)
 DEFobjCurrIf(regexp)
 
 static syslogCODE rs_prioritynames[] =
@@ -258,7 +260,16 @@ rsRetVal msgConstruct(msg_t **ppThis)
 	pM->iRefCount = 1;
 	pM->iSeverity = -1;
 	pM->iFacility = -1;
+
+	/* we initialize both timestamps to contain the current time, so that they
+	 * are consistent. Also, this saves us from doing any further time calls just
+	 * to obtain a timestamp. The memcpy() should not really make a difference,
+	 * especially as I think there is no codepath currently where it would not be
+	 * required (after I have cleaned up the pathes ;)). -- rgerhards, 2008-10-02
+	 */
 	datetime.getCurrTime(&(pM->tRcvdAt));
+	memcpy(&pM->tTIMESTAMP, &pM->tRcvdAt, sizeof(struct syslogTime));
+	
 	objConstructSetObjInfo(pM);
 
 	/* DEV debugging only! dbgprintf("msgConstruct\t0x%x, ref 1\n", (int)pM);*/
@@ -273,9 +284,13 @@ finalize_it:
 BEGINobjDestruct(msg) /* be sure to specify the object type also in END and CODESTART macros! */
 	int currRefCount;
 CODESTARTobjDestruct(msg)
-	/* DEV Debugging only ! dbgprintf("msgDestruct\t0x%lx, Ref now: %d\n", (unsigned long)pM, pM->iRefCount - 1); */
-	MsgLock(pThis);
-	currRefCount = --pThis->iRefCount;
+	/* DEV Debugging only ! dbgprintf("msgDestruct\t0x%lx, Ref now: %d\n", (unsigned long)pThis, pThis->iRefCount - 1); */
+#	ifdef HAVE_ATOMIC_BUILTINS
+		currRefCount = ATOMIC_DEC_AND_FETCH(pThis->iRefCount);
+#	else
+		MsgLock(pThis);
+		currRefCount = --pThis->iRefCount;
+# 	endif
 	if(currRefCount == 0)
 	{
 		/* DEV Debugging Only! dbgprintf("msgDestruct\t0x%lx, RefCount now 0, doing DESTROY\n", (unsigned long)pThis); */
@@ -287,6 +302,8 @@ CODESTARTobjDestruct(msg)
 			free(pThis->pszTAG);
 		if(pThis->pszHOSTNAME != NULL)
 			free(pThis->pszHOSTNAME);
+		if(pThis->pszInputName != NULL)
+			free(pThis->pszInputName);
 		if(pThis->pszRcvFrom != NULL)
 			free(pThis->pszRcvFrom);
 		if(pThis->pszRcvFromIP != NULL)
@@ -333,7 +350,9 @@ CODESTARTobjDestruct(msg)
 			rsCStrDestruct(&pThis->pCSPROCID);
 		if(pThis->pCSMSGID != NULL)
 			rsCStrDestruct(&pThis->pCSMSGID);
+#	ifndef HAVE_ATOMIC_BUILTINS
 		MsgUnlock(pThis);
+# 	endif
 		funcDeleteMutex(pThis);
 	} else {
 		MsgUnlock(pThis);
@@ -455,6 +474,7 @@ static rsRetVal MsgSerialize(msg_t *pThis, strm_t *pStrm)
 	objSerializePTR(pStrm, pszUxTradMsg, PSZ);
 	objSerializePTR(pStrm, pszTAG, PSZ);
 	objSerializePTR(pStrm, pszHOSTNAME, PSZ);
+	objSerializePTR(pStrm, pszInputName, PSZ);
 	objSerializePTR(pStrm, pszRcvFrom, PSZ);
 	objSerializePTR(pStrm, pszRcvFromIP, PSZ);
 
@@ -480,9 +500,13 @@ finalize_it:
 msg_t *MsgAddRef(msg_t *pM)
 {
 	assert(pM != NULL);
-	MsgLock(pM);
-	pM->iRefCount++;
-	MsgUnlock(pM);
+#	ifdef HAVE_ATOMIC_BUILTINS
+		ATOMIC_INC(pM->iRefCount);
+#	else
+		MsgLock(pM);
+		pM->iRefCount++;
+		MsgUnlock(pM);
+#	endif
 	/* DEV debugging only! dbgprintf("MsgAddRef\t0x%x done, Ref now: %d\n", (int)pM, pM->iRefCount);*/
 	return(pM);
 }
@@ -1217,6 +1241,18 @@ char *getHOSTNAME(msg_t *pM)
 }
 
 
+uchar *getInputName(msg_t *pM)
+{
+	if(pM == NULL)
+		return (uchar*) "";
+	else
+		if(pM->pszInputName == NULL)
+			return (uchar*) "";
+		else
+			return pM->pszInputName;
+}
+
+
 char *getRcvFrom(msg_t *pM)
 {
 	if(pM == NULL)
@@ -1397,6 +1433,19 @@ static int getAPPNAMELen(msg_t *pM)
 	return (pM->pCSAPPNAME == NULL) ? 0 : rsCStrLen(pM->pCSAPPNAME);
 }
 
+/* rgerhards 2008-09-10: set pszInputName in msg object
+ */
+void MsgSetInputName(msg_t *pMsg, char* pszInputName)
+{
+	assert(pMsg != NULL);
+	if(pMsg->pszInputName != NULL)
+		free(pMsg->pszInputName);
+
+	pMsg->iLenInputName = strlen(pszInputName);
+	if((pMsg->pszInputName = malloc(pMsg->iLenInputName + 1)) != NULL) {
+		memcpy(pMsg->pszInputName, pszInputName, pMsg->iLenInputName + 1);
+	}
+}
 
 /* rgerhards 2004-11-16: set pszRcvFrom in msg object
  */
@@ -1440,6 +1489,8 @@ void MsgAssignHOSTNAME(msg_t *pMsg, char *pBuf)
 {
 	assert(pMsg != NULL);
 	assert(pBuf != NULL);
+	if(pMsg->pszHOSTNAME != NULL)
+		free(pMsg->pszHOSTNAME);
 	pMsg->iLenHOSTNAME = strlen(pBuf);
 	pMsg->pszHOSTNAME = (uchar*) pBuf;
 }
@@ -1683,6 +1734,8 @@ char *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 		pRes = getRawMsg(pMsg);
 	} else if(!strcmp((char*) pName, "uxtradmsg")) {
 		pRes = getUxTradMsg(pMsg);
+	} else if(!strcmp((char*) pName, "inputname")) {
+		pRes = (char*) getInputName(pMsg);
 	} else if(!strcmp((char*) pName, "fromhost")) {
 		pRes = getRcvFrom(pMsg);
 	} else if(!strcmp((char*) pName, "fromhost-ip")) {
@@ -1770,6 +1823,8 @@ char *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			return "***OUT OF MEMORY***";
 		} else
 			*pbMustBeFreed = 1;	/* all of these functions allocate dyn. memory */
+	} else if(!strcmp((char*) pName, "$myhostname")) {
+		pRes = (char*) glbl.GetLocalHostName();
 	} else {
 		/* there is no point in continuing, we may even otherwise render the
 		 * error message unreadable. rgerhards, 2007-07-10
@@ -1807,6 +1862,11 @@ char *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 				++pFld; /* skip to field terminator */
 			if(*pFld == pTpe->data.field.field_delim) {
 				++pFld; /* eat it */
+				if (pTpe->data.field.field_expand != 0) {
+					while (*pFld == pTpe->data.field.field_delim) {
+						++pFld;
+					}
+				}
 				++iCurrFld;
 			}
 		}
@@ -2369,6 +2429,8 @@ rsRetVal MsgSetProperty(msg_t *pThis, var_t *pProp)
 		MsgSetUxTradMsg(pThis, (char*) rsCStrGetSzStrNoNULL(pProp->val.pStr));
 	} else if(isProp("pszTAG")) {
 		MsgSetTAG(pThis, (char*) rsCStrGetSzStrNoNULL(pProp->val.pStr));
+	} else if(isProp("pszInputName")) {
+		MsgSetInputName(pThis, (char*) rsCStrGetSzStrNoNULL(pProp->val.pStr));
 	} else if(isProp("pszRcvFromIP")) {
 		MsgSetRcvFromIP(pThis, rsCStrGetSzStrNoNULL(pProp->val.pStr));
 	} else if(isProp("pszRcvFrom")) {
@@ -2431,6 +2493,7 @@ BEGINObjClassInit(msg, 1, OBJ_IS_CORE_MODULE)
 	/* request objects we use */
 	CHKiRet(objUse(var, CORE_COMPONENT));
 	CHKiRet(objUse(datetime, CORE_COMPONENT));
+	CHKiRet(objUse(glbl, CORE_COMPONENT));
 
 	/* set our own handlers */
 	OBJSetMethodHandler(objMethod_SERIALIZE, MsgSerialize);

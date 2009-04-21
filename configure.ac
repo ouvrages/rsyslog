@@ -2,9 +2,10 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[3.20.5],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[3.22.0],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([ChangeLog])
+AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS([config.h])
 
 AC_GNU_SOURCE
@@ -42,14 +43,14 @@ AC_DEFINE_UNQUOTED([HOSTENV], "$host", [the host environment, can be queried via
 save_LIBS=$LIBS
 LIBS=
 AC_SEARCH_LIBS(clock_gettime, rt)
-rt_libs=$LIBS
+RT_LIBS=$LIBS
 LIBS=
 AC_SEARCH_LIBS(dlopen, dl)
-dl_libs=$LIBS
+DL_LIBS=$LIBS
 LIBS=$save_LIBS
 
-AC_SUBST(rt_libs)
-AC_SUBST(dl_libs)
+AC_SUBST(RT_LIBS)
+AC_SUBST(DL_LIBS)
 
 # Checks for header files.
 AC_HEADER_RESOLV
@@ -109,6 +110,33 @@ AC_TRY_COMPILE([
 	AC_MSG_RESULT(no; defined as 64)
 )
 
+# check for availability of atomic operations
+RS_ATOMIC_OPERATIONS
+
+
+# Additional module directories
+AC_ARG_WITH(moddirs,
+        [AS_HELP_STRING([--with-moddirs=DIRS],[Additional module search paths appended to @<:@$libdir/rsyslog@:>@])],
+        [_save_IFS=$IFS ; IFS=$PATH_SEPARATOR ; moddirs=""
+         for w in ${with_moddirs} ;
+         do
+                 case $w in
+                 "") continue ;; */) ;; *)  w="${w}/" ;;
+                 esac
+                 for m in ${moddirs} ;
+                 do
+                         test "x$w" = "x${libdir}/${PACKAGE}/"   || \
+                         test "x$w" = "x$m" || test "x$w" = "x/" && \
+                         continue 2
+                 done
+                 case $moddirs in
+                 "") moddirs="$w" ;; *) moddirs="${moddirs}:${w}" ;;
+                 esac
+         done ; IFS=$_save_IFS],[moddirs=""]
+)
+AM_CONDITIONAL(WITH_MODDIRS, test x$moddirs != x)
+AC_SUBST(moddirs)
+
 # Large file support
 AC_ARG_ENABLE(largefile,
         [AS_HELP_STRING([--enable-largefile],[Enable large file support @<:@default=yes@:>@])],
@@ -153,8 +181,8 @@ if test "$enable_zlib" = "yes"; then
 	if test "$zlib_header" = "yes"; then
 		AC_CHECK_LIB(z, deflate,
                         [AC_DEFINE(USE_NETZIP, 1, [Define if you want to enable zlib support]) 
-                         zlib_libs="-lz"
-                         AC_SUBST(zlib_libs)], enable_zlib="false")
+                         ZLIB_LIBS="-lz"
+                         AC_SUBST(ZLIB_LIBS)], enable_zlib="false")
 	fi
 fi
 
@@ -173,8 +201,8 @@ if test $want_gssapi_krb5 = yes; then
 		AC_CHECK_HEADER(gssapi/gssapi.h, [
 			AC_DEFINE(USE_GSSAPI,,
 				  Define if you want to use GSSAPI)
-			gss_libs="-lgssapi_krb5"
-			AC_SUBST(gss_libs)
+			GSS_LIBS="-lgssapi_krb5"
+			AC_SUBST(GSS_LIBS)
 		])
 	])
 fi
@@ -204,10 +232,10 @@ if test "x$enable_pthreads" != "xno"; then
         [pthread_create],
         [
           AC_DEFINE([USE_PTHREADS], [1], [Multithreading support enabled.])
-          pthreads_libs="-lpthread"
-          pthreads_cflags="-pthread"
-          AC_SUBST(pthreads_libs)
-          AC_SUBST(pthreads_cflags)
+          PTHREADS_LIBS="-lpthread"
+          PTHREADS_CFLAGS="-pthread"
+          AC_SUBST(PTHREADS_LIBS)
+          AC_SUBST(PTHREADS_CFLAGS)
         ],
         [AC_MSG_FAILURE([pthread is missing])],
         [-lpthread]
@@ -333,6 +361,19 @@ if test "$enable_valgrind" = "yes"; then
 fi
 
 
+# compile diagnostic tools (small helpers usually not needed)
+AC_ARG_ENABLE(diagtools,
+        [AS_HELP_STRING([--enable-diagtools],[Enable diagnostic tools @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_diagtools="yes" ;;
+          no) enable_diagtools="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-diagtools) ;;
+         esac],
+        [enable_diagtools=no]
+)
+AM_CONDITIONAL(ENABLE_DIAGTOOLS, test x$enable_diagtools = xyes)
+
+
 
 # MySQL support
 AC_ARG_ENABLE(mysql,
@@ -345,10 +386,6 @@ AC_ARG_ENABLE(mysql,
         [enable_mysql=no]
 )
 if test "x$enable_mysql" = "xyes"; then
-  AC_CHECK_HEADERS(
-    [mysql/mysql.h],,
-    [AC_MSG_FAILURE([MySQL is missing])]
-  )
   AC_CHECK_PROG(
     [HAVE_MYSQL_CONFIG],
     [mysql_config],
@@ -360,16 +397,16 @@ if test "x$enable_mysql" = "xyes"; then
   AC_CHECK_LIB(
     [mysqlclient],
     [mysql_init],
-    [mysql_cflags=`mysql_config --cflags`
-     mysql_libs=`mysql_config --libs`
+    [MYSQL_CFLAGS=`mysql_config --cflags`
+     MYSQL_LIBS=`mysql_config --libs`
     ],
     [AC_MSG_FAILURE([MySQL library is missing])],
     [`mysql_config --libs`]
   )
 fi
 AM_CONDITIONAL(ENABLE_MYSQL, test x$enable_mysql = xyes)
-AC_SUBST(mysql_cflags)
-AC_SUBST(mysql_libs)
+AC_SUBST(MYSQL_CFLAGS)
+AC_SUBST(MYSQL_LIBS)
 
 
 # PostgreSQL support
@@ -394,16 +431,16 @@ if test "x$enable_pgsql" = "xyes"; then
   AC_CHECK_LIB(
     [pq],
     [PQconnectdb],
-    [pgsql_cflags="-I`pg_config --includedir`"
-     pgsql_libs="-L`pg_config --libdir` -lpq"
+    [PGSQL_CFLAGS="-I`pg_config --includedir`"
+     PGSQL_LIBS="-L`pg_config --libdir` -lpq"
     ],
     [AC_MSG_FAILURE([PgSQL library is missing])],
     [-L`pg_config --libdir`]
   )
 fi
 AM_CONDITIONAL(ENABLE_PGSQL, test x$enable_pgsql = xyes)
-AC_SUBST(pgsql_cflags)
-AC_SUBST(pgsql_libs)
+AC_SUBST(PGSQL_CFLAGS)
+AC_SUBST(PGSQL_LIBS)
 
 
 # libdbi support
@@ -424,8 +461,8 @@ if test "x$enable_libdbi" = "xyes"; then
   AC_CHECK_LIB(
     [dbi],
     [dbi_initialize],
-    [libdbi_cflags=""
-     libdbi_libs="-ldbi"
+    [LIBDBI_CFLAGS=""
+     LIBDBI_LIBS="-ldbi"
     ],
     [AC_MSG_FAILURE([libdbi library is missing])]
   )
@@ -436,8 +473,8 @@ if test "x$enable_libdbi" = "xyes"; then
   )
 fi
 AM_CONDITIONAL(ENABLE_OMLIBDBI, test x$enable_libdbi = xyes)
-AC_SUBST(libdbi_cflags)
-AC_SUBST(libdbi_libs)
+AC_SUBST(LIBDBI_CFLAGS)
+AC_SUBST(LIBDBI_LIBS)
 
 
 # SNMP support
@@ -458,18 +495,18 @@ if test "x$enable_snmp" = "xyes"; then
   AC_CHECK_LIB(
     [netsnmp],
     [snmp_timeout],
-    [snmp_cflags=""
-     snmp_libs="-lnetsnmp"
+    [SNMP_CFLAGS=""
+     SNMP_LIBS="-lnetsnmp"
     ],
     [AC_MSG_FAILURE([Net-SNMP library is missing])]
   )
 fi
 AM_CONDITIONAL(ENABLE_SNMP, test x$enable_snmp = xyes)
-AC_SUBST(snmp_cflags)
-AC_SUBST(snmp_libs)
+AC_SUBST(SNMP_CFLAGS)
+AC_SUBST(SNMP_LIBS)
 
 
-# GNUtls support
+# GnuTLS support
 AC_ARG_ENABLE(gnutls,
         [AS_HELP_STRING([--enable-gnutls],[Enable GNU TLS support @<:@default=no@:>@])],
         [case "${enableval}" in
@@ -480,31 +517,11 @@ AC_ARG_ENABLE(gnutls,
         [enable_gnutls=no]
 )
 if test "x$enable_gnutls" = "xyes"; then
-  AC_CHECK_HEADERS(
-    [gnutls/gnutls.h],,
-    [AC_MSG_FAILURE([GNUTls is missing])]
-  )
-  AC_CHECK_PROG(
-    [HAVE_GNUTLS_CONFIG],
-    [libgnutls-config],
-    [yes],,,
-  )
-  if test "x${HAVE_GNUTLS_CONFIG}" != "xyes"; then
-    AC_MSG_FAILURE([libgnutls-config not found in PATH])
-  fi
-  AC_CHECK_LIB(
-    [gnutls],
-    [gnutls_check_version],
-    [gnutls_cflags=`libgnutls-config --cflags`
-     gnutls_libs=`libgnutls-config --libs`
-    ],
-    [AC_MSG_FAILURE([GNU TLS library is missing])],
-    [`libgnutls-config --libs`]
-  )
+	PKG_CHECK_MODULES(GNUTLS, gnutls >= 2.0.0)
 fi
 AM_CONDITIONAL(ENABLE_GNUTLS, test x$enable_gnutls = xyes)
-AC_SUBST(gnutls_cflags)
-AC_SUBST(gnutls_libs)
+AC_SUBST(GNUTLS_CFLAGS)
+AC_SUBST(GNUTLS_LIBS)
 
 
 # support for building the rsyslogd runtime
@@ -518,12 +535,12 @@ AC_ARG_ENABLE(rsyslogrt,
         [enable_rsyslogrt=yes]
 )
 if test "x$enable_rsyslogrt" = "xyes"; then
-  rsrt_cflags="-I\$(top_srcdir)/runtime -I\$(top_srcdir)"
-  rsrt_libs="\$(top_builddir)/runtime/librsyslog.la"
+  RSRT_CFLAGS="-I\$(top_srcdir)/runtime -I\$(top_srcdir)"
+  RSRT_LIBS="\$(top_builddir)/runtime/librsyslog.la"
 fi
 AM_CONDITIONAL(ENABLE_RSYSLOGRT, test x$enable_rsyslogrt = xyes)
-AC_SUBST(rsrt_cflags)
-AC_SUBST(rsrt_libs)
+AC_SUBST(RSRT_CFLAGS)
+AC_SUBST(RSRT_LIBS)
 
 
 # support for NOT building rsyslogd (useful for source-based packaging systems)
@@ -550,6 +567,23 @@ AC_ARG_ENABLE(mail,
         [enable_mail=no]
 )
 AM_CONDITIONAL(ENABLE_MAIL, test x$enable_mail = xyes)
+
+
+# imdiag support (so far we do not need a library, but we need to turn this on and off)
+# note that we enable this be default, because an important point is to make
+# it available to users who do not know much about how to handle things. It
+# would complicate things if we first needed to tell them how to enable imdiag.
+# rgerhards, 2008-07-25
+AC_ARG_ENABLE(imdiag,
+        [AS_HELP_STRING([--enable-imdiag],[Enable imdiag @<:@default=yes@:>@])],
+        [case "${enableval}" in
+         yes) enable_imdiag="yes" ;;
+          no) enable_imdiag="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-imdiag) ;;
+         esac],
+        [enable_imdiag=no]
+)
+AM_CONDITIONAL(ENABLE_IMDIAG, test x$enable_imdiag = xyes)
 
 
 # RELP support
@@ -630,7 +664,6 @@ AM_CONDITIONAL(ENABLE_IMTEMPLATE, test x$enable_imtemplate = xyes)
 AC_CONFIG_FILES([Makefile \
 		runtime/Makefile \
 		tools/Makefile \
-		tests/Makefile \
 		doc/Makefile \
 		plugins/imudp/Makefile \
 		plugins/imtcp/Makefile \
@@ -642,6 +675,7 @@ AC_CONFIG_FILES([Makefile \
 		plugins/imtemplate/Makefile \
 		plugins/imfile/Makefile \
 		plugins/imrelp/Makefile \
+		plugins/imdiag/Makefile \
 		plugins/omtesting/Makefile \
 		plugins/omgssapi/Makefile \
 		plugins/ommysql/Makefile \
@@ -649,7 +683,8 @@ AC_CONFIG_FILES([Makefile \
 		plugins/omrelp/Makefile \
 		plugins/omlibdbi/Makefile \
 		plugins/ommail/Makefile \
-		plugins/omsnmp/Makefile])
+		plugins/omsnmp/Makefile \
+		tests/Makefile])
 AC_OUTPUT
 
 echo "****************************************************"
@@ -665,6 +700,7 @@ echo "PostgreSQL support enabled:               $enable_pgsql"
 echo "SNMP support enabled:                     $enable_snmp"
 echo "Mail support enabled:                     $enable_mail"
 echo "RELP support enabled:                     $enable_relp"
+echo "imdiag enabled:                           $enable_imdiag"
 echo "file input module enabled:                $enable_imfile"
 echo "input template module will be compiled:   $enable_imtemplate"
 echo "Large file support enabled:               $enable_largefile"
@@ -673,6 +709,7 @@ echo "GnuTLS network stream driver enabled:     $enable_gnutls"
 echo "Enable GSSAPI Kerberos 5 support:         $want_gssapi_krb5"
 echo "Debug mode enabled:                       $enable_debug"
 echo "Runtime Instrumentation enabled:          $enable_rtinst"
+echo "Diagnostic tools enabled:                 $enable_diagtools"
 echo "valgrind support settings enabled:        $enable_valgrind"
 echo "rsyslog runtime will be built:            $enable_rsyslogrt"
 echo "rsyslogd will be built:                   $enable_rsyslogd"

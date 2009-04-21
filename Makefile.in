@@ -50,8 +50,9 @@ sbin_PROGRAMS =
 @ENABLE_SNMP_TRUE@am__append_10 = plugins/omsnmp
 @ENABLE_IMTEMPLATE_TRUE@am__append_11 = plugins/imtemplate
 @ENABLE_IMFILE_TRUE@am__append_12 = plugins/imfile
-@ENABLE_MAIL_TRUE@am__append_13 = plugins/ommail
-@ENABLE_RFC3195_TRUE@am__append_14 = plugins/im3195
+@ENABLE_IMDIAG_TRUE@am__append_13 = plugins/imdiag
+@ENABLE_MAIL_TRUE@am__append_14 = plugins/ommail
+@ENABLE_RFC3195_TRUE@am__append_15 = plugins/im3195
 subdir = .
 DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
@@ -59,7 +60,8 @@ DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	ChangeLog INSTALL NEWS compile config.guess config.sub depcomp \
 	install-sh ltmain.sh missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/atomic_operations.m4 \
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
@@ -134,12 +136,13 @@ RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
 ETAGS = etags
 CTAGS = ctags
-DIST_SUBDIRS = doc runtime . tests plugins/immark plugins/imuxsock \
+DIST_SUBDIRS = doc runtime . plugins/immark plugins/imuxsock \
 	plugins/imtcp plugins/imudp plugins/omtesting tools \
 	plugins/imklog plugins/omgssapi plugins/imgssapi \
 	plugins/omrelp plugins/imrelp plugins/ommysql plugins/omlibdbi \
 	plugins/ompgsql plugins/omsnmp plugins/imtemplate \
-	plugins/imfile plugins/ommail plugins/im3195
+	plugins/imfile plugins/imdiag plugins/ommail plugins/im3195 \
+	tests
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)
@@ -170,6 +173,7 @@ CXXFLAGS = @CXXFLAGS@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
+DL_LIBS = @DL_LIBS@
 DSYMUTIL = @DSYMUTIL@
 ECHO = @ECHO@
 ECHO_C = @ECHO_C@
@@ -179,8 +183,10 @@ EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 F77 = @F77@
 FFLAGS = @FFLAGS@
+GNUTLS_CFLAGS = @GNUTLS_CFLAGS@
+GNUTLS_LIBS = @GNUTLS_LIBS@
 GREP = @GREP@
-HAVE_GNUTLS_CONFIG = @HAVE_GNUTLS_CONFIG@
+GSS_LIBS = @GSS_LIBS@
 HAVE_MYSQL_CONFIG = @HAVE_MYSQL_CONFIG@
 HAVE_PGSQL_CONFIG = @HAVE_PGSQL_CONFIG@
 INSTALL = @INSTALL@
@@ -189,6 +195,8 @@ INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LDFLAGS = @LDFLAGS@
+LIBDBI_CFLAGS = @LIBDBI_CFLAGS@
+LIBDBI_LIBS = @LIBDBI_LIBS@
 LIBLOGGING_CFLAGS = @LIBLOGGING_CFLAGS@
 LIBLOGGING_LIBS = @LIBLOGGING_LIBS@
 LIBOBJS = @LIBOBJS@
@@ -198,6 +206,8 @@ LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
+MYSQL_CFLAGS = @MYSQL_CFLAGS@
+MYSQL_LIBS = @MYSQL_LIBS@
 NMEDIT = @NMEDIT@
 OBJEXT = @OBJEXT@
 PACKAGE = @PACKAGE@
@@ -207,15 +217,25 @@ PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
+PGSQL_CFLAGS = @PGSQL_CFLAGS@
+PGSQL_LIBS = @PGSQL_LIBS@
 PKG_CONFIG = @PKG_CONFIG@
+PTHREADS_CFLAGS = @PTHREADS_CFLAGS@
+PTHREADS_LIBS = @PTHREADS_LIBS@
 RANLIB = @RANLIB@
 RELP_CFLAGS = @RELP_CFLAGS@
 RELP_LIBS = @RELP_LIBS@
+RSRT_CFLAGS = @RSRT_CFLAGS@
+RSRT_LIBS = @RSRT_LIBS@
+RT_LIBS = @RT_LIBS@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
+SNMP_CFLAGS = @SNMP_CFLAGS@
+SNMP_LIBS = @SNMP_LIBS@
 STRIP = @STRIP@
 VERSION = @VERSION@
+ZLIB_LIBS = @ZLIB_LIBS@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
@@ -237,13 +257,9 @@ build_vendor = @build_vendor@
 builddir = @builddir@
 datadir = @datadir@
 datarootdir = @datarootdir@
-dl_libs = @dl_libs@
 docdir = @docdir@
 dvidir = @dvidir@
 exec_prefix = @exec_prefix@
-gnutls_cflags = @gnutls_cflags@
-gnutls_libs = @gnutls_libs@
-gss_libs = @gss_libs@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@
@@ -253,39 +269,26 @@ htmldir = @htmldir@
 includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@
-libdbi_cflags = @libdbi_cflags@
-libdbi_libs = @libdbi_libs@
 libdir = @libdir@
 libexecdir = @libexecdir@
 localedir = @localedir@
 localstatedir = @localstatedir@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
-mysql_cflags = @mysql_cflags@
-mysql_libs = @mysql_libs@
+moddirs = @moddirs@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
-pgsql_cflags = @pgsql_cflags@
-pgsql_libs = @pgsql_libs@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
-pthreads_cflags = @pthreads_cflags@
-pthreads_libs = @pthreads_libs@
-rsrt_cflags = @rsrt_cflags@
-rsrt_libs = @rsrt_libs@
-rt_libs = @rt_libs@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
-snmp_cflags = @snmp_cflags@
-snmp_libs = @snmp_libs@
 srcdir = @srcdir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-zlib_libs = @zlib_libs@
 pkglib_LTLIBRARIES = $(am__append_1) $(am__append_2)
 #
 #
@@ -297,7 +300,7 @@ pkglib_LTLIBRARIES = $(am__append_1) $(am__append_2)
 @ENABLE_INET_TRUE@	tcpsrv.c \
 @ENABLE_INET_TRUE@	tcpsrv.h
 
-@ENABLE_INET_TRUE@lmtcpsrv_la_CPPFLAGS = $(pthreads_cflags) $(rsrt_cflags)
+@ENABLE_INET_TRUE@lmtcpsrv_la_CPPFLAGS = $(PTHREADS_CFLAGS) $(RSRT_CFLAGS)
 @ENABLE_INET_TRUE@lmtcpsrv_la_LDFLAGS = -module -avoid-version
 @ENABLE_INET_TRUE@lmtcpsrv_la_LIBADD = 
 
@@ -308,13 +311,13 @@ pkglib_LTLIBRARIES = $(am__append_1) $(am__append_2)
 @ENABLE_INET_TRUE@	tcpclt.c \
 @ENABLE_INET_TRUE@	tcpclt.h
 
-@ENABLE_INET_TRUE@lmtcpclt_la_CPPFLAGS = $(pthreads_cflags) $(rsrt_cflags)
+@ENABLE_INET_TRUE@lmtcpclt_la_CPPFLAGS = $(PTHREADS_CFLAGS) $(RSRT_CFLAGS)
 @ENABLE_INET_TRUE@lmtcpclt_la_LDFLAGS = -module -avoid-version
 @ENABLE_INET_TRUE@lmtcpclt_la_LIBADD = 
 @ENABLE_GSSAPI_TRUE@lmgssutil_la_SOURCES = gss-misc.c gss-misc.h
-@ENABLE_GSSAPI_TRUE@lmgssutil_la_CPPFLAGS = $(pthreads_cflags) $(rsrt_cflags)
+@ENABLE_GSSAPI_TRUE@lmgssutil_la_CPPFLAGS = $(PTHREADS_CFLAGS) $(RSRT_CFLAGS)
 @ENABLE_GSSAPI_TRUE@lmgssutil_la_LDFLAGS = -module -avoid-version
-@ENABLE_GSSAPI_TRUE@lmgssutil_la_LIBADD = $(gss_libs)
+@ENABLE_GSSAPI_TRUE@lmgssutil_la_LIBADD = $(GSS_LIBS)
 EXTRA_DIST = \
 	freebsd/rsyslogd \
 	slackware/rc.rsyslogd \
@@ -325,12 +328,16 @@ EXTRA_DIST = \
 	contrib/gnutls/cert.pem \
 	contrib/gnutls/key.pem
 
-SUBDIRS = doc runtime . tests plugins/immark plugins/imuxsock \
-	plugins/imtcp plugins/imudp plugins/omtesting $(am__append_3) \
+
+# tests are added as last element, because tests may need different
+# modules that need to be generated first
+SUBDIRS = doc runtime . plugins/immark plugins/imuxsock plugins/imtcp \
+	plugins/imudp plugins/omtesting $(am__append_3) \
 	$(am__append_4) $(am__append_5) $(am__append_6) \
 	$(am__append_7) $(am__append_8) $(am__append_9) \
 	$(am__append_10) $(am__append_11) $(am__append_12) \
-	$(am__append_13) $(am__append_14)
+	$(am__append_13) $(am__append_14) $(am__append_15) tests
+ACLOCAL_AMFLAGS = -I m4
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
