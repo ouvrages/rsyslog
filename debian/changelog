@@ -1,6 +1,8 @@
 rsyslog (3.22.0-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * debian/rsyslog.init
+    - Pass proper return code to log_end_msg.
 
  -- Michael Biebl <biebl@debian.org>  Tue, 21 Apr 2009 17:52:12 +0200
 
