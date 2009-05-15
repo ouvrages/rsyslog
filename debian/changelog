@@ -6,6 +6,9 @@ rsyslog (3.22.0-1) UNRELEASED; urgency=low
   * debian/rsyslog.conf
     - Set $Umask to 0022 to enforce that new log files or directories are
       always created with the right permissions. Closes: #522297
+  * debian/patches/imudp_multiple_udp_sockets.patch
+    - Fix a segfault in imudp when multiple udp listeners are configured.
+      Patch cherry-picked from upstream git. Closes: #519073
 
  -- Michael Biebl <biebl@debian.org>  Tue, 21 Apr 2009 17:52:12 +0200
 
