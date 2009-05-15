@@ -9,6 +9,8 @@ rsyslog (3.22.0-1) UNRELEASED; urgency=low
   * debian/patches/imudp_multiple_udp_sockets.patch
     - Fix a segfault in imudp when multiple udp listeners are configured.
       Patch cherry-picked from upstream git. Closes: #519073
+  * debian/patches/manpage_pidfile.patch
+    - Fix rsyslogd man page to point to the correct pid file. Closes: #526658
 
  -- Michael Biebl <biebl@debian.org>  Tue, 21 Apr 2009 17:52:12 +0200
 
