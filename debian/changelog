@@ -1,3 +1,9 @@
+rsyslog (4.2.0-1) UNRELEASED; urgency=low
+
+  * New upstream release of the now stable v4 branch.
+
+ -- Michael Biebl <biebl@debian.org>  Tue, 23 Jun 2009 11:07:45 +0100
+
 rsyslog (3.22.0-1) unstable; urgency=low
 
   * New upstream release.
