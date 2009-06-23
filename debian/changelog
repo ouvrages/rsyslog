@@ -9,6 +9,8 @@ rsyslog (4.2.0-1) UNRELEASED; urgency=low
   * debian/rsyslog.logcheck.ignore.server
     - Update logcheck rules files to also ignore rsyslogd and imklog stop
       messages.
+  * debian/control
+    - Bump Standards-Version to 3.8.2. No further changes.
 
  -- Michael Biebl <biebl@debian.org>  Tue, 23 Jun 2009 11:07:45 +0100
 
