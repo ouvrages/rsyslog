@@ -1,4 +1,4 @@
-rsyslog (4.2.0-1) UNRELEASED; urgency=low
+rsyslog (4.2.0-1) unstable; urgency=low
 
   * New upstream release of the now stable v4 branch.
     - Fix warnings when /etc/rsyslog.d/ is empty. Closes: #530228
@@ -12,7 +12,7 @@ rsyslog (4.2.0-1) UNRELEASED; urgency=low
   * debian/control
     - Bump Standards-Version to 3.8.2. No further changes.
 
- -- Michael Biebl <biebl@debian.org>  Tue, 23 Jun 2009 11:07:45 +0100
+ -- Michael Biebl <biebl@debian.org>  Tue, 23 Jun 2009 12:12:43 +0100
 
 rsyslog (3.22.0-1) unstable; urgency=low
 
