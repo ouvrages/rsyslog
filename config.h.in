@@ -46,6 +46,9 @@
 /* Define to 1 if you don't have `vprintf' but do have `_doprnt.' */
 #undef HAVE_DOPRNT
 
+/* Define to 1 if you have the `epoll_wait' function. */
+#undef HAVE_EPOLL_WAIT
+
 /* Define to 1 if you have the <fcntl.h> header file. */
 #undef HAVE_FCNTL_H
 
@@ -60,6 +63,9 @@
 
 /* Define to 1 if you have the `gethostname' function. */
 #undef HAVE_GETHOSTNAME
+
+/* Define to 1 if you have the `getline' function. */
+#undef HAVE_GETLINE
 
 /* Define to 1 if you have the `gettimeofday' function. */
 #undef HAVE_GETTIMEOFDAY
@@ -181,6 +187,9 @@
 /* Define to 1 if you have the <syslog.h> header file. */
 #undef HAVE_SYSLOG_H
 
+/* Define to 1 if you have the <sys/epoll.h> header file. */
+#undef HAVE_SYS_EPOLL_H
+
 /* Define to 1 if you have the <sys/file.h> header file. */
 #undef HAVE_SYS_FILE_H
 
@@ -256,6 +265,9 @@
 
 /* Indicator for a BSD OS */
 #undef OS_BSD
+
+/* Indicator for a Solaris OS */
+#undef OS_SOLARIS
 
 /* Name of package */
 #undef PACKAGE
@@ -352,6 +364,9 @@
 /* Define to 2 if the system does not provide POSIX.1 features except with
    this defined. */
 #undef _POSIX_1_SOURCE
+
+/* Use POSIX pthread semantics */
+#undef _POSIX_PTHREAD_SEMANTICS
 
 /* Define to 1 if you need to in order for `stat' and other things to work. */
 #undef _POSIX_SOURCE
