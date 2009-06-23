@@ -3,6 +3,8 @@ rsyslog (4.2.0-1) UNRELEASED; urgency=low
   * New upstream release of the now stable v4 branch.
   * debian/patches/imudp_multiple_udp_sockets.patch
     - Removed, merged upstream.
+  * debian/rsyslog.default
+    - Set default compat mode to '4'.
 
  -- Michael Biebl <biebl@debian.org>  Tue, 23 Jun 2009 11:07:45 +0100
 
