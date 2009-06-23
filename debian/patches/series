@@ -1,3 +1,2 @@
 no_create_db.patch
-imudp_multiple_udp_sockets.patch
 manpage_pidfile.patch
