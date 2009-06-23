@@ -1,6 +1,7 @@
 rsyslog (4.2.0-1) UNRELEASED; urgency=low
 
   * New upstream release of the now stable v4 branch.
+    - Fix warnings when /etc/rsyslog.d/ is empty. Closes: #530228
   * debian/patches/imudp_multiple_udp_sockets.patch
     - Removed, merged upstream.
   * debian/rsyslog.default
