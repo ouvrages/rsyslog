@@ -46,7 +46,9 @@
 #include <glob.h>
 #include <sys/types.h>
 #ifdef HAVE_LIBGEN_H
-#	include <libgen.h>
+#	ifndef OS_SOLARIS
+#		include <libgen.h>
+#	endif
 #endif
 
 #include "rsyslog.h"
@@ -68,6 +70,9 @@
 #include "ctok.h"
 #include "ctok_token.h"
 
+#ifdef OS_SOLARIS
+#	define NAME_MAX MAXNAMELEN
+#endif
 
 /* forward definitions */
 static rsRetVal cfline(uchar *line, selector_t **pfCurr);
@@ -206,7 +211,7 @@ doIncludeLine(uchar **pp, __attribute__((unused)) void* pVal)
 	 * Required by doIncludeDirectory().
 	 */
 	result = glob(pattern, GLOB_MARK, NULL, &cfgFiles);
-	if(result != 0) {
+	if(result == GLOB_NOSPACE || result == GLOB_ABORTED) {
 		char errStr[1024];
 		rs_strerror_r(errno, errStr, sizeof(errStr));
 		errmsg.LogError(0, RS_RET_FILE_NOT_FOUND, "error accessing config file or directory '%s': %s",
@@ -395,6 +400,7 @@ processConfFile(uchar *pConfFile)
 	uchar cbuf[CFGLNSIZ];
 	uchar *cline;
 	int i;
+	int bHadAnError = 0;
 	ASSERT(pConfFile != NULL);
 
 	if((cf = fopen((char*)pConfFile, "r")) == NULL) {
@@ -456,6 +462,7 @@ processConfFile(uchar *pConfFile)
 			snprintf((char*)szErrLoc, sizeof(szErrLoc) / sizeof(uchar),
 				 "%s, line %d", pConfFile, iLnNbr);
 			errmsg.LogError(0, NO_ERRCODE, "the last error occured in %s", (char*)szErrLoc);
+			bHadAnError = 1;
 		}
 	}
 
@@ -474,6 +481,10 @@ finalize_it:
 		rs_strerror_r(errno, errStr, sizeof(errStr));
 		dbgprintf("error %d processing config file '%s'; os error (if any): %s\n",
 			iRet, pConfFile, errStr);
+	}
+
+	if(bHadAnError && (iRet == RS_RET_OK)) { /* a bit dirty, enhance in future releases */
+		iRet = RS_RET_NONFATAL_CONFIG_ERR;
 	}
 	RETiRet;
 }
@@ -789,6 +800,10 @@ dbgprintf("calling expression parser, pp %p ('%s')\n", *pline, *pline);
 	CHKiRet(ctok.Getpp(tok, pline));
 	CHKiRet(ctok.Destruct(&tok));
 
+	/* debug support - print vmprg after construction (uncomment to use) */
+	/* vmprgDebugPrint(f->f_filterData.f_expr->pVmprg); */
+	vmprgDebugPrint(f->f_filterData.f_expr->pVmprg);
+
 	/* we now need to skip whitespace to the action part, else we confuse
 	 * the legacy rsyslog conf parser. -- rgerhards, 2008-02-25
 	 */
@@ -873,6 +888,8 @@ static rsRetVal cflineProcessPropFilter(uchar **pline, register selector_t *f)
 		f->f_filterData.prop.operation = FIOP_STARTSWITH;
 	} else if(!rsCStrOffsetSzStrCmp(pCSCompOp, iOffset, (unsigned char*) "regex", 5)) {
 		f->f_filterData.prop.operation = FIOP_REGEX;
+	} else if(!rsCStrOffsetSzStrCmp(pCSCompOp, iOffset, (unsigned char*) "ereregex", 8)) {
+		f->f_filterData.prop.operation = FIOP_EREREGEX;
 	} else {
 		errmsg.LogError(0, NO_ERRCODE, "error: invalid compare operation '%s' - ignoring selector",
 		           (char*) rsCStrGetSzStrNoNULL(pCSCompOp));
