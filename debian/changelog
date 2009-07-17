@@ -1,3 +1,11 @@
+rsyslog (4.2.0-2) UNRELEASED; urgency=low
+
+  * debian/rsyslog.logcheck.ignore.server
+    - Bring the logcheck rules up to date with the new SIGHUP log
+      message. Thanks to Frédéric Brière for the patch. Closes: #537324
+
+ -- Michael Biebl <biebl@debian.org>  Fri, 17 Jul 2009 04:28:35 +0200
+
 rsyslog (4.2.0-1) unstable; urgency=low
 
   * New upstream release of the now stable v4 branch.
