@@ -7,6 +7,9 @@ rsyslog (4.2.0-2) UNRELEASED; urgency=low
     - Close stdout/stderr after forking. Closes: #537182
   * debian/control
     - Change Build-Depends: libmysqlclient15-dev → libmysqlclient-dev.
+  * debian/rsyslog.postrm
+    - Cleanup /lib/init/rw/sendsigs.omit.d/rsyslog upon remove to avoid false
+      positives from piuparts. Closes: #539144
 
  -- Michael Biebl <biebl@debian.org>  Fri, 17 Jul 2009 04:28:35 +0200
 
