@@ -5,6 +5,8 @@ rsyslog (4.2.0-2) UNRELEASED; urgency=low
       message. Thanks to Frédéric Brière for the patch. Closes: #537324
   * debian/patches/close-stdout-stderr.patch
     - Close stdout/stderr after forking. Closes: #537182
+  * debian/control
+    - Change Build-Depends: libmysqlclient15-dev → libmysqlclient-dev.
 
  -- Michael Biebl <biebl@debian.org>  Fri, 17 Jul 2009 04:28:35 +0200
 
