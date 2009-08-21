@@ -1,0 +1,45 @@
+diff --git a/tests/Makefile.am b/tests/Makefile.am
+index 88c3137..3f5a6c3 100644
+--- a/tests/Makefile.am
++++ b/tests/Makefile.am
+@@ -12,14 +12,14 @@ if ENABLE_OMSTDOUT
+ TESTS += omod-if-array.sh parsertest.sh inputname.sh fieldtest.sh
+ endif
+ 
++check_JAVA = DiagTalker.java
++
+ endif # if ENABLE_TESTBENCH
+ 
+ TESTS_ENVIRONMENT = RSYSLOG_MODDIR='$(abs_top_builddir)'/runtime/.libs/
+ DISTCLEANFILES=rsyslog.pid '$(abs_top_builddir)'/DiagTalker.class
+ test_files = testbench.h runtime-dummy.c
+ 
+-check_JAVA = DiagTalker.java
+-
+ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
+ 	   validation-run.sh \
+ 	   testsuites/invalid.conf \
+diff --git a/tests/Makefile.in b/tests/Makefile.in
+index d709ba8..08d1be6 100644
+--- a/tests/Makefile.in
++++ b/tests/Makefile.in
+@@ -178,6 +178,7 @@ PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
+ PACKAGE_NAME = @PACKAGE_NAME@
+ PACKAGE_STRING = @PACKAGE_STRING@
+ PACKAGE_TARNAME = @PACKAGE_TARNAME@
++PACKAGE_URL = @PACKAGE_URL@
+ PACKAGE_VERSION = @PACKAGE_VERSION@
+ PATH_SEPARATOR = @PATH_SEPARATOR@
+ PGSQL_CFLAGS = @PGSQL_CFLAGS@
+@@ -257,10 +258,10 @@ top_build_prefix = @top_build_prefix@
+ top_builddir = @top_builddir@
+ top_srcdir = @top_srcdir@
+ @ENABLE_TESTBENCH_TRUE@TESTRUNS = rt_init rscript
++@ENABLE_TESTBENCH_TRUE@check_JAVA = DiagTalker.java
+ TESTS_ENVIRONMENT = RSYSLOG_MODDIR='$(abs_top_builddir)'/runtime/.libs/
+ DISTCLEANFILES = rsyslog.pid '$(abs_top_builddir)'/DiagTalker.class
+ test_files = testbench.h runtime-dummy.c
+-check_JAVA = DiagTalker.java
+ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
+ 	   validation-run.sh \
+ 	   testsuites/invalid.conf \

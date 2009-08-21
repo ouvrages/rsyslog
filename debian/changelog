@@ -6,6 +6,9 @@ rsyslog (4.4.0-1) UNRELEASED; urgency=low
     - debian/patches/close-stdout-stderr.patch (merged upstream)
   * Bump Standards-Version to 3.8.3. No further changes.
   * Disable testbench as it requires java.
+  * debian/patches/testbench-java.patch
+    - Move check_JAVA inside the ENABLE_TESTBENCH section so the tests are not
+      run unless the testbench is enabled.
 
  -- Michael Biebl <biebl@debian.org>  Fri, 21 Aug 2009 22:28:26 +0200
 
