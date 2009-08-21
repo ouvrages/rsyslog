@@ -33,21 +33,34 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-check_PROGRAMS = $(am__EXEEXT_1) ourtail$(EXEEXT) udptester$(EXEEXT)
-TESTS = $(am__EXEEXT_1) cfg.sh parsertest.sh omod-if-array.sh \
-	validation-run.sh
+@ENABLE_TESTBENCH_TRUE@check_PROGRAMS = $(am__EXEEXT_1) \
+@ENABLE_TESTBENCH_TRUE@	ourtail$(EXEEXT) nettester$(EXEEXT) \
+@ENABLE_TESTBENCH_TRUE@	tcpflood$(EXEEXT) chkseq$(EXEEXT)
+@ENABLE_TESTBENCH_TRUE@TESTS = $(am__EXEEXT_1) cfg.sh \
+@ENABLE_TESTBENCH_TRUE@	validation-run.sh imtcp-multiport.sh \
+@ENABLE_TESTBENCH_TRUE@	diskqueue.sh manytcp.sh \
+@ENABLE_TESTBENCH_TRUE@	queue-persist.sh $(am__append_1)
+@ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_1 = omod-if-array.sh parsertest.sh inputname.sh fieldtest.sh
 subdir = tests
 DIST_COMMON = README $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/atomic_operations.m4 \
-	$(top_srcdir)/configure.ac
+	$(top_srcdir)/m4/shave.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-am__EXEEXT_1 = rt_init$(EXEEXT) rscript$(EXEEXT)
+@ENABLE_TESTBENCH_TRUE@am__EXEEXT_1 = rt_init$(EXEEXT) \
+@ENABLE_TESTBENCH_TRUE@	rscript$(EXEEXT)
+am_chkseq_OBJECTS = chkseq.$(OBJEXT)
+chkseq_OBJECTS = $(am_chkseq_OBJECTS)
+chkseq_LDADD = $(LDADD)
+am_nettester_OBJECTS = nettester.$(OBJEXT) getline.$(OBJEXT)
+nettester_OBJECTS = $(am_nettester_OBJECTS)
+am__DEPENDENCIES_1 =
+nettester_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_ourtail_OBJECTS = ourtail.$(OBJEXT)
 ourtail_OBJECTS = $(am_ourtail_OBJECTS)
 ourtail_LDADD = $(LDADD)
@@ -55,7 +68,6 @@ am__objects_1 = rscript-runtime-dummy.$(OBJEXT)
 am_rscript_OBJECTS = rscript-rscript.$(OBJEXT) \
 	rscript-getline.$(OBJEXT) $(am__objects_1)
 rscript_OBJECTS = $(am_rscript_OBJECTS)
-am__DEPENDENCIES_1 =
 rscript_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 rscript_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
@@ -69,9 +81,9 @@ rt_init_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 rt_init_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(rt_init_LDFLAGS) \
 	$(LDFLAGS) -o $@
-am_udptester_OBJECTS = udptester.$(OBJEXT) getline.$(OBJEXT)
-udptester_OBJECTS = $(am_udptester_OBJECTS)
-udptester_DEPENDENCIES = $(am__DEPENDENCIES_1)
+am_tcpflood_OBJECTS = tcpflood.$(OBJEXT)
+tcpflood_OBJECTS = $(am_tcpflood_OBJECTS)
+tcpflood_DEPENDENCIES = $(am__DEPENDENCIES_1)
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -85,10 +97,14 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-SOURCES = $(ourtail_SOURCES) $(rscript_SOURCES) $(rt_init_SOURCES) \
-	$(udptester_SOURCES)
-DIST_SOURCES = $(ourtail_SOURCES) $(rscript_SOURCES) \
-	$(rt_init_SOURCES) $(udptester_SOURCES)
+SOURCES = $(chkseq_SOURCES) $(nettester_SOURCES) $(ourtail_SOURCES) \
+	$(rscript_SOURCES) $(rt_init_SOURCES) $(tcpflood_SOURCES)
+DIST_SOURCES = $(chkseq_SOURCES) $(nettester_SOURCES) \
+	$(ourtail_SOURCES) $(rscript_SOURCES) $(rt_init_SOURCES) \
+	$(tcpflood_SOURCES)
+JAVAC = javac
+CLASSPATH_ENV = CLASSPATH=$(JAVAROOT):$(srcdir)/$(JAVAROOT):$$CLASSPATH
+JAVAROOT = $(top_builddir)
 ETAGS = etags
 CTAGS = ctags
 am__tty_colors = \
@@ -96,6 +112,7 @@ red=; grn=; lgn=; blu=; std=
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
+AM_MAKEFLAGS = @AM_MAKEFLAGS@
 AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
@@ -122,12 +139,14 @@ ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 F77 = @F77@
+FC = @FC@
 FFLAGS = @FFLAGS@
 GNUTLS_CFLAGS = @GNUTLS_CFLAGS@
 GNUTLS_LIBS = @GNUTLS_LIBS@
 GREP = @GREP@
 GSS_LIBS = @GSS_LIBS@
 HAVE_MYSQL_CONFIG = @HAVE_MYSQL_CONFIG@
+HAVE_ORACLE_CONFIG = @HAVE_ORACLE_CONFIG@
 HAVE_PGSQL_CONFIG = @HAVE_PGSQL_CONFIG@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
@@ -144,12 +163,16 @@ LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
+MAKEFLAGS = @MAKEFLAGS@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
 MYSQL_CFLAGS = @MYSQL_CFLAGS@
 MYSQL_LIBS = @MYSQL_LIBS@
 NMEDIT = @NMEDIT@
+OBJC = @OBJC@
 OBJEXT = @OBJEXT@
+ORACLE_CFLAGS = @ORACLE_CFLAGS@
+ORACLE_LIBS = @ORACLE_LIBS@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
 PACKAGE_NAME = @PACKAGE_NAME@
@@ -162,6 +185,7 @@ PGSQL_LIBS = @PGSQL_LIBS@
 PKG_CONFIG = @PKG_CONFIG@
 PTHREADS_CFLAGS = @PTHREADS_CFLAGS@
 PTHREADS_LIBS = @PTHREADS_LIBS@
+Q = @Q@
 RANLIB = @RANLIB@
 RELP_CFLAGS = @RELP_CFLAGS@
 RELP_LIBS = @RELP_LIBS@
@@ -175,6 +199,7 @@ SNMP_CFLAGS = @SNMP_CFLAGS@
 SNMP_LIBS = @SNMP_LIBS@
 SOL_LIBS = @SOL_LIBS@
 STRIP = @STRIP@
+V = @V@
 VERSION = @VERSION@
 ZLIB_LIBS = @ZLIB_LIBS@
 abs_builddir = @abs_builddir@
@@ -224,16 +249,18 @@ program_transform_name = @program_transform_name@
 psdir = @psdir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
+shavedir = @shavedir@
 srcdir = @srcdir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-TESTRUNS = rt_init rscript
+@ENABLE_TESTBENCH_TRUE@TESTRUNS = rt_init rscript
 TESTS_ENVIRONMENT = RSYSLOG_MODDIR='$(abs_top_builddir)'/runtime/.libs/
-DISTCLEANFILES = rsyslog.pid
+DISTCLEANFILES = rsyslog.pid '$(abs_top_builddir)'/DiagTalker.class
 test_files = testbench.h runtime-dummy.c
+check_JAVA = DiagTalker.java
 EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   validation-run.sh \
 	   testsuites/invalid.conf \
@@ -241,7 +268,7 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   cfg.sh \
 	   cfg1.cfgtest \
 	   cfg1.testin \
-      	   cfg2.cfgtest \
+	   cfg2.cfgtest \
 	   cfg2.testin \
 	   cfg3.cfgtest \
 	   cfg3.testin \
@@ -251,7 +278,15 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   err1.rstest \
 	   NoExistFile.cfgtest \
 	   testsuites/parse1.conf \
+	   testsuites/field1.conf \
 	   testsuites/1.parse1 \
+	   testsuites/2.parse1 \
+	   testsuites/3.parse1 \
+	   testsuites/date1.parse1 \
+	   testsuites/date2.parse1 \
+	   testsuites/date3.parse1 \
+	   testsuites/date4.parse1 \
+	   testsuites/date5.parse1 \
    	   testsuites/rfc3164.parse1 \
 	   testsuites/rfc5424-1.parse1 \
 	   testsuites/rfc5424-2.parse1 \
@@ -259,13 +294,36 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/rfc5424-4.parse1 \
 	   testsuites/omod-if-array.conf \
 	   testsuites/1.omod-if-array \
+	   testsuites/1.field1 \
+	   killrsyslog.sh \
 	   parsertest.sh \
+	   fieldtest.sh \
+	   diskqueue.sh \
+	   testsuites/diskqueue.conf \
+	   imtcp-multiport.sh \
+	   testsuites/imtcp-multiport.conf \
+	   manytcp.sh \
+	   testsuites/manytcp.conf \
+	   inputname.sh \
+	   testsuites/inputname_imtcp.conf \
+	   testsuites/1.inputname_imtcp_12514 \
+	   testsuites/1.inputname_imtcp_12515 \
+	   testsuites/1.inputname_imtcp_12516 \
 	   omod-if-array.sh \
+	   diag.sh \
+	   testsuites/diag-common.conf \
+	   queue-persist.sh \
+	   queue-persist-drvr.sh \
+	   testsuites/queue-persist.conf \
+	   DiagTalker.java \
 	   cfg.sh
 
 ourtail_SOURCES = ourtail.c
-udptester_SOURCES = udptester.c getline.c
-udptester_LDADD = $(SOL_LIBS)
+chkseq_SOURCES = chkseq.c
+tcpflood_SOURCES = tcpflood.c
+tcpflood_LDADD = $(SOL_LIBS)
+nettester_SOURCES = nettester.c getline.c
+nettester_LDADD = $(SOL_LIBS)
 rt_init_SOURCES = rt-init.c $(test_files)
 rt_init_CPPFLAGS = -I$(top_srcdir) $(PTHREADS_CFLAGS) $(RSRT_CFLAGS)
 rt_init_LDADD = $(RSRT_LIBS) $(ZLIB_LIBS) $(PTHREADS_LIBS) $(SOL_LIBS)
@@ -317,6 +375,12 @@ clean-checkPROGRAMS:
 	list=`for p in $$list; do echo "$$p"; done | sed 's/$(EXEEXT)$$//'`; \
 	echo " rm -f" $$list; \
 	rm -f $$list
+chkseq$(EXEEXT): $(chkseq_OBJECTS) $(chkseq_DEPENDENCIES) 
+	@rm -f chkseq$(EXEEXT)
+	$(LINK) $(chkseq_OBJECTS) $(chkseq_LDADD) $(LIBS)
+nettester$(EXEEXT): $(nettester_OBJECTS) $(nettester_DEPENDENCIES) 
+	@rm -f nettester$(EXEEXT)
+	$(LINK) $(nettester_OBJECTS) $(nettester_LDADD) $(LIBS)
 ourtail$(EXEEXT): $(ourtail_OBJECTS) $(ourtail_DEPENDENCIES) 
 	@rm -f ourtail$(EXEEXT)
 	$(LINK) $(ourtail_OBJECTS) $(ourtail_LDADD) $(LIBS)
@@ -326,9 +390,9 @@ rscript$(EXEEXT): $(rscript_OBJECTS) $(rscript_DEPENDENCIES)
 rt_init$(EXEEXT): $(rt_init_OBJECTS) $(rt_init_DEPENDENCIES) 
 	@rm -f rt_init$(EXEEXT)
 	$(rt_init_LINK) $(rt_init_OBJECTS) $(rt_init_LDADD) $(LIBS)
-udptester$(EXEEXT): $(udptester_OBJECTS) $(udptester_DEPENDENCIES) 
-	@rm -f udptester$(EXEEXT)
-	$(LINK) $(udptester_OBJECTS) $(udptester_LDADD) $(LIBS)
+tcpflood$(EXEEXT): $(tcpflood_OBJECTS) $(tcpflood_DEPENDENCIES) 
+	@rm -f tcpflood$(EXEEXT)
+	$(LINK) $(tcpflood_OBJECTS) $(tcpflood_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -336,14 +400,16 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/chkseq.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/getline.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nettester.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ourtail.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rscript-getline.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rscript-rscript.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rscript-runtime-dummy.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rt_init-rt-init.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rt_init-runtime-dummy.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/udptester.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tcpflood.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -441,6 +507,20 @@ mostlyclean-libtool:
 
 clean-libtool:
 	-rm -rf .libs _libs
+
+classcheck.stamp: $(check_JAVA)
+	@list1='$?'; list2=; if test -n "$$list1"; then \
+	  for p in $$list1; do \
+	    if test -f $$p; then d=; else d="$(srcdir)/"; fi; \
+	    list2="$$list2 $$d$$p"; \
+	  done; \
+	  echo '$(CLASSPATH_ENV) $(JAVAC) -d $(JAVAROOT) $(AM_JAVACFLAGS) $(JAVACFLAGS) '"$$list2"; \
+	  $(CLASSPATH_ENV) $(JAVAC) -d $(JAVAROOT) $(AM_JAVACFLAGS) $(JAVACFLAGS) $$list2; \
+	else :; fi
+	echo timestamp > classcheck.stamp
+
+clean-checkJAVA:
+	-rm -f *.class classcheck.stamp
 
 ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
 	list='$(SOURCES) $(HEADERS) $(LISP) $(TAGS_FILES)'; \
@@ -617,10 +697,10 @@ distdir: $(DISTFILES)
 	  fi; \
 	done
 check-am: all-am
-	$(MAKE) $(AM_MAKEFLAGS) $(check_PROGRAMS)
+	$(MAKE) $(AM_MAKEFLAGS) $(check_PROGRAMS) $(check_JAVA)
 	$(MAKE) $(AM_MAKEFLAGS) check-TESTS
 check: check-am
-all-am: Makefile
+all-am: Makefile classcheck.stamp
 installdirs:
 install: install-am
 install-exec: install-exec-am
@@ -650,8 +730,8 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-checkPROGRAMS clean-generic clean-libtool \
-	mostlyclean-am
+clean-am: clean-checkJAVA clean-checkPROGRAMS clean-generic \
+	clean-libtool mostlyclean-am
 
 distclean: distclean-am
 	-rm -rf ./$(DEPDIR)
@@ -722,20 +802,19 @@ uninstall-am:
 .MAKE: check-am install-am install-strip
 
 .PHONY: CTAGS GTAGS all all-am check check-TESTS check-am clean \
-	clean-checkPROGRAMS clean-generic clean-libtool ctags \
-	distclean distclean-compile distclean-generic \
-	distclean-libtool distclean-tags distdir dvi dvi-am html \
-	html-am info info-am install install-am install-data \
-	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-html install-html-am install-info \
-	install-info-am install-man install-pdf install-pdf-am \
-	install-ps install-ps-am install-strip installcheck \
-	installcheck-am installdirs maintainer-clean \
+	clean-checkJAVA clean-checkPROGRAMS clean-generic \
+	clean-libtool ctags distclean distclean-compile \
+	distclean-generic distclean-libtool distclean-tags distdir dvi \
+	dvi-am html html-am info info-am install install-am \
+	install-data install-data-am install-dvi install-dvi-am \
+	install-exec install-exec-am install-html install-html-am \
+	install-info install-info-am install-man install-pdf \
+	install-pdf-am install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs maintainer-clean \
 	maintainer-clean-generic mostlyclean mostlyclean-compile \
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
 	tags uninstall uninstall-am
 
-<<<<<<< HEAD:tests/Makefile.am
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
