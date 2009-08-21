@@ -46,6 +46,7 @@ endif
 		--enable-gssapi-krb5 \
 		--enable-gnutls \
 		--enable-relp \
+		--disable-testbench \
 		CFLAGS="$(CFLAGS)"
 
 
