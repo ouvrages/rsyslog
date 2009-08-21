@@ -3,7 +3,7 @@ Section: admin
 Priority: important
 Maintainer: Michael Biebl <biebl@debian.org>
 Build-Depends: debhelper (>= 7.0.9), quilt, autotools-dev, zlib1g-dev, libmysqlclient-dev, libpq-dev, libkrb5-dev, libgnutls-dev, librelp-dev, pkg-config
-Standards-Version: 3.8.2
+Standards-Version: 3.8.3
 Vcs-Git: git://git.debian.org/git/collab-maint/rsyslog.git
 Vcs-Browser: http://git.debian.org/?p=collab-maint/rsyslog.git;a=summary
 Homepage: http://www.rsyslog.com/
