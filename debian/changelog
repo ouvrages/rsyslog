@@ -1,4 +1,4 @@
-rsyslog (4.4.0-1) UNRELEASED; urgency=low
+rsyslog (4.4.0-1) unstable; urgency=low
 
   * New upstream release.
   * Removed patches
@@ -10,7 +10,7 @@ rsyslog (4.4.0-1) UNRELEASED; urgency=low
     - Move check_JAVA inside the ENABLE_TESTBENCH section so the tests are not
       run unless the testbench is enabled.
 
- -- Michael Biebl <biebl@debian.org>  Fri, 21 Aug 2009 22:28:26 +0200
+ -- Michael Biebl <biebl@debian.org>  Fri, 21 Aug 2009 23:08:45 +0200
 
 rsyslog (4.2.0-2) unstable; urgency=low
 
