@@ -37,7 +37,7 @@ subdir = doc
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/atomic_operations.m4 \
-	$(top_srcdir)/configure.ac
+	$(top_srcdir)/m4/shave.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
@@ -49,6 +49,7 @@ DIST_SOURCES =
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
+AM_MAKEFLAGS = @AM_MAKEFLAGS@
 AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
@@ -75,12 +76,14 @@ ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 F77 = @F77@
+FC = @FC@
 FFLAGS = @FFLAGS@
 GNUTLS_CFLAGS = @GNUTLS_CFLAGS@
 GNUTLS_LIBS = @GNUTLS_LIBS@
 GREP = @GREP@
 GSS_LIBS = @GSS_LIBS@
 HAVE_MYSQL_CONFIG = @HAVE_MYSQL_CONFIG@
+HAVE_ORACLE_CONFIG = @HAVE_ORACLE_CONFIG@
 HAVE_PGSQL_CONFIG = @HAVE_PGSQL_CONFIG@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
@@ -97,12 +100,16 @@ LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
+MAKEFLAGS = @MAKEFLAGS@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
 MYSQL_CFLAGS = @MYSQL_CFLAGS@
 MYSQL_LIBS = @MYSQL_LIBS@
 NMEDIT = @NMEDIT@
+OBJC = @OBJC@
 OBJEXT = @OBJEXT@
+ORACLE_CFLAGS = @ORACLE_CFLAGS@
+ORACLE_LIBS = @ORACLE_LIBS@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
 PACKAGE_NAME = @PACKAGE_NAME@
@@ -115,6 +122,7 @@ PGSQL_LIBS = @PGSQL_LIBS@
 PKG_CONFIG = @PKG_CONFIG@
 PTHREADS_CFLAGS = @PTHREADS_CFLAGS@
 PTHREADS_LIBS = @PTHREADS_LIBS@
+Q = @Q@
 RANLIB = @RANLIB@
 RELP_CFLAGS = @RELP_CFLAGS@
 RELP_LIBS = @RELP_LIBS@
@@ -128,6 +136,7 @@ SNMP_CFLAGS = @SNMP_CFLAGS@
 SNMP_LIBS = @SNMP_LIBS@
 SOL_LIBS = @SOL_LIBS@
 STRIP = @STRIP@
+V = @V@
 VERSION = @VERSION@
 ZLIB_LIBS = @ZLIB_LIBS@
 abs_builddir = @abs_builddir@
@@ -177,6 +186,7 @@ program_transform_name = @program_transform_name@
 psdir = @psdir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
+shavedir = @shavedir@
 srcdir = @srcdir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
@@ -218,6 +228,7 @@ html_files = \
 	dev_queue.html \
 	omsnmp.html \
 	ommysql.html \
+	omoracle.html \
 	omlibdbi.html \
 	imfile.html \
 	imtcp.html \
@@ -262,6 +273,7 @@ html_files = \
 	rsconf1_filecreatemode.html \
 	rsconf1_filegroup.html \
 	rsconf1_fileowner.html \
+	rsconf1_generateconfiggraph.html \
 	rsconf1_gssforwardservicename.html \
 	rsconf1_gsslistenservicename.html \
 	rsconf1_gssmode.html \
@@ -293,9 +305,25 @@ html_files = \
 	rsyslog_conf_output.html \
 	rsyslog_conf_templates.html \
 	rsyslog_conf_nomatch.html \
+	queues_analogy.html \
 	src/classes.dia
 
-EXTRA_DIST = $(html_files)
+grfx_files = \
+	rsyslog_confgraph_complex.png\
+	rsyslog_confgraph_std.png \
+	direct_queue0.png \
+	direct_queue1.png \
+	direct_queue2.png \
+	direct_queue3.png \
+	direct_queue_rsyslog.png \
+	direct_queue_rsyslog2.png \
+	direct_queue_directq.png \
+	dataflow.png \
+	queue_analogy_tv.png \
+	gssapi.png \
+	rsyslog-vers.png
+
+EXTRA_DIST = $(html_files) $(grfx_files)
 all: all-am
 
 .SUFFIXES:

@@ -42,10 +42,13 @@ sbin_PROGRAMS =
 # 
 @ENABLE_REGEXP_TRUE@am__append_1 = lmregexp.la
 
+# generic stream server framework
+
 # netstream drivers
 
 # plain tcp driver - main driver
-@ENABLE_INET_TRUE@am__append_2 = lmnet.la lmnetstrms.la lmnsd_ptcp.la
+@ENABLE_INET_TRUE@am__append_2 = lmnet.la lmnetstrms.la lmstrmsrv.la \
+@ENABLE_INET_TRUE@	lmnsd_ptcp.la
 
 #
 # GnuTLS netstream driver
@@ -55,7 +58,7 @@ subdir = runtime
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/atomic_operations.m4 \
-	$(top_srcdir)/configure.ac
+	$(top_srcdir)/m4/shave.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
@@ -157,6 +160,16 @@ lmregexp_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(lmregexp_la_LDFLAGS) $(LDFLAGS) -o $@
 @ENABLE_REGEXP_TRUE@am_lmregexp_la_rpath = -rpath $(pkglibdir)
+lmstrmsrv_la_DEPENDENCIES =
+am__lmstrmsrv_la_SOURCES_DIST = strmsrv.c strmsrv.h strms_sess.c \
+	strms_sess.h
+@ENABLE_INET_TRUE@am_lmstrmsrv_la_OBJECTS = lmstrmsrv_la-strmsrv.lo \
+@ENABLE_INET_TRUE@	lmstrmsrv_la-strms_sess.lo
+lmstrmsrv_la_OBJECTS = $(am_lmstrmsrv_la_OBJECTS)
+lmstrmsrv_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(lmstrmsrv_la_LDFLAGS) $(LDFLAGS) -o $@
+@ENABLE_INET_TRUE@am_lmstrmsrv_la_rpath = -rpath $(pkglibdir)
 PROGRAMS = $(sbin_PROGRAMS)
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
@@ -173,17 +186,20 @@ LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	$(LDFLAGS) -o $@
 SOURCES = $(librsyslog_la_SOURCES) $(lmnet_la_SOURCES) \
 	$(lmnetstrms_la_SOURCES) $(lmnsd_gtls_la_SOURCES) \
-	$(lmnsd_ptcp_la_SOURCES) $(lmregexp_la_SOURCES)
+	$(lmnsd_ptcp_la_SOURCES) $(lmregexp_la_SOURCES) \
+	$(lmstrmsrv_la_SOURCES)
 DIST_SOURCES = $(librsyslog_la_SOURCES) $(am__lmnet_la_SOURCES_DIST) \
 	$(am__lmnetstrms_la_SOURCES_DIST) \
 	$(am__lmnsd_gtls_la_SOURCES_DIST) \
 	$(am__lmnsd_ptcp_la_SOURCES_DIST) \
-	$(am__lmregexp_la_SOURCES_DIST)
+	$(am__lmregexp_la_SOURCES_DIST) \
+	$(am__lmstrmsrv_la_SOURCES_DIST)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
+AM_MAKEFLAGS = @AM_MAKEFLAGS@
 AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
@@ -210,12 +226,14 @@ ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 F77 = @F77@
+FC = @FC@
 FFLAGS = @FFLAGS@
 GNUTLS_CFLAGS = @GNUTLS_CFLAGS@
 GNUTLS_LIBS = @GNUTLS_LIBS@
 GREP = @GREP@
 GSS_LIBS = @GSS_LIBS@
 HAVE_MYSQL_CONFIG = @HAVE_MYSQL_CONFIG@
+HAVE_ORACLE_CONFIG = @HAVE_ORACLE_CONFIG@
 HAVE_PGSQL_CONFIG = @HAVE_PGSQL_CONFIG@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
@@ -232,12 +250,16 @@ LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
+MAKEFLAGS = @MAKEFLAGS@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
 MYSQL_CFLAGS = @MYSQL_CFLAGS@
 MYSQL_LIBS = @MYSQL_LIBS@
 NMEDIT = @NMEDIT@
+OBJC = @OBJC@
 OBJEXT = @OBJEXT@
+ORACLE_CFLAGS = @ORACLE_CFLAGS@
+ORACLE_LIBS = @ORACLE_LIBS@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
 PACKAGE_NAME = @PACKAGE_NAME@
@@ -250,6 +272,7 @@ PGSQL_LIBS = @PGSQL_LIBS@
 PKG_CONFIG = @PKG_CONFIG@
 PTHREADS_CFLAGS = @PTHREADS_CFLAGS@
 PTHREADS_LIBS = @PTHREADS_LIBS@
+Q = @Q@
 RANLIB = @RANLIB@
 RELP_CFLAGS = @RELP_CFLAGS@
 RELP_LIBS = @RELP_LIBS@
@@ -263,6 +286,7 @@ SNMP_CFLAGS = @SNMP_CFLAGS@
 SNMP_LIBS = @SNMP_LIBS@
 SOL_LIBS = @SOL_LIBS@
 STRIP = @STRIP@
+V = @V@
 VERSION = @VERSION@
 ZLIB_LIBS = @ZLIB_LIBS@
 abs_builddir = @abs_builddir@
@@ -312,6 +336,7 @@ program_transform_name = @program_transform_name@
 psdir = @psdir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
+shavedir = @shavedir@
 srcdir = @srcdir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
@@ -325,6 +350,7 @@ pkglib_LTLIBRARIES = $(am__append_1) $(am__append_2) $(am__append_3)
 librsyslog_la_SOURCES = \
 	rsyslog.c \
 	rsyslog.h \
+	unicode-helper.h \
 	atomic.h \
 	syslogd-types.h \
 	module-template.h \
@@ -424,6 +450,10 @@ librsyslog_la_LIBADD = $(DL_LIBS) $(RT_LIBS)
 @ENABLE_INET_TRUE@lmnetstrms_la_CPPFLAGS = $(PTHREADS_CFLAGS) $(RSRT_CFLAGS)
 @ENABLE_INET_TRUE@lmnetstrms_la_LDFLAGS = -module -avoid-version
 @ENABLE_INET_TRUE@lmnetstrms_la_LIBADD = 
+@ENABLE_INET_TRUE@lmstrmsrv_la_SOURCES = strmsrv.c strmsrv.h strms_sess.c strms_sess.h
+@ENABLE_INET_TRUE@lmstrmsrv_la_CPPFLAGS = $(PTHREADS_CFLAGS) $(RSRT_CFLAGS)
+@ENABLE_INET_TRUE@lmstrmsrv_la_LDFLAGS = -module -avoid-version
+@ENABLE_INET_TRUE@lmstrmsrv_la_LIBADD = 
 @ENABLE_INET_TRUE@lmnsd_ptcp_la_SOURCES = nsd_ptcp.c nsd_ptcp.h nsdsel_ptcp.c nsdsel_ptcp.h
 @ENABLE_INET_TRUE@lmnsd_ptcp_la_CPPFLAGS = $(PTHREADS_CFLAGS) $(RSRT_CFLAGS)
 @ENABLE_INET_TRUE@lmnsd_ptcp_la_LDFLAGS = -module -avoid-version
@@ -518,6 +548,8 @@ lmnsd_ptcp.la: $(lmnsd_ptcp_la_OBJECTS) $(lmnsd_ptcp_la_DEPENDENCIES)
 	$(lmnsd_ptcp_la_LINK) $(am_lmnsd_ptcp_la_rpath) $(lmnsd_ptcp_la_OBJECTS) $(lmnsd_ptcp_la_LIBADD) $(LIBS)
 lmregexp.la: $(lmregexp_la_OBJECTS) $(lmregexp_la_DEPENDENCIES) 
 	$(lmregexp_la_LINK) $(am_lmregexp_la_rpath) $(lmregexp_la_OBJECTS) $(lmregexp_la_LIBADD) $(LIBS)
+lmstrmsrv.la: $(lmstrmsrv_la_OBJECTS) $(lmstrmsrv_la_DEPENDENCIES) 
+	$(lmstrmsrv_la_LINK) $(am_lmstrmsrv_la_rpath) $(lmstrmsrv_la_OBJECTS) $(lmstrmsrv_la_LIBADD) $(LIBS)
 install-sbinPROGRAMS: $(sbin_PROGRAMS)
 	@$(NORMAL_INSTALL)
 	test -z "$(sbindir)" || $(MKDIR_P) "$(DESTDIR)$(sbindir)"
@@ -611,6 +643,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lmnsd_ptcp_la-nsd_ptcp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lmnsd_ptcp_la-nsdsel_ptcp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lmregexp_la-regexp.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lmstrmsrv_la-strms_sess.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lmstrmsrv_la-strmsrv.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -933,6 +967,20 @@ lmregexp_la-regexp.lo: regexp.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='regexp.c' object='lmregexp_la-regexp.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(lmregexp_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o lmregexp_la-regexp.lo `test -f 'regexp.c' || echo '$(srcdir)/'`regexp.c
+
+lmstrmsrv_la-strmsrv.lo: strmsrv.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(lmstrmsrv_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT lmstrmsrv_la-strmsrv.lo -MD -MP -MF $(DEPDIR)/lmstrmsrv_la-strmsrv.Tpo -c -o lmstrmsrv_la-strmsrv.lo `test -f 'strmsrv.c' || echo '$(srcdir)/'`strmsrv.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/lmstrmsrv_la-strmsrv.Tpo $(DEPDIR)/lmstrmsrv_la-strmsrv.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='strmsrv.c' object='lmstrmsrv_la-strmsrv.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(lmstrmsrv_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o lmstrmsrv_la-strmsrv.lo `test -f 'strmsrv.c' || echo '$(srcdir)/'`strmsrv.c
+
+lmstrmsrv_la-strms_sess.lo: strms_sess.c
+@am__fastdepCC_TRUE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(lmstrmsrv_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT lmstrmsrv_la-strms_sess.lo -MD -MP -MF $(DEPDIR)/lmstrmsrv_la-strms_sess.Tpo -c -o lmstrmsrv_la-strms_sess.lo `test -f 'strms_sess.c' || echo '$(srcdir)/'`strms_sess.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/lmstrmsrv_la-strms_sess.Tpo $(DEPDIR)/lmstrmsrv_la-strms_sess.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='strms_sess.c' object='lmstrmsrv_la-strms_sess.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL)  --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(lmstrmsrv_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o lmstrmsrv_la-strms_sess.lo `test -f 'strms_sess.c' || echo '$(srcdir)/'`strms_sess.c
 
 mostlyclean-libtool:
 	-rm -f *.lo
