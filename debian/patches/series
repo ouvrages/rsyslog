@@ -1,3 +1,1 @@
 no_create_db.patch
-manpage_pidfile.patch
-close-stdout-stderr.patch

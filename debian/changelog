@@ -1,6 +1,9 @@
 rsyslog (4.4.0-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * Removed patches
+    - debian/patches/manpage_pidfile.patch (merged upstream)
+    - debian/patches/close-stdout-stderr.patch (merged upstream)
 
  -- Michael Biebl <biebl@debian.org>  Fri, 21 Aug 2009 22:28:26 +0200
 
