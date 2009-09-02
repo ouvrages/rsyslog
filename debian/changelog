@@ -2,6 +2,8 @@ rsyslog (4.4.1-1) UNRELEASED; urgency=low
 
   * New upstream release.
     - Fix invalid double-quoted PRI in log messages. Closes: #543505
+  * debian/watch
+    - Only check for stable upstream releases.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 02 Sep 2009 16:44:00 +0200
 
