@@ -2,13 +2,19 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[4.4.0],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[4.4.1],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([ChangeLog])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS([config.h])
 
 AC_GNU_SOURCE
+
+# check for Java compiler
+AC_CHECK_PROG(HAVE_JAVAC, [javac], [yes])
+if test x"$HAVE_JAVAC" = x"yes"; then
+        AC_MSG_WARN([no javac found, disabling features depending on it])
+fi
 
 # Checks for programs.
 AC_PROG_CC
@@ -689,6 +695,11 @@ AC_ARG_ENABLE(testbench,
          esac],
         [enable_testbench=yes]
 )
+if test "$enable_testbench" = "yes"; then
+	if test x$HAVE_JAVAC = x; then
+	   enable_testbench='no'
+	fi
+fi
 AM_CONDITIONAL(ENABLE_TESTBENCH, test x$enable_testbench = xyes)
 
 
