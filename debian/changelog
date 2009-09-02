@@ -4,6 +4,8 @@ rsyslog (4.4.1-1) UNRELEASED; urgency=low
     - Fix invalid double-quoted PRI in log messages. Closes: #543505
   * debian/watch
     - Only check for stable upstream releases.
+  * debian/patches/testbench-java.patch
+    - Removed, merged upstream.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 02 Sep 2009 16:44:00 +0200
 
