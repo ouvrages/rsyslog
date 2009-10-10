@@ -178,9 +178,12 @@ processSocket(int fd, struct sockaddr_storage *frominetPrev, int *pbIsPermitted,
 			ABORT_FINALIZE(RS_RET_ERR);
 		}
 
+		if(lenRcvBuf == 0)
+			continue; /* this looks a bit strange, but practice shows it happens... */
+
 		/* if we reach this point, we had a good receive and can process the packet received */
 		/* check if we have a different sender than before, if so, we need to query some new values */
-		if(memcmp(&frominet, frominetPrev, socklen) != 0) {
+		if(net.CmpHost(&frominet, frominetPrev, socklen) != 0) {
 			CHKiRet(net.cvthname(&frominet, fromHost, fromHostFQDN, fromHostIP));
 			memcpy(frominetPrev, &frominet, socklen); /* update cache indicator */
 			/* Here we check if a host is permitted to send us
