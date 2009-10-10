@@ -1,8 +1,8 @@
-rsyslog (4.4.2-1) UNRELEASED; urgency=low
+rsyslog (4.4.2-1) unstable; urgency=low
 
   * New upstream release.
 
- -- Michael Biebl <biebl@debian.org>  Sat, 10 Oct 2009 12:29:43 +0200
+ -- Michael Biebl <biebl@debian.org>  Sat, 10 Oct 2009 14:08:16 +0200
 
 rsyslog (4.4.1-1) unstable; urgency=low
 
