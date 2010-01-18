@@ -52,7 +52,8 @@ Package: rsyslog-mysql
 Architecture: any
 Priority: extra
 Depends: ${shlibs:Depends}, ${misc:Depends}, rsyslog (= ${binary:Version}), dbconfig-common, ucf
-Recommends: mysql-server
+Recommends: mysql-client
+Suggests: mysql-server
 Description: MySQL output plugin for rsyslog
  This plugin allows rsyslog to write the syslog messages into a MySQL database.
 
@@ -60,7 +61,8 @@ Package: rsyslog-pgsql
 Architecture: any
 Priority: extra
 Depends: ${shlibs:Depends}, ${misc:Depends}, rsyslog (= ${binary:Version}), dbconfig-common, ucf
-Recommends: postgresql
+Recommends: postgresql-client
+Suggests: postgresql
 Description: PostgreSQL output plugin for rsyslog
  This plugin allows rsyslog to write the syslog messages into a PostgreSQL 
  database.

@@ -1,3 +1,14 @@
+rsyslog (4.4.2-2) UNRELEASED; urgency=low
+
+  * debian/control
+    - Demote mysql-server and postgresql from Recommends to Suggests. The
+      server packages are not strictly necessary for dbconfig-common's
+      autoconfiguration to work and one might want to use a remote server.
+    - Add Recommends: mysql-client for rsyslog-mysql.
+    - Add Recommends: postgresql-client for rsyslog-pgsql.
+
+ -- Michael Biebl <biebl@debian.org>  Mon, 18 Jan 2010 14:43:18 +0100
+
 rsyslog (4.4.2-1) unstable; urgency=low
 
   * New upstream release.
