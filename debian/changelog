@@ -1,4 +1,4 @@
-rsyslog (4.4.2-2) UNRELEASED; urgency=low
+rsyslog (4.4.2-2) unstable; urgency=low
 
   * debian/control
     - Demote mysql-server and postgresql from Recommends to Suggests. The
@@ -11,7 +11,7 @@ rsyslog (4.4.2-2) UNRELEASED; urgency=low
       header file and the syslog(3) man page. Closes: #559334
       Thanks to Alexander Gerasiov for spotting this.
 
- -- Michael Biebl <biebl@debian.org>  Mon, 18 Jan 2010 14:43:18 +0100
+ -- Michael Biebl <biebl@debian.org>  Mon, 18 Jan 2010 15:31:40 +0100
 
 rsyslog (4.4.2-1) unstable; urgency=low
 
