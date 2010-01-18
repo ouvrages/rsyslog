@@ -1,0 +1,33 @@
+Description: Fix a typo regarding syslog.h and syslog(3)
+Author: Michael Biebl <biebl@debian.org>
+Debian-Bug: http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=559334
+diff --git a/doc/rsyslog_conf_filter.html b/doc/rsyslog_conf_filter.html
+index 1d30d8a..841ec9c 100644
+--- a/doc/rsyslog_conf_filter.html
++++ b/doc/rsyslog_conf_filter.html
+@@ -48,8 +48,8 @@ in rsyslog and offer the best performance for this job.</p>
+ facility and a priority, separated by a period (".''). Both parts are
+ case insensitive and can also be specified as decimal numbers, but
+ don't do that, you have been warned. Both facilities and priorities are
+-described in rsyslog(3). The names mentioned below correspond to the
+-similar LOG_-values in /usr/include/rsyslog.h.<br>
++described in syslog(3). The names mentioned below correspond to the
++similar LOG_-values in /usr/include/syslog.h.<br>
+ <br>
+ The facility is one of the following keywords: auth, authpriv, cron,
+ daemon, kern, lpr, mail, mark, news, security (same as auth), syslog,
+diff --git a/tools/rsyslog.conf.5 b/tools/rsyslog.conf.5
+index 0a2422c..f2b915e 100644
+--- a/tools/rsyslog.conf.5
++++ b/tools/rsyslog.conf.5
+@@ -164,8 +164,8 @@ a pattern of facilities and priorities belonging to the specified action.
+ The selector field itself again consists of two parts, a facility and a
+ priority, separated by a period ('.'). Both parts are case insensitive and can
+ also be specified as decimal numbers, but don't do that, you have been warned.
+-Both facilities and priorities are described in rsyslog(3). The names mentioned
+-below correspond to the similar LOG_-values in /usr/include/rsyslog.h.
++Both facilities and priorities are described in syslog(3). The names mentioned
++below correspond to the similar LOG_-values in /usr/include/syslog.h.
+ 
+ The facility is one of the following keywords: auth, authpriv, cron, daemon,
+ kern, lpr, mail, mark, news, security (same as auth), syslog, user, uucp and

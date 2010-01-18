@@ -6,6 +6,10 @@ rsyslog (4.4.2-2) UNRELEASED; urgency=low
       autoconfiguration to work and one might want to use a remote server.
     - Add Recommends: mysql-client for rsyslog-mysql.
     - Add Recommends: postgresql-client for rsyslog-pgsql.
+  * debian/patches/doc_typo_fix.patch
+    - Fix a typo in the html documentation and man page regarding the syslog.h
+      header file and the syslog(3) man page. Closes: #559334
+      Thanks to Alexander Gerasiov for spotting this.
 
  -- Michael Biebl <biebl@debian.org>  Mon, 18 Jan 2010 14:43:18 +0100
 
