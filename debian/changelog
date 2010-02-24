@@ -9,6 +9,8 @@ rsyslog (4.6.0-1) UNRELEASED; urgency=low
     - Refresh to apply cleanly.
   * debian/control
     - Bump Standards-Version to 3.8.4. No further changes.
+  * debian/rsyslog.install
+    - Install new lmstrmsrv.so and lmzlibw.so plugins.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 24 Feb 2010 20:34:25 +0100
 
