@@ -11,6 +11,9 @@ rsyslog (4.6.0-1) UNRELEASED; urgency=low
     - Bump Standards-Version to 3.8.4. No further changes.
   * debian/rsyslog.install
     - Install new lmstrmsrv.so and lmzlibw.so plugins.
+  * debian/rsyslog.lintian-overrides
+    - Add lintian override for init.d-script-missing-dependency-on-remote_fs
+      false positive. See also the corresponding lintian bug: #571280.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 24 Feb 2010 20:34:25 +0100
 
