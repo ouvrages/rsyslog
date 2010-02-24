@@ -39,10 +39,13 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <atomic.h>
+#if HAVE_SYS_PRCTL_H
+#  include <sys/prctl.h>
+#endif
 
 #ifdef OS_SOLARIS
 #	include <sched.h>
-#	define pthread_yield() sched_yield()
 #endif
 
 #include "rsyslog.h"
@@ -51,6 +54,7 @@
 #include "wtp.h"
 #include "wti.h"
 #include "obj.h"
+#include "unicode-helper.h"
 #include "glbl.h"
 
 /* static data */
@@ -82,7 +86,6 @@ static rsRetVal NotImplementedDummy() { return RS_RET_OK; }
 /* Standard-Constructor for the wtp object
  */
 BEGINobjConstruct(wtp) /* be sure to specify the object type also in END macro! */
-	pThis->bOptimizeUniProc = glbl.GetOptimizeUniProc();
 	pthread_mutex_init(&pThis->mut, NULL);
 	pthread_mutex_init(&pThis->mutThrdShutdwn, NULL);
 	pthread_cond_init(&pThis->condThrdTrm, NULL);
@@ -151,8 +154,7 @@ CODESTARTobjDestruct(wtp)
 	pthread_mutex_destroy(&pThis->mut);
 	pthread_mutex_destroy(&pThis->mutThrdShutdwn);
 
-	if(pThis->pszDbgHdr != NULL)
-		free(pThis->pszDbgHdr);
+	free(pThis->pszDbgHdr);
 ENDobjDestruct(wtp)
 
 
@@ -179,9 +181,7 @@ wtpWakeupAllWrkr(wtp_t *pThis)
 	DEFiRet;
 
 	ISOBJ_TYPE_assert(pThis, wtp);
-	d_pthread_mutex_lock(pThis->pmutUsr);
 	pthread_cond_broadcast(pThis->pcondBusy);
-	d_pthread_mutex_unlock(pThis->pmutUsr);
 	RETiRet;
 }
 
@@ -216,7 +216,7 @@ wtpProcessThrdChanges(wtp_t *pThis)
 	 */
 	do {
 		/* reset the change marker */
-		pThis->bThrdStateChanged = 0;
+		ATOMIC_STORE_0_TO_INT(pThis->bThrdStateChanged);
 		/* go through all threads */
 		for(i = 0 ; i < pThis->iNumWorkerThreads ; ++i) {
 			wtiProcessThrdChanges(pThis->pWrkr[i], LOCK_MUTEX);
@@ -421,6 +421,8 @@ wtpWrkrExecCancelCleanup(void *arg)
 static void *
 wtpWorker(void *arg) /* the arg is actually a wti object, even though we are in wtp! */
 {
+	uchar *pszDbgHdr;
+	uchar thrdName[32] = "rs:";
 	DEFiRet;
 	DEFVARS_mutexProtection;
 	wti_t *pWti = (wti_t*) arg;
@@ -433,6 +435,15 @@ wtpWorker(void *arg) /* the arg is actually a wti object, even though we are in 
 
 	sigfillset(&sigSet);
 	pthread_sigmask(SIG_BLOCK, &sigSet, NULL);
+
+#	if HAVE_PRCTL && defined PR_SET_NAME
+	/* set thread name - we ignore if the call fails, has no harsh consequences... */
+	pszDbgHdr = wtpGetDbgHdr(pThis);
+	ustrncpy(thrdName+3, pszDbgHdr, 20);
+	if(prctl(PR_SET_NAME, thrdName, 0, 0, 0) != 0) {
+		DBGPRINTF("prctl failed, not setting thread name for '%s'\n", wtpGetDbgHdr(pThis));
+	}
+#	endif
 
 	BEGIN_MTX_PROTECTED_OPERATIONS(&pThis->mut, LOCK_MUTEX);
 
@@ -509,14 +520,6 @@ wtpStartWrkr(wtp_t *pThis, int bLockMutex)
 	iState = pthread_create(&(pWti->thrdID), NULL, wtpWorker, (void*) pWti);
 	dbgprintf("%s: started with state %d, num workers now %d\n",
 		  wtpGetDbgHdr(pThis), iState, pThis->iCurNumWrkThrd);
-
-	/* we try to give the starting worker a little boost. It won't help much as we still
- 	 * hold the queue's mutex, but at least it has a chance to start on a single-CPU system.
- 	 */
-#	if !defined(__hpux) /* pthread_yield is missing there! */
-	if(pThis->bOptimizeUniProc)
-		pthread_yield();
-#	endif
 
 	/* indicate we just started a worker and would like to see it running */
 	wtpSetInactivityGuard(pThis, 1, MUTEX_ALREADY_LOCKED);

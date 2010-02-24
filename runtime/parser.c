@@ -114,10 +114,7 @@ static inline rsRetVal uncompressMessage(msg_t *pMsg)
 				    "Message ignored.", ret);
 			FINALIZE; /* unconditional exit, nothing left to do... */
 		}
-		free(pMsg->pszRawMsg);
-		pMsg->pszRawMsg = deflateBuf;
-		pMsg->iLenRawMsg = iLenDefBuf;
-		deflateBuf = NULL; /* logically "freed" - caller is now responsible */
+		MsgSetRawMsg(pMsg, (char*)deflateBuf, iLenDefBuf);
 	}
 finalize_it:
 	if(deflateBuf != NULL)
@@ -165,6 +162,9 @@ sanitizeMessage(msg_t *pMsg)
 	size_t iSrc;
 	size_t iDst;
 	size_t iMaxLine;
+	size_t maxDest;
+	bool bUpdatedLen = FALSE;
+	uchar szSanBuf[32*1024]; /* buffer used for sanitizing a string */
 
 	assert(pMsg != NULL);
 	assert(pMsg->iLenRawMsg > 0);
@@ -179,6 +179,7 @@ sanitizeMessage(msg_t *pMsg)
 	/* remove NUL character at end of message (see comment in function header) */
 	if(pszMsg[lenMsg-1] == '\0') {
 		DBGPRINTF("dropped NUL at very end of message\n");
+		bUpdatedLen = TRUE;
 		lenMsg--;
 	}
 
@@ -189,6 +190,7 @@ sanitizeMessage(msg_t *pMsg)
 	 */
 	if(bDropTrailingLF && pszMsg[lenMsg-1] == '\n') {
 		DBGPRINTF("dropped LF at very end of message (DropTrailingLF is set)\n");
+		bUpdatedLen = TRUE;
 		lenMsg--;
 	}
 
@@ -199,77 +201,55 @@ sanitizeMessage(msg_t *pMsg)
 	 */
 	int bNeedSanitize = 0;
 	for(iSrc = 0 ; iSrc < lenMsg ; iSrc++) {
-		if(pszMsg[iSrc] < 32) {
+		if(iscntrl(pszMsg[iSrc])) {
 			if(pszMsg[iSrc] == '\0' || bEscapeCCOnRcv) {
 				bNeedSanitize = 1;
 				break;
 			}
 		}
 	}
-	if(bNeedSanitize == 0) {
-		/* what a shame - we do not have a \0 byte...
-		 * TODO: think about adding it or otherwise be able to use it...
-		 */
-		uchar *pRaw;
-		CHKmalloc(pRaw = realloc(pMsg->pszRawMsg, pMsg->iLenRawMsg + 1));
-		pRaw[pMsg->iLenRawMsg] = '\0';
-		pMsg->pszRawMsg = pRaw;
+
+	if(!bNeedSanitize) {
+		if(bUpdatedLen == TRUE)
+			MsgSetRawMsgSize(pMsg, lenMsg);
 		FINALIZE;
 	}
 
 	/* now copy over the message and sanitize it */
-	/* TODO: can we get cheaper memory alloc? {alloca()?}*/
 	iMaxLine = glbl.GetMaxLine();
-	CHKmalloc(pDst = malloc(sizeof(uchar) * (iMaxLine + 1)));
+	maxDest = lenMsg * 4; /* message can grow at most four-fold */
+	if(maxDest > iMaxLine)
+		maxDest = iMaxLine;	/* but not more than the max size! */
+	if(maxDest < sizeof(szSanBuf))
+		pDst = szSanBuf;
+	else 
+		CHKmalloc(pDst = malloc(sizeof(uchar) * (iMaxLine + 1)));
 	iSrc = iDst = 0;
-	while(iSrc < lenMsg && iDst < iMaxLine) {
-		if(pszMsg[iSrc] == '\0') { /* guard against \0 characters... */
-			/* changed to the sequence (somewhat) proposed in
-			 * draft-ietf-syslog-protocol-19. rgerhards, 2006-11-30
+	while(iSrc < lenMsg && iDst < maxDest - 3) { /* leave some space if last char must be escaped */
+		if(iscntrl((int) pszMsg[iSrc])) {
+			/* note: \0 must always be escaped, the rest of the code currently
+			 * can not handle it! -- rgerhards, 2009-08-26
 			 */
-			if(iDst + 3 < iMaxLine) { /* do we have space? */
-				pDst[iDst++] =  cCCEscapeChar;
-				pDst[iDst++] = '0';
-				pDst[iDst++] = '0';
-				pDst[iDst++] = '0';
-			} /* if we do not have space, we simply ignore the '\0'... */
-			  /* log an error? Very questionable... rgerhards, 2006-11-30 */
-			  /* decided: we do not log an error, it won't help... rger, 2007-06-21 */
-		} else if(bEscapeCCOnRcv && iscntrl((int) pszMsg[iSrc])) {
+			if(pszMsg[iSrc] == '\0' || bEscapeCCOnRcv) {
 			/* we are configured to escape control characters. Please note
 			 * that this most probably break non-western character sets like
 			 * Japanese, Korean or Chinese. rgerhards, 2007-07-17
-			 * Note: sysklogd logs octal values only for DEL and CCs above 127.
-			 * For others, it logs ^n where n is the control char converted to an
-			 * alphabet character. We like consistency and thus escape it to octal
-			 * in all cases. If someone complains, we may change the mode. At least
-			 * we known now what's going on.
-			 * rgerhards, 2007-07-17
 			 */
-			if(iDst + 3 < iMaxLine) { /* do we have space? */
-				pDst[iDst++] = cCCEscapeChar;
-				pDst[iDst++] = '0' + ((pszMsg[iSrc] & 0300) >> 6);
-				pDst[iDst++] = '0' + ((pszMsg[iSrc] & 0070) >> 3);
-				pDst[iDst++] = '0' + ((pszMsg[iSrc] & 0007));
-			} /* again, if we do not have space, we ignore the char - see comment at '\0' */
+			pDst[iDst++] = cCCEscapeChar;
+			pDst[iDst++] = '0' + ((pszMsg[iSrc] & 0300) >> 6);
+			pDst[iDst++] = '0' + ((pszMsg[iSrc] & 0070) >> 3);
+			pDst[iDst++] = '0' + ((pszMsg[iSrc] & 0007));
+			}
 		} else {
 			pDst[iDst++] = pszMsg[iSrc];
 		}
 		++iSrc;
 	}
-	pDst[iDst] = '\0'; /* space *is* reserved for this! */
 
-	/* we have a sanitized string. Let's save it now */
-	free(pMsg->pszRawMsg);
-	if((pMsg->pszRawMsg = malloc((iDst+1) * sizeof(uchar))) == NULL) {
-		/* when we get no new buffer, we use what we already have ;) */
-		pMsg->pszRawMsg = pDst;
-	} else {
-		/* trim buffer */
-		memcpy(pMsg->pszRawMsg, pDst, iDst+1);
-		free(pDst); /* too big! */
-		pMsg->iLenRawMsg = iDst;
-	}
+	MsgSetRawMsg(pMsg, (char*)pDst, iDst); /* save sanitized string */
+
+	if(pDst != szSanBuf)
+		free(pDst);
 
 finalize_it:
 	RETiRet;
@@ -295,7 +275,7 @@ rsRetVal parseMsg(msg_t *pMsg)
 	CHKiRet(sanitizeMessage(pMsg));
 
 	/* we needed to sanitize first, because we otherwise do not have a C-string we can print... */
-	DBGPRINTF("msg parser: flags %x, from '%s', msg '%s'\n", pMsg->msgFlags, pMsg->pszRcvFrom, pMsg->pszRawMsg);
+	DBGPRINTF("msg parser: flags %x, from '%s', msg '%s'\n", pMsg->msgFlags, getRcvFrom(pMsg), pMsg->pszRawMsg);
 
 	/* pull PRI */
 	lenMsg = pMsg->iLenRawMsg;
@@ -309,11 +289,8 @@ rsRetVal parseMsg(msg_t *pMsg)
 		 */
 		pri = 0;
 		while(--lenMsg > 0 && isdigit((int) *++msg)) {
-			pMsg->bufPRI[iPriText++ % 4] = *msg;	 /* mod 4 to guard against malformed messages! */
 			pri = 10 * pri + (*msg - '0');
 		}
-		pMsg->bufPRI[iPriText % 4] = '\0';
-		pMsg->iLenPRI = iPriText % 4;
 		if(*msg == '>')
 			++msg;
 		if(pri & ~(LOG_FACMASK|LOG_PRIMASK))
@@ -322,9 +299,6 @@ rsRetVal parseMsg(msg_t *pMsg)
 	pMsg->iFacility = LOG_FAC(pri);
 	pMsg->iSeverity = LOG_PRI(pri);
 	MsgSetAfterPRIOffs(pMsg, msg - pMsg->pszRawMsg);
-
-	if(pMsg->bParseHOSTNAME == 0)
-		MsgSetHOSTNAME(pMsg, pMsg->pszRcvFrom);
 
 	/* rger 2005-11-24 (happy thanksgiving!): we now need to check if we have
 	 * a traditional syslog message or one formatted according to syslog-protocol.
@@ -349,7 +323,6 @@ rsRetVal parseMsg(msg_t *pMsg)
 
 	/* finalize message object */
 	pMsg->msgFlags &= ~NEEDS_PARSING; /* this message is now parsed */
-	MsgPrepareEnqueue(pMsg); /* "historical" name - prepare for multi-threading */
 
 finalize_it:
 	RETiRet;

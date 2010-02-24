@@ -1,4 +1,240 @@
 ---------------------------------------------------------------------------
+Version 4.6.0  [v4-beta] (rgerhards), 2010-02-24
+***************************************************************************
+* This is a new stable v4 version. It contains all fixes and enhancements *
+* made during the 4.5.x phase as well as those listed below.              *
+* Note: this version is scheduled to conclude the v4 development process. *
+*       Do not expect any more new developments in v4. The focus is now   *
+*       on v5 (what also means we have a single devel branch again.       *
+***************************************************************************
+- improved testbench to contain samples for totally malformed messages
+  which miss parts of the message content
+- bugfix: some malformed messages could lead to a missing LF inside files
+  or some other missing parts of the template content.
+- bugfix: if a message ended immediately with a hostname, the hostname
+  was mistakenly interpreted as TAG, and localhost be used as hostname
+- bugfix: message without MSG part could case a segfault
+  [backported from v5 commit 98d1ed504ec001728955a5bcd7916f64cd85f39f]
+  This actually was a "recent" regression, but I did not realize that it
+  was introduced by the performance optimization in v4-devel. Shame on
+  me for having two devel versions at the same time...
+---------------------------------------------------------------------------
+Version 4.5.8  [v4-beta] (rgerhards), 2010-02-10
+- enhanced doc for using PostgreSQL
+  Thanks to Marc Schiffbauer for the new/updated doc
+- bugfix: property replacer returned invalid parameters under some (unusual)
+  conditions. In extreme cases, this could lead to garbled logs and/or
+  a system failure.
+- bugfix: invalid length returned (often) when using regular expressions
+  inside the property replacer
+- bugfix: submatch regex in property replacer did not honor "return 0 on
+  no match" config case
+- bugfix: imuxsock incorrectly stated inputname "imudp"
+  Thanks to Ryan Lynch for reporting this.
+- (slightly) enhanced support for FreeBSD by setting _PATH_MODDIR to
+  the correct value on FreeBSD.
+  Thanks to Cristiano for the patch.
+- bugfix: -d did not enable display of debug messages
+  regression from introduction of "debug on demand" mode
+  Thanks to Michael Biebl for reporting this bug
+- bugfix: blanks inside file names did not terminate file name parsing.
+  This could reslult in the whole rest of a line (including comments)
+  to be treated as file name in "write to file" actions.
+  Thanks to Jack for reporting this issue.
+- bugfix: rsyslog hang when writing to a named pipe which nobody was
+  reading. Thanks to Michael Biebl for reporting this bug.
+- bugfix: memory leak when sending messages in zip-compressed format
+  Thanks to Naoya Nakazawa for analyzing this issue and providing a patch.
+- bugfix: potential segfaults during queue shutdown
+  (bugs require certain non-standard settings to appear)
+  Thanks to varmojfekoj for the patch
+---------------------------------------------------------------------------
+Version 4.5.7  [v4-beta] (rgerhards), 2009-11-18
+- added a so-called "On Demand Debug" mode, in which debug output can
+  be generated only after the process has started, but not right from
+  the beginning. This is assumed to be useful for hard-to-find bugs.
+  Also improved the doc on the debug system.
+- bugfix (kind of): check if TCP connection is still alive if using TLS
+  Thanks to Jonathan Bond-Caron for the patch.
+- bugfix: hostname accidently set to IP address for some message sources,
+  for example imudp. Thanks to Anton for reporting this bug.
+- bugfix [imported from 4.4.3]: $ActionExecOnlyOnceEveryInterval did
+  not work.
+---------------------------------------------------------------------------
+Version 4.5.6  [v4-beta] (rgerhards), 2009-11-05
+- bugfix: named pipes did no longer work (they always got an open error)
+  this was a regression from the omfile rewrite in 4.5.0
+- bugfix(minor): diag function returned wrong queue memeber count
+  for the main queue if an active DA queue existed. This had no relevance
+  to real deployments (assuming they are not running the debug/diagnostic
+  module...), but sometimes caused grief and false alerts in the 
+  testbench.
+- included some important fixes from v4-stable:
+  * bugfix: invalid handling of zero-sized messages
+  * bugfix: zero-sized UDP messages are no longer processed
+  * bugfix: random data could be appended to message
+  * bugfix: reverse lookup reduction logic in imudp do DNS queries too often
+- bugfix(testbench): testcase did not properly wait for rsyslod shutdown
+  thus some unpredictable behavior and a false negative test result
+  could occur. [BACKPORTED from v5]
+- bugfix(testbench): sequence check was not always performed correctly,
+  that could result in tests reporting success when they actually failed
+---------------------------------------------------------------------------
+Version 4.5.5  [v4-beta] (rgerhards), 2009-10-21
+- added $InputTCPServerNotifyOnConnectionClose config directive
+  see doc for details
+- bugfix: debug string larger than 1K were improperly displayed. Max size
+  is now 32K
+- bugfix: invalid storage class selected for some size config parameters.
+  This resulted in wrong values. The most prominent victim was the
+  directory creation mode, which was set to zero in some cases. For 
+  details, see related blog post:
+  http://blog.gerhards.net/2009/10/another-note-on-hard-to-find-bugs.html
+---------------------------------------------------------------------------
+Version 4.5.4  [v4-beta] (rgerhards), 2009-09-29
+- bugfix: potential segfault in stream writer on destruction
+  Most severely affected omfile. The problem was that some buffers were
+  freed before the asynchronous writer thread was shut down. So the
+  writer thread accessed invalid data, which may even already be
+  overwritten. Symptoms (with omfile) were segfaults, grabled data
+  and files with random names placed around the file system (most
+  prominently into the root directory). Special thanks to Aaron for
+  helping to track this down.
+- bugfix: potential race in object loader (obj.c) during use/release
+  of object interface
+- bugfixes: potential problems in out file zip writer. Problems could
+  lead to abort and/or memory leak. The module is now hardened in a very
+  conservative way, which is sub-optimal from a performance point of view.
+  This should be improved if it has proven reliable in practice.
+---------------------------------------------------------------------------
+Version 4.5.3  [v4-beta] (rgerhards), 2009-09-17
+- bugfix: repeated messages were incorrectly processed
+  this could lead to loss of the repeated message content. As a side-
+  effect, it could probably also be possible that some segfault occurs
+  (quite unlikely). The root cause was that some counters introduced
+  during the malloc optimizations were not properly duplicated in
+  MsgDup(). Note that repeated message processing is not enabled
+  by default.
+- bugfix: message sanitation had some issues:
+  - control character DEL was not properly escaped
+  - NUL and LF characters were not properly stripped if no control
+    character replacement was to be done
+  - NUL characters in the message body were silently dropped (this was
+    a regeression introduced by some of the recent optimizations)
+- bugfix: strings improperly reused, resulting in some message properties
+  be populated with strings from previous messages. This was caused by
+  an improper predicate check. [backported from v5]
+- fixed some minor portability issues
+- bugfix: reverse lookup reduction logic in imudp do DNS queries too often
+  [imported from 4.4.2]
+---------------------------------------------------------------------------
+Version 4.5.2  [v4-beta] (rgerhards), 2009-08-21
+- legacy syslog parser changed so that it now accepts date stamps in
+  wrong case. Some devices seem to create them and I do not see any harm
+  in supporting that.
+- added $InputTCPMaxListeners directive - permits to specify how many 
+  TCP servers shall be possible (default is 20).
+- bugfix: memory leak with some input modules. Those inputs that
+  use parseAndSubmitMsg() leak two small memory blocks with every message.
+  Typically, those process only relatively few messages, so the issue 
+  does most probably not have any effect in practice.
+- bugfix: if tcp listen port could not be created, no error message was
+  emitted
+- bugfix: potential segfault in output file writer (omfile)
+  In async write mode, we use modular arithmetic to index the output
+  buffer array. However, the counter variables accidently were signed,
+  thus resulting in negative indizes after integer overflow. That in turn
+  could lead to segfaults, but was depending on the memory layout of 
+  the instance in question (which in turn depended on a number of
+  variables, like compile settings but also configuration). The counters
+  are now unsigned (as they always should have been) and so the dangling
+  mis-indexing does no longer happen. This bug potentially affected all
+  installations, even if only some may actually have seen a segfault.
+- bugfix: hostnames with dashes in them were incorrectly treated as
+  malformed, thus causing them to be treated as TAG (this was a regression
+  introduced from the "rfc3164 strict" change in 4.5.0).
+---------------------------------------------------------------------------
+Version 4.5.1  [DEVEL] (rgerhards), 2009-07-15
+- CONFIG CHANGE: $HUPisRestart default is now "off". We are doing this
+  to support removal of restart-type HUP in v5.
+- bugfix: fromhost-ip was sometimes truncated
+- bugfix: potential segfault when zip-compressed syslog records were
+  received (double free)
+- bugfix: properties inputname, fromhost, fromhost-ip, msg were lost when
+  working with disk queues
+- performance enhancement: much faster, up to twice as fast (depending
+  on configuration)
+- bugfix: abort condition when RecvFrom was not set and message reduction
+  was on. Happend e.g. with imuxsock.
+- added $klogConsoleLogLevel directive which permits to set a new
+  console log level while rsyslog is active
+- bugfix: message could be truncated after TAG, often when forwarding
+  This was a result of an internal processing error if maximum field
+  sizes had been specified in the property replacer.
+- added ability for the TCP output action to "rebind" its send socket after
+  sending n messages (actually, it re-opens the connection, the name is 
+  used because this is a concept very similiar to $ActionUDPRebindInterval).
+  New config directive $ActionSendTCPRebindInterval added for the purpose.
+  By default, rebinding is disabled. This is considered useful for load
+  balancers.
+- testbench improvements
+---------------------------------------------------------------------------
+Version 4.5.0  [DEVEL] (rgerhards), 2009-07-02
+- activation order of inputs changed, they are now activated only after
+  privileges are dropped. Thanks to Michael Terry for the patch.
+- greatly improved performance
+- greatly reduced memory requirements of msg object
+  to around half of the previous demand. This means that more messages can
+  be stored in core! Due to fewer cache misses, this also means some
+  performance improvement.
+- improved config error messages: now contain a copy of the config line
+  that (most likely) caused the error
+- reduced max value for $DynaFileCacheSize to 1,000 (the former maximum
+  of 10,000 really made no sense, even 1,000 is very high, but we like
+  to keep the user in control ;)).
+- added capability to fsync() queue disk files for enhanced reliability
+  (also add's speed, because you do no longer need to run the whole file
+  system in sync mode)
+- more strict parsing of the hostname in rfc3164 mode, hopefully
+  removes false positives (but may cause some trouble with hostname
+  parsing). For details, see this bug tracker:
+  http://bugzilla.adiscon.com/show_bug.cgi?id=126
+- omfile rewrite to natively support zip files (includes large extension
+  of the stream class)
+- added configuration commands (see doc for explanations)
+  * $OMFileZipLevel
+  * $OMFileIOBufferSize
+  * $OMFileFlushOnTXEnd
+  * $MainMsgQueueSyncQueueFiles
+  * $ActionQueueSyncQueueFiles
+- done some memory accesses explicitely atomic
+- bugfix: subtle (and usually irrelevant) issue in timout processing
+  timeout could be one second too early if nanoseconds wrapped
+- set a more sensible timeout for shutdow, now 1.5 seconds to complete
+  processing (this also removes those cases where the shutdown message
+  was not written because the termination happened before it)
+- internal bugfix: object pointer was only reset to NULL when an object
+  was actually destructed. This most likely had no effect to existing code,
+  but it may also have caused trouble in remote cases. Similarly, the fix
+  may also cause trouble...
+- bugfix: missing initialization during timestamp creation
+  This could lead to timestamps written in the wrong format, but not to
+  an abort
+---------------------------------------------------------------------------
+Version 4.4.3  [v4-stable] (rgerhards), 2009-10-??
+- bugfix: several smaller bugs resolved after flexelint review
+  Thanks to varmojfekoj for the patch.
+- bugfix: $ActionExecOnlyOnceEveryInterval did not work.
+  This was a regression from the time() optimizations done in v4.
+  Bug tracker: http://bugzilla.adiscon.com/show_bug.cgi?id=143
+  Thanks to Klaus Tachtler for reporting this bug.
+- bugfix: potential segfault on queue shutdown
+  Thanks to varmojfekoj for the patch.
+- bugfix: potential hang condition on queue shutdown
+  [imported from v3-stable]
+- bugfix: segfault on startup when -q or -Q option was given
+  [imported from v3-stable]
+---------------------------------------------------------------------------
 Version 4.4.2  [v4-stable] (rgerhards), 2009-10-09
 - bugfix: invalid handling of zero-sized messages, could lead to mis-
   addressing and potential memory corruption/segfault
@@ -250,9 +486,19 @@ version before switching to this one.
   Thanks to Ken for providing the patch
 ---------------------------------------------------------------------------
 Version 3.22.2 [v3-stable] (rgerhards), 2009-07-??
+- enhance: imrelp now also provides remote peer's IP address 
+  [if librelp != 1.0.0 is used]
 - bugfix: sending syslog messages with zip compression did not work
+- bugfix: potential hang condition on queue shutdown
+- bugfix: segfault on startup when -q or -Q option was given
+  bug tracker: http://bugzilla.adiscon.com/show_bug.cgi?id=157
+  Thanks to Jonas Nogueira for reporting this bug.
 - clarified use of $ActionsSendStreamDriver[AuthMode/PermittedPeers]
   in doc set (require TLS drivers)
+- bugfix: $CreateDirs variable not properly initialized, default thus
+  was random (but most often "on")
+- bugfix: potential segfault when -p command line option was used
+  thanks to varmojfekoj for pointing me at this bug
 ---------------------------------------------------------------------------
 Version 3.22.1 [v3-stable] (rgerhards), 2009-07-02
 - bugfix: invalid error message issued if $inlcudeConfig was on an empty

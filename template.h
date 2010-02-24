@@ -63,7 +63,7 @@ struct templateEntry {
 			int iLenConstant;	/* its length */
 		} constant;
 		struct {
-			uchar *pPropRepl;	/* pointer to property replacer string */
+			propid_t propid;	/* property to be used */
 			unsigned iFromPos;	/* for partial strings only chars from this position ... */
 			unsigned iToPos;	/* up to that one... */
 #ifdef FEATURE_REGEXP
@@ -127,7 +127,7 @@ void tplLastStaticInit(struct template *tpl);
  * rgerhards, 2007-08-06
  */
 rsRetVal tplToArray(struct template *pTpl, msg_t *pMsg, uchar*** ppArr);
-rsRetVal tplToString(struct template *pTpl, msg_t *pMsg, uchar** ppSz);
+rsRetVal tplToString(struct template *pTpl, msg_t *pMsg, uchar** ppSz, size_t *);
 rsRetVal doSQLEscape(uchar **pp, size_t *pLen, unsigned short *pbMustBeFreed, int escapeMode);
 
 rsRetVal templateInit();

@@ -29,7 +29,18 @@
 /* ############################################################# *
  * #                    Config Settings                        # *
  * ############################################################# */
-#define RS_STRINGBUF_ALLOC_INCREMENT 128
+#define RS_STRINGBUF_ALLOC_INCREMENT	128
+/* MAXSIZE are absolute maxima, while BUFSIZE are just values after which
+ * processing is more time-intense. The BUFSIZE params currently add their
+ * value to the fixed size of the message object.
+ */
+#define CONF_TAG_MAXSIZE		512	/* a value that is deemed far too large for any valid TAG */
+#define CONF_HOSTNAME_MAXSIZE		512	/* a value that is deemed far too large for any valid HOSTNAME */
+#define CONF_RAWMSG_BUFSIZE		101
+#define CONF_TAG_BUFSIZE		32
+#define CONF_HOSTNAME_BUFSIZE		32
+#define CONF_PROP_BUFSIZE		16	/* should be close to sizeof(ptr) or lighly above it */
+
 
 /* ############################################################# *
  * #                  End Config Settings                      # *
@@ -62,7 +73,9 @@
 typedef unsigned char uchar;/* get rid of the unhandy "unsigned char" */
 typedef struct thrdInfo thrdInfo_t;
 typedef struct obj_s obj_t;
-typedef struct filed selector_t;/* TODO: this so far resides in syslogd.c, think about modularization */
+typedef struct ruleset_s ruleset_t;
+typedef struct rule_s rule_t;
+//typedef struct filed selector_t;/* TODO: this so far resides in syslogd.c, think about modularization */
 typedef struct NetAddr netAddr_t;
 typedef struct netstrms_s netstrms_t;
 typedef struct netstrm_s netstrm_t;
@@ -77,6 +90,7 @@ typedef struct nsdsel_gtls_s nsdsel_gtls_t;
 typedef obj_t nsd_t;
 typedef obj_t nsdsel_t;
 typedef struct msg msg_t;
+typedef struct prop_s prop_t;
 typedef struct interface_s interface_t;
 typedef struct objInfo_s objInfo_t;
 typedef enum rsRetVal_ rsRetVal; /**< friendly type for global return value */
@@ -97,6 +111,8 @@ typedef struct strmLstnPortList_s strmLstnPortList_t; // TODO: rename?
 typedef long long int64;
 typedef long long unsigned uint64;
 typedef int64 number_t; /* type to use for numbers - TODO: maybe an autoconf option? */
+typedef char intTiny; 	/* 0..127! */
+typedef uchar uintTiny;	/* 0..255! */
 
 #ifdef __hpux
 typedef unsigned int u_int32_t; /* TODO: is this correct? */
@@ -113,6 +129,72 @@ typedef enum {
 	eFLOWCTL_LIGHT_DELAY = 1,	/**< some light delay possible, but no extended period of time */
 	eFLOWCTL_FULL_DELAY = 2	/**< delay possible for extended period of time */
 } flowControl_t;
+
+/* filter operations */
+typedef enum {
+	FIOP_NOP = 0,		/* do not use - No Operation */
+	FIOP_CONTAINS  = 1,	/* contains string? */
+	FIOP_ISEQUAL  = 2,	/* is (exactly) equal? */
+	FIOP_STARTSWITH = 3,	/* starts with a string? */
+	FIOP_REGEX = 4,		/* matches a (BRE) regular expression? */
+	FIOP_EREREGEX = 5	/* matches a ERE regular expression? */
+} fiop_t;
+
+
+/* multi-submit support.
+ * This is done via a simple data structure, which holds the number of elements
+ * as well as an array of to-be-submitted messages.
+ * rgerhards, 2009-06-16
+ */
+typedef struct multi_submit_s multi_submit_t;
+struct multi_submit_s {
+	short	maxElem;	/* maximum number of Elements */
+	short	nElem;		/* current number of Elements, points to the next one FREE */
+	msg_t	**ppMsgs;
+};
+
+
+#ifndef _PATH_CONSOLE
+#define _PATH_CONSOLE	"/dev/console"
+#endif
+
+/* properties are now encoded as (tiny) integers. I do not use an enum as I would like
+ * to keep the memory footprint small (and thus cache hits high).
+ * rgerhards, 2009-06-26
+ */
+typedef uintTiny	propid_t;
+#define PROP_INVALID			0
+#define PROP_MSG			1
+#define PROP_TIMESTAMP			2
+#define PROP_HOSTNAME			3
+#define PROP_SYSLOGTAG			4
+#define PROP_RAWMSG			5
+#define PROP_INPUTNAME			6
+#define PROP_FROMHOST			7
+#define PROP_FROMHOST_IP		8
+#define PROP_PRI			9
+#define PROP_PRI_TEXT			10
+#define PROP_IUT			11
+#define PROP_SYSLOGFACILITY		12
+#define PROP_SYSLOGFACILITY_TEXT	13
+#define PROP_SYSLOGSEVERITY		14
+#define PROP_SYSLOGSEVERITY_TEXT	15
+#define PROP_TIMEGENERATED		16
+#define PROP_PROGRAMNAME		17
+#define PROP_PROTOCOL_VERSION		18
+#define PROP_STRUCTURED_DATA		19
+#define PROP_APP_NAME			20
+#define PROP_PROCID			21
+#define PROP_MSGID			22
+#define PROP_SYS_NOW			150
+#define PROP_SYS_YEAR			151
+#define PROP_SYS_MONTH			152
+#define PROP_SYS_DAY			153
+#define PROP_SYS_HOUR			154
+#define PROP_SYS_HHOUR			155
+#define PROP_SYS_QHOUR			156
+#define PROP_SYS_MINUTE			157
+#define PROP_SYS_MYHOSTNAME		158
 
 
 /* The error codes below are orginally "borrowed" from
@@ -279,8 +361,14 @@ enum rsRetVal_				/** return value. All methods return this if not specified oth
 	RS_RET_PREVIOUS_COMMITTED = -2122, /**< output plugin status: previous record was committed (an OK state!) */
 	RS_RET_ACTION_FAILED = -2123, /**< action failed and is now suspended (consider this permanent for the time being) */
 	RS_RET_NONFATAL_CONFIG_ERR = -2124, /**< non-fatal error during config processing */
+	RS_RET_NON_SIZELIMITCMD = -2125, /**< size limit for file defined, but no size limit command given */
+	RS_RET_SIZELIMITCMD_DIDNT_RESOLVE = -2126, /**< size limit command did not resolve situation */
+	RS_RET_STREAM_DISABLED = -2127, /**< a file has been disabled (e.g. by size limit restriction) */
 	RS_RET_FILENAME_INVALID = -2140, /**< filename invalid, not found, no access, ... */
+	RS_RET_ZLIB_ERR = -2141, /**< error during zlib call */
+	RS_RET_VAR_NOT_FOUND = -2142, /**< variable not found */
 	RS_RET_EMPTY_MSG = -2143, /**< provided (raw) MSG is empty */
+	RS_RET_PEER_CLOSED_CONN = -2144, /**< remote peer closed connection (information, no error) */
 
 	/* RainerScript error messages (range 1000.. 1999) */
 	RS_RET_SYSVAR_NOT_FOUND = 1001, /**< system variable could not be found (maybe misspelled) */
@@ -368,6 +456,10 @@ typedef enum rsObjectID rsObjID;
 /* of course, this limits the functionality... */
 #  define O_CLOEXEC 0
 #endif
+
+/* some constants */
+#define MUTEX_ALREADY_LOCKED	0
+#define LOCK_MUTEX		1
 
 /* The following prototype is convenient, even though it may not be the 100% correct place.. -- rgerhards 2008-01-07 */
 void dbgprintf(char *, ...) __attribute__((format(printf, 1, 2)));

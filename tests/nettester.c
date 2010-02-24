@@ -38,6 +38,7 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <arpa/inet.h>
 #include <assert.h>
 #include <unistd.h>
@@ -61,6 +62,9 @@ static int iPort = 12514; /* port which shall be used for sending data */
 static char* pszCustomConf = NULL;	/* custom config file, use -c conf to specify */
 static int verbose = 0;	/* verbose output? -v option */
 
+/* these two are quick hacks... */
+int iFailed = 0;
+int iTests = 0;
 
 /* provide user-friednly name of input mode
  */
@@ -79,14 +83,27 @@ static char *inputMode2Str(inputMode_t mode)
 
 void readLine(int fd, char *ln)
 {
+	char *orig = ln;
 	char c;
 	int lenRead;
+
+	if(verbose)
+		fprintf(stderr, "begin readLine\n");
 	lenRead = read(fd, &c, 1);
 	while(lenRead == 1 && c != '\n') {
+		if(c == '\0') {
+			*ln = c;
+			fprintf(stderr, "Warning: there was a '\\0'-Byte in the read response "
+					"right after this string: '%s'\n", orig);
+			c = '?';
+		}
 		*ln++ = c;
-		 lenRead = read(fd, &c, 1);
+		lenRead = read(fd, &c, 1);
 	}
 	*ln = '\0';
+
+	if(verbose)
+		fprintf(stderr, "end readLine, val read '%s'\n", orig);
 }
 
 
@@ -104,6 +121,7 @@ tcpSend(char *buf, int lenBuf)
 {
 	static int sock = INVALID_SOCKET;
 	struct sockaddr_in addr;
+	int retries;
 
 	if(sock == INVALID_SOCKET) {
 		/* first time, need to connect to target */
@@ -119,10 +137,20 @@ tcpSend(char *buf, int lenBuf)
 			fprintf(stderr, "inet_aton() failed\n");
 			return(1);
 		}
-		if(connect(sock, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
-			fprintf(stderr, "connect() failed\n");
-			return(1);
-		}
+		retries = 0;
+		while(1) { /* loop broken inside */
+			if(connect(sock, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
+				break;
+			} else {
+				if(retries++ == 50) {
+					++iFailed;
+					fprintf(stderr, "connect() failed\n");
+					return(1);
+				} else {
+					usleep(100000); /* 0.1 sec, these are us! */
+				}
+			}
+		} 
 	}
 
 	/* send test data */
@@ -191,9 +219,8 @@ int openPipe(char *configFile, pid_t *pid, int *pfd)
 	char *newenviron[] = { NULL };
 	/* debug aide...
 	char *newenviron[] = { "RSYSLOG_DEBUG=debug nostdout",
-				"RSYSLOG_DEBUGLOG=tmp", NULL };
+				"RSYSLOG_DEBUGLOG=log", NULL };
 	*/
-
 
 	sprintf(confFile, "-f%s/testsuites/%s.conf", srcdir,
 		(pszCustomConf == NULL) ? configFile : pszCustomConf);
@@ -247,38 +274,47 @@ processTestFile(int fd, char *pszFileName)
 
 	/* skip comments at start of file */
 
-	getline(&testdata, &lenLn, fp);
 	while(!feof(fp)) {
-		if(*testdata == '#')
-			getline(&testdata, &lenLn, fp);
-		else
-			break; /* first non-comment */
-	}
+		getline(&testdata, &lenLn, fp);
+		while(!feof(fp)) {
+			if(*testdata == '#')
+				getline(&testdata, &lenLn, fp);
+			else
+				break; /* first non-comment */
+		}
 
+		/* this is not perfect, but works ;) */
+		if(feof(fp))
+			break;
 
-	testdata[strlen(testdata)-1] = '\0'; /* remove \n */
-	/* now we have the test data to send (we could use function pointers here...) */
-	if(inputMode == inputUDP) {
-		if(udpSend(testdata, strlen(testdata)) != 0)
-			return(2);
-	} else {
-		if(tcpSend(testdata, strlen(testdata)) != 0)
-			return(2);
-	}
+		++iTests; /* increment test count, we now do one! */
 
-	/* next line is expected output 
-	 * we do not care about EOF here, this will lead to a failure and thus
-	 * draw enough attention. -- rgerhards, 2009-03-31
-	 */
-	getline(&expected, &lenLn, fp);
-	expected[strlen(expected)-1] = '\0'; /* remove \n */
+		testdata[strlen(testdata)-1] = '\0'; /* remove \n */
+		/* now we have the test data to send (we could use function pointers here...) */
+		if(inputMode == inputUDP) {
+			if(udpSend(testdata, strlen(testdata)) != 0)
+				return(2);
+		} else {
+			if(tcpSend(testdata, strlen(testdata)) != 0)
+				return(2);
+		}
 
-	/* pull response from server and then check if it meets our expectation */
-	readLine(fd, buf);
-	if(strcmp(expected, buf)) {
-		printf("\nExpected Response:\n'%s'\nActual Response:\n'%s'\n",
-			expected, buf);
-			ret = 1;
+		/* next line is expected output 
+		 * we do not care about EOF here, this will lead to a failure and thus
+		 * draw enough attention. -- rgerhards, 2009-03-31
+		 */
+		getline(&expected, &lenLn, fp);
+		expected[strlen(expected)-1] = '\0'; /* remove \n */
+
+		/* pull response from server and then check if it meets our expectation */
+		readLine(fd, buf);
+		if(strcmp(expected, buf)) {
+			++iFailed;
+			printf("\nExpected Response:\n'%s'\nActual Response:\n'%s'\n",
+				expected, buf);
+				ret = 1;
+		}
+
 	}
 
 	free(testdata);
@@ -297,8 +333,6 @@ processTestFile(int fd, char *pszFileName)
 int
 doTests(int fd, char *files)
 {
-	int iFailed = 0;
-	int iTests = 0;
 	int ret;
 	char *testFile;
 	glob_t testFiles;
@@ -313,7 +347,6 @@ doTests(int fd, char *files)
 		if(stat((char*) testFile, &fileInfo) != 0) 
 			continue; /* continue with the next file if we can't stat() the file */
 
-		++iTests;
 		/* all regular files are run through the test logic. Symlinks don't work. */
 		if(S_ISREG(fileInfo.st_mode)) { /* config file */
 			if(verbose) printf("processing test case '%s' ... ", testFile);
@@ -321,8 +354,9 @@ doTests(int fd, char *files)
 			if(ret == 0) {
 				if(verbose) printf("successfully completed\n");
 			} else {
-				if(verbose) printf("failed!\n");
-				++iFailed;
+				if(!verbose)
+					printf("test '%s' ", testFile);
+				printf("failed!\n");
 			}
 		}
 	}
