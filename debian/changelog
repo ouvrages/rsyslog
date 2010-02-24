@@ -7,6 +7,8 @@ rsyslog (4.6.0-1) UNRELEASED; urgency=low
     - Removed, merged upstream.
   * debian/patches/no_create_db.patch
     - Refresh to apply cleanly.
+  * debian/control
+    - Bump Standards-Version to 3.8.4. No further changes.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 24 Feb 2010 20:34:25 +0100
 
