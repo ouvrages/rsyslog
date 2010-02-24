@@ -3,6 +3,10 @@ rsyslog (4.6.0-1) UNRELEASED; urgency=low
   * New upstream release.
   * debian/rsyslog-doc.install
     - Install png image files.
+  * debian/patches/doc_typo_fix.patch
+    - Removed, merged upstream.
+  * debian/patches/no_create_db.patch
+    - Refresh to apply cleanly.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 24 Feb 2010 20:34:25 +0100
 
