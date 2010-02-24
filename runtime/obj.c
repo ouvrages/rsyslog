@@ -75,6 +75,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
+#include <pthread.h>
 
 /* how many objects are supported by rsyslogd? */
 #define OBJ_NUM_IDS 100 /* TODO change to a linked list?  info: 16 were currently in use 2008-02-29 */
@@ -87,13 +88,17 @@
 #include "modules.h"
 #include "errmsg.h"
 #include "cfsysline.h"
+#include "unicode-helper.h"
+#include "apc.h"
 
 /* static data */
 DEFobjCurrIf(obj) /* we define our own interface, as this is expected by some macros! */
 DEFobjCurrIf(var)
 DEFobjCurrIf(module)
 DEFobjCurrIf(errmsg)
+DEFobjCurrIf(strm)
 static objInfo_t *arrObjInfo[OBJ_NUM_IDS]; /* array with object information pointers */
+static pthread_mutex_t mutObjGlobalOp;	/* mutex to guard global operations of the object system */
 
 
 /* cookies for serialized lines */
@@ -144,8 +149,8 @@ InfoConstruct(objInfo_t **ppThis, uchar *pszID, int iObjVers,
 		ABORT_FINALIZE(RS_RET_OUT_OF_MEMORY);
 
 	pThis->pszID = pszID;
-	pThis->lenID = strlen((char*)pszID);
-	pThis->pszName = (uchar*)strdup((char*)pszID); /* it's OK if we have NULL ptr, GetName() will deal with that! */
+	pThis->lenID = ustrlen(pszID);
+	pThis->pszName = ustrdup(pszID); /* it's OK if we have NULL ptr, GetName() will deal with that! */
 	pThis->iObjVers = iObjVers;
 	pThis->QueryIF = pQueryIF;
 	pThis->pModInfo = pModInfo;
@@ -176,8 +181,7 @@ InfoDestruct(objInfo_t **ppThis)
 	pThis = *ppThis;
 	assert(pThis != NULL);
 
-	if(pThis->pszName != NULL)
-		free(pThis->pszName);
+	free(pThis->pszName);
 	free(pThis);
 	*ppThis = NULL;
 
@@ -205,9 +209,7 @@ DestructObjSelf(obj_t *pThis)
 	DEFiRet;
 
 	ISOBJ_assert(pThis);
-	if(pThis->pszName != NULL) {
-		free(pThis->pszName);
-	}
+	free(pThis->pszName);
 
 	RETiRet;
 }
@@ -228,20 +230,20 @@ static rsRetVal objSerializeHeader(strm_t *pStrm, obj_t *pObj, uchar *pszRecType
 	assert(!strcmp((char*) pszRecType, "Obj") || !strcmp((char*) pszRecType, "OPB"));
 
 	/* object cookie and serializer version (so far always 1) */
-	CHKiRet(strmWriteChar(pStrm, COOKIE_OBJLINE));
-	CHKiRet(strmWrite(pStrm, (uchar*) pszRecType, 3)); /* record types are always 3 octets */
-	CHKiRet(strmWriteChar(pStrm, ':'));
-	CHKiRet(strmWriteChar(pStrm, '1'));
+	CHKiRet(strm.WriteChar(pStrm, COOKIE_OBJLINE));
+	CHKiRet(strm.Write(pStrm, (uchar*) pszRecType, 3)); /* record types are always 3 octets */
+	CHKiRet(strm.WriteChar(pStrm, ':'));
+	CHKiRet(strm.WriteChar(pStrm, '1'));
 
 	/* object type, version and string length */
-	CHKiRet(strmWriteChar(pStrm, ':'));
-	CHKiRet(strmWrite(pStrm, pObj->pObjInfo->pszID, pObj->pObjInfo->lenID));
-	CHKiRet(strmWriteChar(pStrm, ':'));
-	CHKiRet(strmWriteLong(pStrm, objGetVersion(pObj)));
+	CHKiRet(strm.WriteChar(pStrm, ':'));
+	CHKiRet(strm.Write(pStrm, pObj->pObjInfo->pszID, pObj->pObjInfo->lenID));
+	CHKiRet(strm.WriteChar(pStrm, ':'));
+	CHKiRet(strm.WriteLong(pStrm, objGetVersion(pObj)));
 
 	/* record trailer */
-	CHKiRet(strmWriteChar(pStrm, ':'));
-	CHKiRet(strmWriteChar(pStrm, '\n'));
+	CHKiRet(strm.WriteChar(pStrm, ':'));
+	CHKiRet(strm.WriteChar(pStrm, '\n'));
 
 finalize_it:
 	RETiRet;
@@ -259,7 +261,7 @@ BeginSerialize(strm_t *pStrm, obj_t *pObj)
 	ISOBJ_TYPE_assert(pStrm, strm);
 	ISOBJ_assert(pObj);
 	
-	CHKiRet(strmRecordBegin(pStrm));
+	CHKiRet(strm.RecordBegin(pStrm));
 	CHKiRet(objSerializeHeader(pStrm, pObj, (uchar*) "Obj"));
 
 finalize_it:
@@ -284,7 +286,7 @@ BeginSerializePropBag(strm_t *pStrm, obj_t *pObj)
 	ISOBJ_TYPE_assert(pStrm, strm);
 	ISOBJ_assert(pObj);
 	
-	CHKiRet(strmRecordBegin(pStrm));
+	CHKiRet(strm.RecordBegin(pStrm));
 	CHKiRet(objSerializeHeader(pStrm, pObj, (uchar*) "OPB"));
 
 finalize_it:
@@ -320,31 +322,31 @@ SerializeProp(strm_t *pStrm, uchar *pszPropName, propType_t propType, void *pUsr
 	switch(propType) {
 		case PROPTYPE_PSZ:
 			pszBuf = (uchar*) pUsr;
-			lenBuf = strlen((char*) pszBuf);
+			lenBuf = ustrlen(pszBuf);
 			vType = VARTYPE_STR;
 			break;
 		case PROPTYPE_SHORT:
 			CHKiRet(srUtilItoA((char*) szBuf, sizeof(szBuf), (long) *((short*) pUsr)));
 			pszBuf = szBuf;
-			lenBuf = strlen((char*) szBuf);
+			lenBuf = ustrlen(szBuf);
 			vType = VARTYPE_NUMBER;
 			break;
 		case PROPTYPE_INT:
 			CHKiRet(srUtilItoA((char*) szBuf, sizeof(szBuf), (long) *((int*) pUsr)));
 			pszBuf = szBuf;
-			lenBuf = strlen((char*) szBuf);
+			lenBuf = ustrlen(szBuf);
 			vType = VARTYPE_NUMBER;
 			break;
 		case PROPTYPE_LONG:
 			CHKiRet(srUtilItoA((char*) szBuf, sizeof(szBuf), *((long*) pUsr)));
 			pszBuf = szBuf;
-			lenBuf = strlen((char*) szBuf);
+			lenBuf = ustrlen(szBuf);
 			vType = VARTYPE_NUMBER;
 			break;
 		case PROPTYPE_INT64:
 			CHKiRet(srUtilItoA((char*) szBuf, sizeof(szBuf), *((int64*) pUsr)));
 			pszBuf = szBuf;
-			lenBuf = strlen((char*) szBuf);
+			lenBuf = ustrlen(szBuf);
 			vType = VARTYPE_NUMBER;
 			break;
 		case PROPTYPE_CSTR:
@@ -377,23 +379,23 @@ SerializeProp(strm_t *pStrm, uchar *pszPropName, propType_t propType, void *pUsr
 	}
 
 	/* cookie */
-	CHKiRet(strmWriteChar(pStrm, COOKIE_PROPLINE));
+	CHKiRet(strm.WriteChar(pStrm, COOKIE_PROPLINE));
 	/* name */
-	CHKiRet(strmWrite(pStrm, pszPropName, strlen((char*)pszPropName)));
-	CHKiRet(strmWriteChar(pStrm, ':'));
+	CHKiRet(strm.Write(pStrm, pszPropName, ustrlen(pszPropName)));
+	CHKiRet(strm.WriteChar(pStrm, ':'));
 	/* type */
-	CHKiRet(strmWriteLong(pStrm, (int) vType));
-	CHKiRet(strmWriteChar(pStrm, ':'));
+	CHKiRet(strm.WriteLong(pStrm, (int) vType));
+	CHKiRet(strm.WriteChar(pStrm, ':'));
 	/* length */
-	CHKiRet(strmWriteLong(pStrm, lenBuf));
-	CHKiRet(strmWriteChar(pStrm, ':'));
+	CHKiRet(strm.WriteLong(pStrm, lenBuf));
+	CHKiRet(strm.WriteChar(pStrm, ':'));
 
 	/* data */
-	CHKiRet(strmWrite(pStrm, (uchar*) pszBuf, lenBuf));
+	CHKiRet(strm.Write(pStrm, (uchar*) pszBuf, lenBuf));
 
 	/* trailer */
-	CHKiRet(strmWriteChar(pStrm, ':'));
-	CHKiRet(strmWriteChar(pStrm, '\n'));
+	CHKiRet(strm.WriteChar(pStrm, ':'));
+	CHKiRet(strm.WriteChar(pStrm, '\n'));
 
 finalize_it:
 	RETiRet;
@@ -410,12 +412,12 @@ EndSerialize(strm_t *pStrm)
 
 	assert(pStrm != NULL);
 
-	CHKiRet(strmWriteChar(pStrm, COOKIE_ENDLINE));
-	CHKiRet(strmWrite(pStrm, (uchar*) "End\n", sizeof("END\n") - 1));
-	CHKiRet(strmWriteChar(pStrm, COOKIE_BLANKLINE));
-	CHKiRet(strmWriteChar(pStrm, '\n'));
+	CHKiRet(strm.WriteChar(pStrm, COOKIE_ENDLINE));
+	CHKiRet(strm.Write(pStrm, (uchar*) "End\n", sizeof("END\n") - 1));
+	CHKiRet(strm.WriteChar(pStrm, COOKIE_BLANKLINE));
+	CHKiRet(strm.WriteChar(pStrm, '\n'));
 
-	CHKiRet(strmRecordEnd(pStrm));
+	CHKiRet(strm.RecordEnd(pStrm));
 
 finalize_it:
 	RETiRet;
@@ -423,7 +425,7 @@ finalize_it:
 
 
 /* define a helper to make code below a bit cleaner (and quicker to write) */
-#define NEXTC CHKiRet(strmReadChar(pStrm, &c))/*;dbgprintf("c: %c\n", c)*/
+#define NEXTC CHKiRet(strm.ReadChar(pStrm, &c))/*;dbgprintf("c: %c\n", c)*/
 
 
 /* de-serialize an embedded, non-octect-counted string. This is useful
@@ -440,11 +442,11 @@ objDeserializeEmbedStr(cstr_t **ppStr, strm_t *pStrm)
 
 	assert(ppStr != NULL);
 
-	CHKiRet(rsCStrConstruct(&pStr));
+	CHKiRet(cstrConstruct(&pStr));
 
 	NEXTC;
 	while(c != ':') {
-		CHKiRet(rsCStrAppendChar(pStr, c));
+		CHKiRet(cstrAppendChar(pStr, c));
 		NEXTC;
 	}
 	CHKiRet(cstrFinalize(pStr));
@@ -453,7 +455,7 @@ objDeserializeEmbedStr(cstr_t **ppStr, strm_t *pStrm)
 
 finalize_it:
 	if(iRet != RS_RET_OK && pStr != NULL)
-		rsCStrDestruct(&pStr);
+		cstrDestruct(&pStr);
 
 	RETiRet;
 }
@@ -508,11 +510,11 @@ static rsRetVal objDeserializeStr(cstr_t **ppCStr, int iLen, strm_t *pStrm)
 	assert(ppCStr != NULL);
 	assert(iLen >= 0);
 
-	CHKiRet(rsCStrConstruct(&pCStr));
+	CHKiRet(cstrConstruct(&pCStr));
 
 	NEXTC;
 	for(i = 0 ; i < iLen ; ++i) {
-		CHKiRet(rsCStrAppendChar(pCStr, c));
+		CHKiRet(cstrAppendChar(pCStr, c));
 		NEXTC;
 	}
 	CHKiRet(cstrFinalize(pCStr));
@@ -524,7 +526,7 @@ static rsRetVal objDeserializeStr(cstr_t **ppCStr, int iLen, strm_t *pStrm)
 
 finalize_it:
 	if(iRet != RS_RET_OK && pCStr != NULL)
-		rsCStrDestruct(&pCStr);
+		cstrDestruct(&pCStr);
 
 	RETiRet;
 }
@@ -617,16 +619,16 @@ static rsRetVal objDeserializeProperty(var_t *pProp, strm_t *pStrm)
 	NEXTC;
 	if(c != COOKIE_PROPLINE) {
 		/* oops, we've read one char that does not belong to use - unget it first */
-		CHKiRet(strmUnreadChar(pStrm, c));
+		CHKiRet(strm.UnreadChar(pStrm, c));
 		ABORT_FINALIZE(RS_RET_NO_PROPLINE);
 	}
 
 	/* get the property name first */
-	CHKiRet(rsCStrConstruct(&pProp->pcsName));
+	CHKiRet(cstrConstruct(&pProp->pcsName));
 
 	NEXTC;
 	while(c != ':') {
-		CHKiRet(rsCStrAppendChar(pProp->pcsName, c));
+		CHKiRet(cstrAppendChar(pProp->pcsName, c));
 		NEXTC;
 	}
 	CHKiRet(cstrFinalize(pProp->pcsName));
@@ -718,7 +720,7 @@ static rsRetVal objDeserializeTryRecover(strm_t *pStrm)
 		}
 	}
 
-	CHKiRet(strmUnreadChar(pStrm, c));
+	CHKiRet(strm.UnreadChar(pStrm, c));
 
 finalize_it:
 	dbgprintf("deserializer has possibly been able to re-sync and recover, state %d\n", iRet);
@@ -803,7 +805,7 @@ Deserialize(void *ppObj, uchar *pszTypeExpected, strm_t *pStrm, rsRetVal (*fFixu
 		}
 	} while(iRetLocal != RS_RET_OK);
 
-	if(rsCStrSzStrCmp(pstrID, pszTypeExpected, strlen((char*)pszTypeExpected))) /* TODO: optimize strlen() - caller shall provide */
+	if(rsCStrSzStrCmp(pstrID, pszTypeExpected, ustrlen(pszTypeExpected))) /* TODO: optimize strlen() - caller shall provide */
 		ABORT_FINALIZE(RS_RET_INVALID_OID);
 
 	CHKiRet(FindObjInfo(pstrID, &pObjInfo));
@@ -948,13 +950,8 @@ SetName(obj_t *pThis, uchar *pszName)
 {
 	DEFiRet;
 
-	if(pThis->pszName != NULL)
-		free(pThis->pszName);
-
-	pThis->pszName = (uchar*) strdup((char*) pszName);
-
-	if(pThis->pszName == NULL)
-		ABORT_FINALIZE(RS_RET_OUT_OF_MEMORY);
+	free(pThis->pszName);
+	CHKmalloc(pThis->pszName = ustrdup(pszName));
 
 finalize_it:
 	RETiRet;
@@ -1057,7 +1054,7 @@ RegisterObj(uchar *pszObjName, objInfo_t *pInfo)
 	i = 0;
 	while(!bFound && i < OBJ_NUM_IDS && arrObjInfo[i] != NULL) {
 		if(   arrObjInfo[i] != NULL
-		   && !strcmp((char*)arrObjInfo[i]->pszID, (char*)pszObjName)) {
+		   && !ustrcmp(arrObjInfo[i]->pszID, pszObjName)) {
 			bFound = 1;
 			break;
 		}
@@ -1096,7 +1093,7 @@ UnregisterObj(uchar *pszObjName)
 	i = 0;
 	while(!bFound && i < OBJ_NUM_IDS) {
 		if(   arrObjInfo[i] != NULL
-		   && !strcmp((char*)arrObjInfo[i]->pszID, (char*)pszObjName)) {
+		   && !ustrcmp(arrObjInfo[i]->pszID, pszObjName)) {
 			bFound = 1;
 			break;
 		}
@@ -1132,6 +1129,7 @@ UseObj(char *srcFile, uchar *pObjName, uchar *pObjFile, interface_t *pIf)
 
 
 	/* DEV debug only: dbgprintf("source file %s requests object '%s', ifIsLoaded %d\n", srcFile, pObjName, pIf->ifIsLoaded); */
+	d_pthread_mutex_lock(&mutObjGlobalOp);
 
 	if(pIf->ifIsLoaded == 1) {
 		ABORT_FINALIZE(RS_RET_OK); /* we are already set */
@@ -1172,6 +1170,8 @@ UseObj(char *srcFile, uchar *pObjName, uchar *pObjFile, interface_t *pIf)
 	pIf->ifIsLoaded = 1; /* we are happy */
 
 finalize_it:
+	d_pthread_mutex_unlock(&mutObjGlobalOp);
+
 	if(pStr != NULL)
 		rsCStrDestruct(&pStr);
 
@@ -1193,15 +1193,16 @@ ReleaseObj(char *srcFile, uchar *pObjName, uchar *pObjFile, interface_t *pIf)
 
 
 	/* dev debug only dbgprintf("source file %s releasing object '%s', ifIsLoaded %d\n", srcFile, pObjName, pIf->ifIsLoaded); */
+	d_pthread_mutex_lock(&mutObjGlobalOp);
 
 	if(pObjFile == NULL)
 		FINALIZE; /* if it is not a lodable module, we do not need to do anything... */
 
 	if(pIf->ifIsLoaded == 0) {
-		ABORT_FINALIZE(RS_RET_OK); /* we are not loaded - this is perfectly OK... */
+		FINALIZE; /* we are not loaded - this is perfectly OK... */
 	} else if(pIf->ifIsLoaded == 2) {
 		pIf->ifIsLoaded = 0; /* clean up */
-		ABORT_FINALIZE(RS_RET_OK); /* we had a load error and can not continue */
+		FINALIZE; /* we had a load error and can not/must not continue */
 	}
 
 	CHKiRet(rsCStrConstructFromszStr(&pStr, pObjName));
@@ -1213,6 +1214,8 @@ ReleaseObj(char *srcFile, uchar *pObjName, uchar *pObjFile, interface_t *pIf)
 	pIf->ifIsLoaded = 0; /* indicated "no longer valid" */
 
 finalize_it:
+	d_pthread_mutex_unlock(&mutObjGlobalOp);
+
 	if(pStr != NULL)
 		rsCStrDestruct(&pStr);
 
@@ -1278,14 +1281,15 @@ objClassExit(void)
 {
 	DEFiRet;
 	/* release objects we no longer need */
+	objRelease(strm, CORE_COMPONENT);
 	objRelease(var, CORE_COMPONENT);
 	objRelease(module, CORE_COMPONENT);
 	objRelease(errmsg, CORE_COMPONENT);
 
 	/* TODO: implement the class exits! */
 #if 0
-	cfsyslineInit(pModInfo);
-	varClassInit(pModInfo);
+	cfsyslineExit(pModInfo);
+	varClassExit(pModInfo);
 #endif
 	errmsgClassExit();
 	moduleClassExit();
@@ -1304,8 +1308,9 @@ objClassExit(void)
 rsRetVal
 objClassInit(modInfo_t *pModInfo)
 {
-	DEFiRet;
+	pthread_mutexattr_t mutAttr;
 	int i;
+	DEFiRet;
 	
 	/* first, initialize the object system itself. This must be done
 	 * before any other object is created.
@@ -1314,17 +1319,27 @@ objClassInit(modInfo_t *pModInfo)
 		arrObjInfo[i] = NULL;
 	}
 
+	/* the mutex must be recursive, because objects may call into other
+	 * object identifieres recursively.
+	 */
+	pthread_mutexattr_init(&mutAttr);
+	pthread_mutexattr_settype(&mutAttr, PTHREAD_MUTEX_RECURSIVE);
+	pthread_mutex_init(&mutObjGlobalOp, &mutAttr);
+
 	/* request objects we use */
 	CHKiRet(objGetObjInterface(&obj)); /* get ourselves ;) */
 
 	/* init classes we use (limit to as few as possible!) */
+	CHKiRet(apcClassInit(pModInfo));
 	CHKiRet(errmsgClassInit(pModInfo));
 	CHKiRet(cfsyslineInit());
 	CHKiRet(varClassInit(pModInfo));
 	CHKiRet(moduleClassInit(pModInfo));
+	CHKiRet(strmClassInit(pModInfo));
 	CHKiRet(objUse(var, CORE_COMPONENT));
 	CHKiRet(objUse(module, CORE_COMPONENT));
 	CHKiRet(objUse(errmsg, CORE_COMPONENT));
+	CHKiRet(objUse(strm, CORE_COMPONENT));
 
 finalize_it:
 	RETiRet;

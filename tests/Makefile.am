@@ -5,11 +5,24 @@ TESTS = $(TESTRUNS) cfg.sh \
 	validation-run.sh \
 	imtcp-multiport.sh \
 	diskqueue.sh \
+	diskqueue-fsync.sh \
 	manytcp.sh \
+	sndrcv.sh \
+	sndrcv_gzip.sh \
+	queue-persist.sh \
+	pipeaction.sh
+	execonlyonce.sh \
 	queue-persist.sh 
 
 if ENABLE_OMSTDOUT
-TESTS += omod-if-array.sh parsertest.sh inputname.sh fieldtest.sh
+TESTS += omod-if-array.sh \
+	 proprepltest.sh \
+	 parsertest.sh \
+	 timestamp.sh \
+	 inputname.sh \
+	 threadingmq.sh \
+	 threadingmqaq.sh \
+	 fieldtest.sh
 endif
 
 check_JAVA = DiagTalker.java
@@ -36,11 +49,37 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   DevNull.cfgtest \
 	   err1.rstest \
 	   NoExistFile.cfgtest \
+	   timestamp.sh \
+	   testsuites/ts3164.conf \
+	   testsuites/mon1digit.ts3164 \
+	   testsuites/mon2digit.ts3164 \
+	   testsuites/Jan.ts3164 \
+	   testsuites/Feb.ts3164 \
+	   testsuites/Mar.ts3164 \
+	   testsuites/Apr.ts3164 \
+	   testsuites/May.ts3164 \
+	   testsuites/Jun.ts3164 \
+	   testsuites/Jul.ts3164 \
+	   testsuites/Aug.ts3164 \
+	   testsuites/Sep.ts3164 \
+	   testsuites/Oct.ts3164 \
+	   testsuites/Nov.ts3164 \
+	   testsuites/Dec.ts3164 \
+	   testsuites/ts3339.conf \
+	   testsuites/master.ts3339 \
+	   testsuites/tsmysql.conf \
+	   testsuites/master.tsmysql \
+	   testsuites/tspgsql.conf \
+	   testsuites/master.tspgsql \
+	   testsuites/subsecond.conf \
+	   testsuites/master.subsecond \
 	   testsuites/parse1.conf \
 	   testsuites/field1.conf \
 	   testsuites/1.parse1 \
 	   testsuites/2.parse1 \
 	   testsuites/3.parse1 \
+	   testsuites/oversizeTag-1.parse1 \
+	   testsuites/weird.parse1 \
 	   testsuites/date1.parse1 \
 	   testsuites/date2.parse1 \
 	   testsuites/date3.parse1 \
@@ -51,6 +90,10 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/rfc5424-2.parse1 \
 	   testsuites/rfc5424-3.parse1 \
 	   testsuites/rfc5424-4.parse1 \
+	   testsuites/parse3.conf \
+	   testsuites/reallife.parse3 \
+	   testsuites/parse_invld_regex.conf \
+	   testsuites/samples.parse_invld_regex \
 	   testsuites/omod-if-array.conf \
 	   testsuites/1.omod-if-array \
 	   testsuites/1.field1 \
@@ -59,6 +102,8 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   fieldtest.sh \
 	   diskqueue.sh \
 	   testsuites/diskqueue.conf \
+	   diskqueue-fsync.sh \
+	   testsuites/diskqueue-fsync.conf \
 	   imtcp-multiport.sh \
 	   testsuites/imtcp-multiport.conf \
 	   manytcp.sh \
@@ -71,9 +116,31 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   omod-if-array.sh \
 	   diag.sh \
 	   testsuites/diag-common.conf \
+	   testsuites/diag-common2.conf \
 	   queue-persist.sh \
 	   queue-persist-drvr.sh \
 	   testsuites/queue-persist.conf \
+	   threadingmq.sh \
+	   testsuites/threadingmq.conf \
+	   threadingmqaq.sh \
+	   testsuites/threadingmqaq.conf \
+	   sndrcv_drvr.sh \
+	   sndrcv.sh \
+	   testsuites/sndrcv_sender.conf \
+	   testsuites/sndrcv_rcvr.conf \
+	   sndrcv_gzip.sh \
+	   testsuites/sndrcv_gzip_sender.conf \
+	   testsuites/sndrcv_gzip_rcvr.conf \
+	   pipeaction.sh \
+	   testsuites/pipeaction.conf \
+	   proprepltest.sh \
+	   testsuites/rfctag.conf \
+	   testsuites/master.rfctag \
+	   testsuites/nolimittag.conf \
+	   testsuites/master.nolimittag \
+	   execonlyonce.sh \
+	   testsuites/execonlyonce.conf \
+	   testsuites/execonlyonce.data \
 	   DiagTalker.java \
 	   cfg.sh
 

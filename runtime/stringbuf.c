@@ -70,7 +70,6 @@ rsRetVal cstrConstruct(cstr_t **ppThis)
 	pThis->pszBuf = NULL;
 	pThis->iBufSize = 0;
 	pThis->iStrLen = 0;
-	pThis->iAllocIncrement = RS_STRINGBUF_ALLOC_INCREMENT;
 	*ppThis = pThis;
 
 finalize_it:
@@ -153,24 +152,24 @@ void rsCStrDestruct(cstr_t **ppThis)
  * rgerhards, 2008-01-07
  * changed to utilized realloc() -- rgerhards, 2009-06-16
  */
-static rsRetVal
+rsRetVal
 rsCStrExtendBuf(cstr_t *pThis, size_t iMinNeeded)
 {
 	uchar *pNewBuf;
-	size_t iNewSize;
+	unsigned short iNewSize;
 	DEFiRet;
 
 	/* first compute the new size needed */
-	if(iMinNeeded > pThis->iAllocIncrement) {
-		/* we allocate "n" iAllocIncrements. Usually, that should
+	if(iMinNeeded > RS_STRINGBUF_ALLOC_INCREMENT) {
+		/* we allocate "n" ALLOC_INCREMENTs. Usually, that should
 		 * leave some room after the absolutely needed one. It also
 		 * reduces memory fragmentation. Note that all of this are
 		 * integer operations (very important to understand what is
 		 * going on)! Parenthesis are for better readibility.
 		 */
-		iNewSize = ((iMinNeeded / pThis->iAllocIncrement) + 1) * pThis->iAllocIncrement;
+		iNewSize = (iMinNeeded / RS_STRINGBUF_ALLOC_INCREMENT + 1) * RS_STRINGBUF_ALLOC_INCREMENT;
 	} else {
-		iNewSize = pThis->iBufSize + pThis->iAllocIncrement;
+		iNewSize = pThis->iBufSize + RS_STRINGBUF_ALLOC_INCREMENT;
 	}
 	iNewSize += pThis->iBufSize; /* add current size */
 
@@ -224,7 +223,7 @@ rsRetVal rsCStrAppendStr(cstr_t *pThis, uchar* psz)
 /* append the contents of one cstr_t object to another
  * rgerhards, 2008-02-25
  */
-rsRetVal rsCStrAppendCStr(cstr_t *pThis, cstr_t *pstrAppend)
+rsRetVal cstrAppendCStr(cstr_t *pThis, cstr_t *pstrAppend)
 {
 	return rsCStrAppendStrWithLen(pThis, pstrAppend->pBuf, pstrAppend->iStrLen);
 }
@@ -245,58 +244,10 @@ finalize_it:
 }
 
 
-rsRetVal rsCStrAppendChar(cstr_t *pThis, uchar c)
-{
-	DEFiRet;
-
-	rsCHECKVALIDOBJECT(pThis, OIDrsCStr);
-
-	if(pThis->iStrLen >= pThis->iBufSize) {  
-		CHKiRet(rsCStrExtendBuf(pThis, 1)); /* need more memory! */
-	}
-
-	/* ok, when we reach this, we have sufficient memory */
-	*(pThis->pBuf + pThis->iStrLen++) = c;
-
-	/* check if we need to invalidate an sz representation! */
-	if(pThis->pszBuf != NULL) {
-		free(pThis->pszBuf);
-		pThis->pszBuf = NULL;
-	}
-
-finalize_it:
-	RETiRet;
-}
-
-
-/* NEW VARIANT
- * Append a character to the current string object. This may only be done until
- * cstrFinalize() is called.
- * rgerhards, 2009-06-16
- */
-rsRetVal cstrAppendChar(cstr_t *pThis, uchar c)
-{
-	DEFiRet;
-
-	rsCHECKVALIDOBJECT(pThis, OIDrsCStr);
-
-	if(pThis->iStrLen >= pThis->iBufSize) {  
-		CHKiRet(rsCStrExtendBuf(pThis, 1)); /* need more memory! */
-	}
-
-	/* ok, when we reach this, we have sufficient memory */
-	*(pThis->pBuf + pThis->iStrLen++) = c;
-
-finalize_it:
-	RETiRet;
-}
-
-
 /* Sets the string object to the classigal sz-string provided.
  * Any previously stored vlaue is discarded. If a NULL pointer
  * the the new value (pszNew) is provided, an empty string is
- * created (this is NOT an error!). Property iAllocIncrement is
- * not modified by this function.
+ * created (this is NOT an error!).
  * rgerhards, 2005-10-18
  */
 rsRetVal rsCStrSetSzStr(cstr_t *pThis, uchar *pszNew)
@@ -314,7 +265,6 @@ rsRetVal rsCStrSetSzStr(cstr_t *pThis, uchar *pszNew)
 		pThis->iStrLen = strlen((char*)pszNew);
 		pThis->iBufSize = pThis->iStrLen;
 		pThis->pszBuf = NULL;
-		/* iAllocIncrement is NOT modified! */
 
 		/* now save the new value */
 		if((pThis->pBuf = (uchar*) malloc(sizeof(uchar) * pThis->iStrLen)) == NULL) {
@@ -392,25 +342,6 @@ uchar*  rsCStrGetSzStr(cstr_t *pThis)
 }
 
 
-/* NEW VERSION for interface without separate psz buffer! */
-/* Returns the cstr data as a classical C sz string. We use that the 
- * Finalizer did properly terminate our string (but we may stil be NULL).
- * So it is vital that the finalizer is called BEFORe this function here!
- * The caller must not free or otherwise manipulate the returned string and must not
- * destroy the CStr object as long as the ascii string is used.
- * This function may return NULL, if the string is currently NULL. This
- * is a feature, not a bug. If you need non-NULL in any case, use
- * cstrGetSzStrNoNULL() instead.
- * Note that due to the new single-buffer interface this function almost does nothing!
- * rgerhards, 2006-09-16
- */
-uchar*  cstrGetSzStr(cstr_t *pThis)
-{
-	rsCHECKVALIDOBJECT(pThis, OIDrsCStr);
-	return(pThis->pBuf);
-}
-
-
 /* Converts the CStr object to a classical zero-terminated C string,
  * returns that string and destroys the CStr object. The returned string
  * MUST be freed by the caller. The function might return NULL if
@@ -458,38 +389,6 @@ finalize_it:
 }
 
 
-/* Finalize the string object. This must be called after all data is added to it
- * but before that data is used.
- * rgerhards, 2009-06-16
- */
-rsRetVal
-cstrFinalize(cstr_t *pThis)
-{
-	DEFiRet;
-	rsCHECKVALIDOBJECT(pThis, OIDrsCStr);
-	
-	assert(pThis->bIsFinalized == 0);
-
-	if(pThis->iStrLen > 0) {
-		/* terminate string only if one exists */
-		CHKiRet(cstrAppendChar(pThis, '\0'));
-		--pThis->iStrLen;	/* do NOT count the \0 byte */
-	}
-	pThis->bIsFinalized = 1;
-
-finalize_it:
-	RETiRet;
-}
-
-
-void rsCStrSetAllocIncrement(cstr_t *pThis, int iNewIncrement)
-{
-	rsCHECKVALIDOBJECT(pThis, OIDrsCStr);
-	assert(iNewIncrement > 0);
-	pThis->iAllocIncrement = iNewIncrement;
-}
-
-
 /* return the length of the current string
  * 2005-09-09 rgerhards
  * Please note: this is only a function in a debug build.
@@ -497,7 +396,7 @@ void rsCStrSetAllocIncrement(cstr_t *pThis, int iNewIncrement)
  * This is due to performance reasons.
  */
 #ifndef NDEBUG
-int rsCStrLen(cstr_t *pThis)
+int cstrLen(cstr_t *pThis)
 {
 	rsCHECKVALIDOBJECT(pThis, OIDrsCStr);
 	return(pThis->iStrLen);
@@ -544,6 +443,27 @@ rsRetVal rsCStrTrimTrailingWhiteSpace(cstr_t *pThis)
 	}
 	/* i now is the new string length! */
 	pThis->iStrLen = i;
+
+	return RS_RET_OK;
+}
+
+/* Trim trailing whitespace from a given string
+ */
+rsRetVal cstrTrimTrailingWhiteSpace(cstr_t *pThis)
+{
+	register int i;
+	register uchar *pC;
+	rsCHECKVALIDOBJECT(pThis, OIDrsCStr);
+
+	i = pThis->iStrLen;
+	pC = pThis->pBuf + i - 1;
+	while(i > 0 && isspace((int)*pC)) {
+		--pC;
+		--i;
+	}
+	/* i now is the new string length! */
+	pThis->iStrLen = i;
+	pThis->pBuf[pThis->iStrLen] = '0'; /* we always have this space */
 
 	return RS_RET_OK;
 }

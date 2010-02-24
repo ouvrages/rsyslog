@@ -69,6 +69,7 @@
 #include "netstrm.h"
 #include "nssel.h"
 #include "errmsg.h"
+#include "ruleset.h"
 #include "unicode-helper.h"
 
 MODULE_TYPE_LIB
@@ -81,12 +82,14 @@ MODULE_TYPE_LIB
 DEFobjStaticHelpers
 DEFobjCurrIf(conf)
 DEFobjCurrIf(glbl)
+DEFobjCurrIf(ruleset)
 DEFobjCurrIf(tcps_sess)
 DEFobjCurrIf(errmsg)
 DEFobjCurrIf(net)
 DEFobjCurrIf(netstrms)
 DEFobjCurrIf(netstrm)
 DEFobjCurrIf(nssel)
+DEFobjCurrIf(prop)
 
 
 /* add new listener port to listener port list
@@ -104,8 +107,12 @@ addNewLstnPort(tcpsrv_t *pThis, uchar *pszPort)
 	CHKmalloc(pEntry = malloc(sizeof(tcpLstnPortList_t)));
 	pEntry->pszPort = pszPort;
 	pEntry->pSrv = pThis;
-	CHKmalloc(pEntry->pszInputName = ustrdup(pThis->pszInputName));
-	pEntry->lenInputName = ustrlen(pEntry->pszInputName);
+	pEntry->pRuleset = pThis->pRuleset;
+
+	/* we need to create a property */ 
+	CHKiRet(prop.Construct(&pEntry->pInputName));
+	CHKiRet(prop.SetString(pEntry->pInputName, pThis->pszInputName, ustrlen(pThis->pszInputName)));
+	CHKiRet(prop.ConstructFinalize(pEntry->pInputName));
 
 	/* and add to list */
 	pEntry->pNext = pThis->pLstnPorts;
@@ -247,14 +254,14 @@ static void deinit_tcp_listener(tcpsrv_t *pThis)
 	pEntry = pThis->pLstnPorts;
 	while(pEntry != NULL) {
 		free(pEntry->pszPort);
-		free(pEntry->pszInputName);
+		prop.Destruct(&pEntry->pInputName);
 		pDel = pEntry;
 		pEntry = pEntry->pNext;
 		free(pDel);
 	}
 
 	/* finally close our listen streams */
-	for(i = 0 ; i < pThis->iLstnMax ; ++i) {
+	for(i = 0 ; i < pThis->iLstnCurr ; ++i) {
 		netstrm.Destruct(pThis->ppLstn + i);
 	}
 }
@@ -273,12 +280,12 @@ addTcpLstn(void *pUsr, netstrm_t *pLstn)
 	ISOBJ_TYPE_assert(pThis, tcpsrv);
 	ISOBJ_TYPE_assert(pLstn, netstrm);
 
-	if(pThis->iLstnMax >= TCPLSTN_MAX_DEFAULT)
+	if(pThis->iLstnCurr >= pThis->iLstnMax)
 		ABORT_FINALIZE(RS_RET_MAX_LSTN_REACHED);
 
-	pThis->ppLstn[pThis->iLstnMax] = pLstn;
-	pThis->ppLstnPort[pThis->iLstnMax] = pPortList;
-	++pThis->iLstnMax;
+	pThis->ppLstn[pThis->iLstnCurr] = pLstn;
+	pThis->ppLstnPort[pThis->iLstnCurr] = pPortList;
+	++pThis->iLstnCurr;
 
 finalize_it:
 	RETiRet;
@@ -320,15 +327,19 @@ finalize_it:
 static rsRetVal
 create_tcp_socket(tcpsrv_t *pThis)
 {
-	tcpLstnPortList_t *pEntry;
 	DEFiRet;
+	rsRetVal localRet;
+	tcpLstnPortList_t *pEntry;
 
 	ISOBJ_TYPE_assert(pThis, tcpsrv);
 
 	/* init all configured ports */
 	pEntry = pThis->pLstnPorts;
 	while(pEntry != NULL) {
-		CHKiRet(initTCPListener(pThis, pEntry));
+		localRet = initTCPListener(pThis, pEntry);
+		if(localRet != RS_RET_OK) {
+			errmsg.LogError(0, localRet, "Could not create tcp listener, ignoring port %s.", pEntry->pszPort);
+		}
 		pEntry = pEntry->pNext;
 	}
 
@@ -481,7 +492,7 @@ Run(tcpsrv_t *pThis)
 		CHKiRet(nssel.ConstructFinalize(pSel));
 
 		/* Add the TCP listen sockets to the list of read descriptors. */
-		for(i = 0 ; i < pThis->iLstnMax ; ++i) {
+		for(i = 0 ; i < pThis->iLstnCurr ; ++i) {
 			CHKiRet(nssel.Add(pSel, pThis->ppLstn[i], NSDSEL_RD));
 		}
 
@@ -497,7 +508,7 @@ Run(tcpsrv_t *pThis)
 		/* wait for io to become ready */
 		CHKiRet(nssel.Wait(pSel, &nfds));
 
-		for(i = 0 ; i < pThis->iLstnMax ; ++i) {
+		for(i = 0 ; i < pThis->iLstnCurr ; ++i) {
 			CHKiRet(nssel.IsReady(pSel, pThis->ppLstn[i], NSDSEL_RD, &bIsReady, &nfds));
 			if(bIsReady) {
 				dbgprintf("New connect on NSD %p.\n", pThis->ppLstn[i]);
@@ -518,6 +529,14 @@ Run(tcpsrv_t *pThis)
 				iRet = pThis->pRcvData(pThis->pSessions[iTCPSess], buf, sizeof(buf), &iRcvd);
 				switch(iRet) {
 				case RS_RET_CLOSED:
+					if(pThis->bEmitMsgOnClose) {
+						uchar *pszPeer;
+						int lenPeer;
+						errno = 0;
+						prop.GetString(pThis->pSessions[iTCPSess]->fromHostIP, &pszPeer, &lenPeer);
+						errmsg.LogError(0, RS_RET_PEER_CLOSED_CONN, "Netstream session %p closed by remote peer %s.\n",
+								pThis->pSessions[iTCPSess]->pStrm, pszPeer);
+					}
 					pThis->pOnRegularClose(pThis->pSessions[iTCPSess]);
 					tcps_sess.Destruct(&pThis->pSessions[iTCPSess]);
 					break;
@@ -568,7 +587,8 @@ finalize_it: /* this is a very special case - this time only we do not exit the 
 
 /* Standard-Constructor */
 BEGINobjConstruct(tcpsrv) /* be sure to specify the object type also in END macro! */
-	pThis->iSessMax = TCPSESS_MAX_DEFAULT; /* TODO: useful default ;) */
+	pThis->iSessMax = TCPSESS_MAX_DEFAULT;
+	pThis->iLstnMax = TCPLSTN_MAX_DEFAULT;
 	pThis->addtlFrameDelim = TCPSRV_NO_ADDTL_DELIMITER;
 	pThis->OnMsgReceive = NULL;
 ENDobjConstruct(tcpsrv)
@@ -592,8 +612,8 @@ tcpsrvConstructFinalize(tcpsrv_t *pThis)
 	CHKiRet(netstrms.ConstructFinalize(pThis->pNS));
 
 	/* set up listeners */
-	CHKmalloc(pThis->ppLstn = calloc(TCPLSTN_MAX_DEFAULT, sizeof(netstrm_t*)));
-	CHKmalloc(pThis->ppLstnPort = calloc(TCPLSTN_MAX_DEFAULT, sizeof(tcpLstnPortList_t*)));
+	CHKmalloc(pThis->ppLstn = calloc(pThis->iLstnMax, sizeof(netstrm_t*)));
+	CHKmalloc(pThis->ppLstnPort = calloc(pThis->iLstnMax, sizeof(tcpLstnPortList_t*)));
 	iRet = pThis->OpenLstnSocks(pThis);
 
 finalize_it:
@@ -756,6 +776,26 @@ finalize_it:
 }
 
 
+/* Set the ruleset (ptr) to use */
+static rsRetVal
+SetRuleset(tcpsrv_t *pThis, ruleset_t *pRuleset)
+{
+	DEFiRet;
+	pThis->pRuleset = pRuleset;
+	RETiRet;
+}
+
+
+/* Set connection close notification */
+static rsRetVal
+SetNotificationOnRemoteClose(tcpsrv_t *pThis, int bNewVal)
+{
+	DEFiRet;
+	pThis->bEmitMsgOnClose = bNewVal;
+	RETiRet;
+}
+
+
 /* here follows a number of methods that shuffle authentication settings down
  * to the drivers. Drivers not supporting these settings may return an error
  * state.
@@ -800,6 +840,20 @@ SetDrvrPermPeers(tcpsrv_t *pThis, permittedPeers_t *pPermPeers)
  * -------------------------------------------------------------------------- */
 
 
+/* set max number of listeners
+ * this must be called before ConstructFinalize, or it will have no effect!
+ * rgerhards, 2009-08-17
+ */
+static rsRetVal
+SetLstnMax(tcpsrv_t *pThis, int iMax)
+{
+	DEFiRet;
+	ISOBJ_TYPE_assert(pThis, tcpsrv);
+	pThis->iLstnMax = iMax;
+	RETiRet;
+}
+
+
 /* set max number of sessions
  * this must be called before ConstructFinalize, or it will have no effect!
  * rgerhards, 2009-04-09
@@ -842,6 +896,7 @@ CODESTARTobjQueryInterface(tcpsrv)
 	pIf->SetInputName = SetInputName;
 	pIf->SetAddtlFrameDelim = SetAddtlFrameDelim;
 	pIf->SetSessMax = SetSessMax;
+	pIf->SetLstnMax = SetLstnMax;
 	pIf->SetDrvrMode = SetDrvrMode;
 	pIf->SetDrvrAuthMode = SetDrvrAuthMode;
 	pIf->SetDrvrPermPeers = SetDrvrPermPeers;
@@ -856,6 +911,8 @@ CODESTARTobjQueryInterface(tcpsrv)
 	pIf->SetCBOnRegularClose = SetCBOnRegularClose;
 	pIf->SetCBOnErrClose = SetCBOnErrClose;
 	pIf->SetOnMsgReceive = SetOnMsgReceive;
+	pIf->SetRuleset = SetRuleset;
+	pIf->SetNotificationOnRemoteClose = SetNotificationOnRemoteClose;
 
 finalize_it:
 ENDobjQueryInterface(tcpsrv)
@@ -869,6 +926,8 @@ CODESTARTObjClassExit(tcpsrv)
 	/* release objects we no longer need */
 	objRelease(tcps_sess, DONT_LOAD_LIB);
 	objRelease(conf, CORE_COMPONENT);
+	objRelease(prop, CORE_COMPONENT);
+	objRelease(ruleset, CORE_COMPONENT);
 	objRelease(glbl, CORE_COMPONENT);
 	objRelease(errmsg, CORE_COMPONENT);
 	objRelease(netstrms, DONT_LOAD_LIB);
@@ -892,6 +951,8 @@ BEGINObjClassInit(tcpsrv, 1, OBJ_IS_LOADABLE_MODULE) /* class, version - CHANGE 
 	CHKiRet(objUse(tcps_sess, DONT_LOAD_LIB));
 	CHKiRet(objUse(conf, CORE_COMPONENT));
 	CHKiRet(objUse(glbl, CORE_COMPONENT));
+	CHKiRet(objUse(ruleset, CORE_COMPONENT));
+	CHKiRet(objUse(prop, CORE_COMPONENT));
 
 	/* set our own handlers */
 	OBJSetMethodHandler(objMethod_DEBUGPRINT, tcpsrvDebugPrint);

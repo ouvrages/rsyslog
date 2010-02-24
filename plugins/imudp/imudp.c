@@ -43,6 +43,7 @@
 #include "msg.h"
 #include "parser.h"
 #include "datetime.h"
+#include "prop.h"
 #include "unicode-helper.h"
 
 MODULE_TYPE_INPUT
@@ -55,6 +56,7 @@ DEFobjCurrIf(errmsg)
 DEFobjCurrIf(glbl)
 DEFobjCurrIf(net)
 DEFobjCurrIf(datetime)
+DEFobjCurrIf(prop)
 
 static int iMaxLine;			/* maximum UDP message size supported */
 static time_t ttLastDiscard = 0;	/* timestamp when a message from a non-permitted sender was last discarded
@@ -68,6 +70,8 @@ static uchar *pRcvBuf = NULL;		/* receive buffer (for a single packet). We use a
 					 * it so that we can check available memory in willRun() and request
 					 * termination if we can not get it. -- rgerhards, 2007-12-27
 					 */
+static prop_t *pInputName = NULL;	/* our inputName currently is always "imudp", and this will hold it */
+// TODO: static ruleset_t *pBindRuleset = NULL; /* ruleset to bind listener to (use system default if unspecified) */
 #define TIME_REQUERY_DFLT 2
 static int iTimeRequery = TIME_REQUERY_DFLT;/* how often is time to be queried inside tight recv loop? 0=always */
 
@@ -97,7 +101,7 @@ static rsRetVal addListner(void __attribute__((unused)) *pVal, uchar *pNewVal)
 	else
 		bindAddr = pszBindAddr;
 
-	dbgprintf("Trying to open syslog UDP ports at %s:%s.\n",
+	DBGPRINTF("Trying to open syslog UDP ports at %s:%s.\n",
 		  (bindAddr == NULL) ? (uchar*)"*" : bindAddr, pNewVal);
 
 	newSocks = net.create_udp_socket(bindAddr, (pNewVal == NULL || *pNewVal == '\0') ? (uchar*) "514" : pNewVal, 1);
@@ -137,6 +141,30 @@ finalize_it:
 }
 
 
+#if 0 /* TODO: implement when tehre is time, requires restructure of socket array! */
+/* accept a new ruleset to bind. Checks if it exists and complains, if not */
+static rsRetVal
+setRuleset(void __attribute__((unused)) *pVal, uchar *pszName)
+{
+	ruleset_t *pRuleset;
+	rsRetVal localRet;
+	DEFiRet;
+
+	localRet = ruleset.GetRuleset(&pRuleset, pszName);
+	if(localRet == RS_RET_NOT_FOUND) {
+		errmsg.LogError(0, NO_ERRCODE, "error: ruleset '%s' not found - ignored", pszName);
+	}
+	CHKiRet(localRet);
+	pBindRuleset = pRuleset;
+	DBGPRINTF("imudp current bind ruleset %p: '%s'\n", pRuleset, pszName);
+
+finalize_it:
+	free(pszName); /* no longer needed */
+	RETiRet;
+}
+#endif
+
+
 /* This function is a helper to runInput. I have extracted it
  * from the main loop just so that we do not have that large amount of code
  * in a single place. This function takes a socket and pulls messages from
@@ -163,6 +191,8 @@ processSocket(int fd, struct sockaddr_storage *frominetPrev, int *pbIsPermitted,
 	ssize_t lenRcvBuf;
 	struct sockaddr_storage frominet;
 	msg_t *pMsg;
+	prop_t *propFromHost = NULL;
+	prop_t *propFromHostIP = NULL;
 	char errStr[1024];
 
 	iNbrTimeUsed = 0;
@@ -219,22 +249,23 @@ processSocket(int fd, struct sockaddr_storage *frominetPrev, int *pbIsPermitted,
 			}
 			/* we now create our own message object and submit it to the queue */
 			CHKiRet(msgConstructWithTime(&pMsg, &stTime, ttGenTime));
-			/* first trim the buffer to what we have actually received */
-			CHKmalloc(pMsg->pszRawMsg = malloc(sizeof(uchar)* lenRcvBuf));
-			memcpy(pMsg->pszRawMsg, pRcvBuf, lenRcvBuf);
-			pMsg->iLenRawMsg = lenRcvBuf;
-			MsgSetInputName(pMsg, UCHAR_CONSTANT("imudp"), sizeof("imudp")-1);
+			MsgSetRawMsg(pMsg, (char*)pRcvBuf, lenRcvBuf);
+			MsgSetInputName(pMsg, pInputName);
 			MsgSetFlowControlType(pMsg, eFLOWCTL_NO_DELAY);
 			pMsg->msgFlags  = NEEDS_PARSING | PARSE_HOSTNAME;
 			pMsg->bParseHOSTNAME = 1;
-			MsgSetRcvFrom(pMsg, fromHost);
-			CHKiRet(MsgSetRcvFromIP(pMsg, fromHostIP));
+			MsgSetRcvFromStr(pMsg, fromHost, ustrlen(fromHost), &propFromHost);
+			CHKiRet(MsgSetRcvFromIPStr(pMsg, fromHostIP, ustrlen(fromHostIP), &propFromHostIP));
 			CHKiRet(submitMsg(pMsg));
 		}
 	}
 
-
 finalize_it:
+	if(propFromHost != NULL)
+		prop.Destruct(&propFromHost);
+	if(propFromHostIP != NULL)
+		prop.Destruct(&propFromHostIP);
+
 	RETiRet;
 }
 
@@ -319,6 +350,11 @@ ENDrunInput
 /* initialize and return if will run or not */
 BEGINwillRun
 CODESTARTwillRun
+	/* we need to create the inputName property (only once during our lifetime) */
+	CHKiRet(prop.Construct(&pInputName));
+	CHKiRet(prop.SetString(pInputName, UCHAR_CONSTANT("imudp"), sizeof("imudp") - 1));
+	CHKiRet(prop.ConstructFinalize(pInputName));
+
 	net.PrintAllowedSenders(1); /* UDP */
 
 	/* if we could not set up any listners, there is no point in running... */
@@ -346,6 +382,8 @@ CODESTARTafterRun
 		free(pRcvBuf);
 		pRcvBuf = NULL;
 	}
+	if(pInputName != NULL)
+		prop.Destruct(&pInputName);
 ENDafterRun
 
 
@@ -355,6 +393,7 @@ CODESTARTmodExit
 	objRelease(errmsg, CORE_COMPONENT);
 	objRelease(glbl, CORE_COMPONENT);
 	objRelease(datetime, CORE_COMPONENT);
+	objRelease(prop, CORE_COMPONENT);
 	objRelease(net, LM_NET_FILENAME);
 ENDmodExit
 
@@ -386,9 +425,14 @@ CODEmodInit_QueryRegCFSLineHdlr
 	CHKiRet(objUse(errmsg, CORE_COMPONENT));
 	CHKiRet(objUse(glbl, CORE_COMPONENT));
 	CHKiRet(objUse(datetime, CORE_COMPONENT));
+	CHKiRet(objUse(prop, CORE_COMPONENT));
 	CHKiRet(objUse(net, LM_NET_FILENAME));
 
 	/* register config file handlers */
+	/* TODO: add - but this requires more changes, no time right now...
+	CHKiRet(omsdRegCFSLineHdlr((uchar *)"udpserverbindruleset", 0, eCmdHdlrGetWord,
+		setRuleset, NULL, STD_LOADABLE_MODULE_ID));
+	*/
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"udpserverrun", 0, eCmdHdlrGetWord,
 		addListner, NULL, STD_LOADABLE_MODULE_ID));
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"udpserveraddress", 0, eCmdHdlrGetWord,

@@ -48,6 +48,7 @@
 #endif
 #include <pthread.h>
 #include "syslogd.h"
+#include "conf.h"
 #include "syslogd-types.h"
 #include "srUtils.h"
 #include "net.h"
@@ -89,6 +90,7 @@ typedef struct _instanceData {
 	char *port;
 	int protocol;
 	int iUDPRebindInterval;	/* rebind interval */
+	int iTCPRebindInterval;	/* rebind interval */
 	int nXmit;		/* number of transmissions since last (re-)bind */
 #	define	FORW_UDP 0
 #	define	FORW_TCP 1
@@ -103,6 +105,7 @@ static short iStrmDrvrMode = 0; /* mode for stream driver, driver-dependent (0 m
 static short bResendLastOnRecon = 0; /* should the last message be re-sent on a successful reconnect? */
 static uchar *pszStrmDrvrAuthMode = NULL; /* authentication mode to use */
 static int iUDPRebindInterval = 0;	/* support for automatic re-binding (load balancers!). 0 - no rebind */
+static int iTCPRebindInterval = 0;	/* support for automatic re-binding (load balancers!). 0 - no rebind */
 
 static permittedPeers_t *pPermPeers = NULL;
 
@@ -455,11 +458,14 @@ CODESTARTdoAction
 			 * rgerhards, 2006-11-30
 			 */
 			dbgprintf("Compression failed, sending uncompressed message\n");
+			free(out);
 		} else if(destLen+1 < l) {
 			/* only use compression if there is a gain in using it! */
 			dbgprintf("there is gain in compression, so we do it\n");
 			psz = (char*) out;
 			l = destLen + 1; /* take care for the "z" at message start! */
+		} else {
+			free(out);
 		}
 		++destLen;
 	}
@@ -480,6 +486,12 @@ CODESTARTdoAction
 		}
 	}
 finalize_it:
+#	ifdef USE_NETZIP
+	if(psz != (char*) ppString[0])  {
+		/* we need to free temporary buffer, alloced above - Naoya Nakazawa, 2010-01-11 */
+		free(psz);
+	}
+#	endif
 ENDdoAction
 
 
@@ -642,6 +654,7 @@ CODE_STD_STRING_REQUESTparseSelectorAct(1)
 
 	/* copy over config data as needed */
 	pData->iUDPRebindInterval = iUDPRebindInterval;
+	pData->iTCPRebindInterval = iTCPRebindInterval;
 
 	/* process template */
 	CHKiRet(cflineParseTemplateName(&p, *ppOMSR, 0, OMSR_NO_RQD_TPL_OPTS,
@@ -656,6 +669,7 @@ CODE_STD_STRING_REQUESTparseSelectorAct(1)
 		CHKiRet(tcpclt.SetSendFrame(pData->pTCPClt, TCPSendFrame));
 		CHKiRet(tcpclt.SetSendPrepRetry(pData->pTCPClt, TCPSendPrepRetry));
 		CHKiRet(tcpclt.SetFraming(pData->pTCPClt, tcp_framing));
+		CHKiRet(tcpclt.SetRebindInterval(pData->pTCPClt, pData->iTCPRebindInterval));
 		pData->iStrmDrvrMode = iStrmDrvrMode;
 		if(pszStrmDrvr != NULL)
 			CHKmalloc(pData->pszStrmDrvr = (uchar*)strdup((char*)pszStrmDrvr));
@@ -727,6 +741,7 @@ static rsRetVal resetConfigVariables(uchar __attribute__((unused)) *pp, void __a
 	iStrmDrvrMode = 0;
 	bResendLastOnRecon = 0;
 	iUDPRebindInterval = 0;
+	iTCPRebindInterval = 0;
 
 	return RS_RET_OK;
 }
@@ -741,6 +756,7 @@ CODEmodInit_QueryRegCFSLineHdlr
 	CHKiRet(objUse(net,LM_NET_FILENAME));
 
 	CHKiRet(regCfSysLineHdlr((uchar *)"actionforwarddefaulttemplate", 0, eCmdHdlrGetWord, NULL, &pszTplName, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"actionsendtcprebindinterval", 0, eCmdHdlrInt, NULL, &iTCPRebindInterval, NULL));
 	CHKiRet(regCfSysLineHdlr((uchar *)"actionsendudprebindinterval", 0, eCmdHdlrInt, NULL, &iUDPRebindInterval, NULL));
 	CHKiRet(regCfSysLineHdlr((uchar *)"actionsendstreamdriver", 0, eCmdHdlrGetWord, NULL, &pszStrmDrvr, NULL));
 	CHKiRet(regCfSysLineHdlr((uchar *)"actionsendstreamdrivermode", 0, eCmdHdlrInt, NULL, &iStrmDrvrMode, NULL));

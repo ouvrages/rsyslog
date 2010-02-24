@@ -13,13 +13,13 @@ html_files = \
 	ipv6.html \
 	log_rotation_fix_size.html \
 	manual.html \
-	man_rsyslogd.html \
 	modules.html \
 	property_replacer.html \
 	rsyslog_ng_comparison.html \
 	rsyslog_conf.html \
 	rsyslog-example.conf \
 	rsyslog_mysql.html \
+	rsyslog_pgsql.html \
 	rsyslog_packages.html \
 	rsyslog_high_database_rate.html \
 	rsyslog_php_syslog_ng.html \
@@ -91,6 +91,7 @@ html_files = \
 	rsconf1_resetconfigvariables.html \
 	rsconf1_umask.html \
 	v3compatibility.html \
+	v4compatibility.html \
 	im3195.html \
 	netstream.html \
 	ns_gtls.html \
@@ -111,6 +112,7 @@ html_files = \
 	rsyslog_conf_templates.html \
 	rsyslog_conf_nomatch.html \
 	queues_analogy.html \
+	multi_ruleset.html \
 	src/classes.dia
 
 grfx_files = \
