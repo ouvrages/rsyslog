@@ -1,0 +1,18 @@
+Description: Correct error in rsyslog.conf(5) man page
+ $InputUDPServerRun config variable does not exist, should be $UDPServerRun
+ instead http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=571202
+Debian-Bug: http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=571202
+Author: Michael Biebl <biebl@debian.org>
+Index: rsyslog/tools/rsyslog.conf.5
+===================================================================
+--- rsyslog.orig/tools/rsyslog.conf.5	2010-02-25 01:36:13.548462788 +0100
++++ rsyslog/tools/rsyslog.conf.5	2010-02-25 01:36:31.828462479 +0100
+@@ -80,7 +80,7 @@
+ .IP
+ $ModLoad imudp
+ .IP
+-$InputUDPServerRun 514
++$UDPServerRun 514
+ .TP
+ .I imtcp
+ Input plugin for plain TCP syslog. Replaces the deprecated -t

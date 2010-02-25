@@ -1,1 +1,2 @@
 no_create_db.patch
+rsyslog_conf_man_page_fix.patch

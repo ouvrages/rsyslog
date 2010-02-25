@@ -16,6 +16,10 @@ rsyslog (4.6.0-1) UNRELEASED; urgency=low
       false positive. See also the corresponding lintian bug: #571280.
   * debian/rules
     - Add call to dh_lintian.
+  * debian/patches/rsyslog_conf_man_page_fix.patch
+    - Fix error in rsyslog.conf(5) man page. The configuration variable
+      $InputUDPServerRun does not exist, it should be $UDPServerRun instead.
+      Thanks to Alexander Gerasiov for spotting this. Closes: #571202
 
  -- Michael Biebl <biebl@debian.org>  Wed, 24 Feb 2010 20:34:25 +0100
 
