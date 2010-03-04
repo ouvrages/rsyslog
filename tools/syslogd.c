@@ -127,6 +127,7 @@
 #include "omusrmsg.h"
 #include "omfwd.h"
 #include "omfile.h"
+#include "ompipe.h"
 #include "omdiscard.h"
 #include "threads.h"
 #include "queue.h"
@@ -2663,6 +2664,9 @@ static rsRetVal loadBuildInModules(void)
 	if((iRet = module.doModInit(modInitFile, UCHAR_CONSTANT("builtin-file"), NULL)) != RS_RET_OK) {
 		RETiRet;
 	}
+	if((iRet = module.doModInit(modInitPipe, UCHAR_CONSTANT("builtin-pipe"), NULL)) != RS_RET_OK) {
+		RETiRet;
+	}
 #ifdef SYSLOG_INET
 	if((iRet = module.doModInit(modInitFwd, UCHAR_CONSTANT("builtin-fwd"), NULL)) != RS_RET_OK) {
 		RETiRet;
@@ -2766,7 +2770,7 @@ static void printVersion(void)
 #else
 	printf("\tFEATURE_REGEXP:\t\t\t\tNo\n");
 #endif
-#ifndef	NOLARGEFILE
+#if defined(_LARGE_FILES) || (defined (_FILE_OFFSET_BITS) && _FILE_OFFSET_BITS >= 64)
 	printf("\tFEATURE_LARGEFILE:\t\t\tYes\n");
 #else
 	printf("\tFEATURE_LARGEFILE:\t\t\tNo\n");

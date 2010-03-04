@@ -67,8 +67,8 @@ rsyslog_diag_hostname_LDADD = $(LDADD)
 am_rsyslogd_OBJECTS = rsyslogd-syslogd.$(OBJEXT) \
 	rsyslogd-omshell.$(OBJEXT) rsyslogd-omusrmsg.$(OBJEXT) \
 	rsyslogd-omfwd.$(OBJEXT) rsyslogd-omfile.$(OBJEXT) \
-	rsyslogd-omdiscard.$(OBJEXT) rsyslogd-iminternal.$(OBJEXT) \
-	rsyslogd-pidfile.$(OBJEXT)
+	rsyslogd-ompipe.$(OBJEXT) rsyslogd-omdiscard.$(OBJEXT) \
+	rsyslogd-iminternal.$(OBJEXT) rsyslogd-pidfile.$(OBJEXT)
 rsyslogd_OBJECTS = $(am_rsyslogd_OBJECTS)
 am__DEPENDENCIES_1 =
 rsyslogd_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
@@ -288,6 +288,8 @@ rsyslogd_SOURCES = \
 	omfwd.h \
 	omfile.c \
 	omfile.h \
+	ompipe.c \
+	ompipe.h \
 	omdiscard.c \
 	omdiscard.h \
 	iminternal.c \
@@ -407,6 +409,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-omdiscard.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-omfile.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-omfwd.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-ompipe.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-omshell.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-omusrmsg.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-pidfile.Po@am__quote@
@@ -503,6 +506,20 @@ rsyslogd-omfile.obj: omfile.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='omfile.c' object='rsyslogd-omfile.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rsyslogd-omfile.obj `if test -f 'omfile.c'; then $(CYGPATH_W) 'omfile.c'; else $(CYGPATH_W) '$(srcdir)/omfile.c'; fi`
+
+rsyslogd-ompipe.o: ompipe.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rsyslogd-ompipe.o -MD -MP -MF $(DEPDIR)/rsyslogd-ompipe.Tpo -c -o rsyslogd-ompipe.o `test -f 'ompipe.c' || echo '$(srcdir)/'`ompipe.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/rsyslogd-ompipe.Tpo $(DEPDIR)/rsyslogd-ompipe.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='ompipe.c' object='rsyslogd-ompipe.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rsyslogd-ompipe.o `test -f 'ompipe.c' || echo '$(srcdir)/'`ompipe.c
+
+rsyslogd-ompipe.obj: ompipe.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rsyslogd-ompipe.obj -MD -MP -MF $(DEPDIR)/rsyslogd-ompipe.Tpo -c -o rsyslogd-ompipe.obj `if test -f 'ompipe.c'; then $(CYGPATH_W) 'ompipe.c'; else $(CYGPATH_W) '$(srcdir)/ompipe.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/rsyslogd-ompipe.Tpo $(DEPDIR)/rsyslogd-ompipe.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='ompipe.c' object='rsyslogd-ompipe.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rsyslogd-ompipe.obj `if test -f 'ompipe.c'; then $(CYGPATH_W) 'ompipe.c'; else $(CYGPATH_W) '$(srcdir)/ompipe.c'; fi`
 
 rsyslogd-omdiscard.o: omdiscard.c
 @am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsyslogd_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rsyslogd-omdiscard.o -MD -MP -MF $(DEPDIR)/rsyslogd-omdiscard.Tpo -c -o rsyslogd-omdiscard.o `test -f 'omdiscard.c' || echo '$(srcdir)/'`omdiscard.c
