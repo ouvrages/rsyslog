@@ -5,16 +5,16 @@
  *       works!
  *
  * File begun on 2007-07-21 by RGerhards (extracted from syslogd.c)
- * This file is under development and has not yet arrived at being fully
- * self-contained and a real object. So far, it is mostly an excerpt
- * of the "old" message code without any modifications. However, it
- * helps to have things at the right place one we go to the meat of it.
  *
  * A large re-write of this file was done in June, 2009. The focus was
  * to introduce many more features (like zipped writing), clean up the code
  * and make it more reliable. In short, that rewrite tries to provide a new
  * solid basis for the next three to five years to come. During it, bugs
  * may have been introduced ;) -- rgerhards, 2009-06-04
+ *
+ * Note that as of 2010-02-28 this module does no longer handle
+ * pipes. These have been moved to ompipe, to reduced the entanglement
+ * between the two different functionalities. -- rgerhards
  *
  * Copyright 2007-2009 Rainer Gerhards and Adiscon GmbH.
  *
@@ -102,7 +102,7 @@ static int	iZipLevel = 0;	/* zip compression mode (0..9 as usual) */
 static bool	bFlushOnTXEnd = 1;/* flush write buffers when transaction has ended? */
 static int64	iIOBufSize = IOBUF_DFLT_SIZE;	/* size of an io buffer */
 static int	iFlushInterval = FLUSH_INTRVL_DFLT; 	/* how often flush the output buffer on inactivity? */
-static uchar	*pszTplName = NULL; /* name of the default template to use */
+uchar	*pszFileDfltTplName = NULL; /* name of the default template to use */
 /* end globals for default values */
 
 
@@ -258,7 +258,7 @@ static rsRetVal cflineParseOutchannel(instanceData *pData, uchar* p, omodStringR
 	pData->pszSizeLimitCmd = pOch->cmdOnSizeLimit;
 
 	iRet = cflineParseTemplateName(&p, pOMSR, iEntry, iTplOpts,
-				       (pszTplName == NULL) ? (uchar*)"RSYSLOG_FileFormat" : pszTplName);
+				       (pszFileDfltTplName == NULL) ? (uchar*)"RSYSLOG_FileFormat" : pszFileDfltTplName);
 
 finalize_it:
 	RETiRet;
@@ -318,6 +318,7 @@ dynaFileFreeCacheEntries(instanceData *pData)
 	for(i = 0 ; i < pData->iCurrCacheSize ; ++i) {
 		dynaFileDelCacheEntry(pData->dynCache, i, 1);
 	}
+	pData->iCurrElt = -1; /* invalidate current element */
 	ENDfunc;
 }
 
@@ -486,6 +487,14 @@ prepareDynFile(instanceData *pData, uchar *newFileName, unsigned iMsgOpts)
 	}
 
 	/* we have not found an entry */
+
+	/* invalidate iCurrElt as we may error-exit out of this function when the currrent
+	 * iCurrElt has been freed or otherwise become unusable. This is a precaution, and
+	 * performance-wise it may be better to do that in each of the exits. However, that
+	 * is error-prone, so I prefer to do it here. -- rgerhards, 2010-03-02
+	 */
+	pData->iCurrElt = -1;
+
 	if(iFirstFree == -1 && (pData->iCurrCacheSize < pData->iDynaFileCacheSize)) {
 		/* there is space left, so set it to that index */
 		iFirstFree = pData->iCurrCacheSize++;
@@ -517,7 +526,11 @@ prepareDynFile(instanceData *pData, uchar *newFileName, unsigned iMsgOpts)
 		ABORT_FINALIZE(localRet);
 	}
 
-	CHKmalloc(pCache[iFirstFree]->pName = ustrdup(newFileName));
+	if((pCache[iFirstFree]->pName = ustrdup(newFileName)) == NULL) {
+		/* we need to discard the entry, otherwise things could lead to a segfault! */
+		dynaFileDelCacheEntry(pCache, iFirstFree, 1);
+		ABORT_FINALIZE(RS_RET_OUT_OF_MEMORY);
+	}
 	pCache[iFirstFree]->pStrm = pData->pStrm;
 	pCache[iFirstFree]->lastUsed = time(NULL); // monotonically increasing value! TODO: performance
 	pData->iCurrElt = iFirstFree;
@@ -620,7 +633,7 @@ ENDdoAction
 
 BEGINparseSelectorAct
 CODESTARTparseSelectorAct
-	if(!(*p == '$' || *p == '?' || *p == '|' || *p == '/' || *p == '-'))
+	if(!(*p == '$' || *p == '?' || *p == '/' || *p == '-'))
 		ABORT_FINALIZE(RS_RET_CONFLINE_UNPROCESSED);
 
 	CHKiRet(createInstance(&pData));
@@ -653,7 +666,7 @@ CODESTARTparseSelectorAct
 		CODE_STD_STRING_REQUESTparseSelectorAct(2)
 		++p; /* eat '?' */
 		CHKiRet(cflineParseFileName(p, (uchar*) pData->f_fname, *ppOMSR, 0, OMSR_NO_RQD_TPL_OPTS,
-				               (pszTplName == NULL) ? (uchar*)"RSYSLOG_FileFormat" : pszTplName));
+				               (pszFileDfltTplName == NULL) ? (uchar*)"RSYSLOG_FileFormat" : pszFileDfltTplName));
 		/* "filename" is actually a template name, we need this as string 1. So let's add it
 		 * to the pOMSR. -- rgerhards, 2007-07-27
 		 */
@@ -666,7 +679,9 @@ CODESTARTparseSelectorAct
 				calloc(iDynaFileCacheSize, sizeof(dynaFileCacheEntry*)));
 		break;
 
-        case '|':
+        /* case '|': while pipe support has been removed, I leave the code in in case we 
+	 *           need high-performance pipes at a later stage (unlikely). -- rgerhards, 2010-02-28
+	 */
 	case '/':
 		CODE_STD_STRING_REQUESTparseSelectorAct(1)
 		/* we now have *almost* the same semantics for files and pipes, but we still need
@@ -681,7 +696,7 @@ CODESTARTparseSelectorAct
 		}
 
 		CHKiRet(cflineParseFileName(p, (uchar*) pData->f_fname, *ppOMSR, 0, OMSR_NO_RQD_TPL_OPTS,
-				               (pszTplName == NULL) ? (uchar*)"RSYSLOG_FileFormat" : pszTplName));
+				               (pszFileDfltTplName == NULL) ? (uchar*)"RSYSLOG_FileFormat" : pszFileDfltTplName));
 		pData->bDynamicName = 0;
 		break;
 	default:
@@ -737,9 +752,9 @@ static rsRetVal resetConfigVariables(uchar __attribute__((unused)) *pp, void __a
 	bFlushOnTXEnd = 1;
 	iIOBufSize = IOBUF_DFLT_SIZE;
 	iFlushInterval = FLUSH_INTRVL_DFLT;
-	if(pszTplName != NULL) {
-		free(pszTplName);
-		pszTplName = NULL;
+	if(pszFileDfltTplName != NULL) {
+		free(pszFileDfltTplName);
+		pszFileDfltTplName = NULL;
 	}
 
 	return RS_RET_OK;
@@ -750,7 +765,6 @@ BEGINdoHUP
 CODESTARTdoHUP
 	if(pData->bDynamicName) {
 		dynaFileFreeCacheEntries(pData);
-		pData->iCurrElt = -1; /* invalidate current element */
 	} else {
 		if(pData->pStrm != NULL) {
 			strm.Destruct(&pData->pStrm);
@@ -764,7 +778,7 @@ BEGINmodExit
 CODESTARTmodExit
 	objRelease(errmsg, CORE_COMPONENT);
 	objRelease(strm, CORE_COMPONENT);
-	free(pszTplName);
+	free(pszFileDfltTplName);
 ENDmodExit
 
 
@@ -795,7 +809,7 @@ CODEmodInit_QueryRegCFSLineHdlr
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"createdirs", 0, eCmdHdlrBinary, NULL, &bCreateDirs, STD_LOADABLE_MODULE_ID));
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"failonchownfailure", 0, eCmdHdlrBinary, NULL, &bFailOnChown, STD_LOADABLE_MODULE_ID));
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"actionfileenablesync", 0, eCmdHdlrBinary, NULL, &bEnableSync, STD_LOADABLE_MODULE_ID));
-	CHKiRet(regCfSysLineHdlr((uchar *)"actionfiledefaulttemplate", 0, eCmdHdlrGetWord, NULL, &pszTplName, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"actionfiledefaulttemplate", 0, eCmdHdlrGetWord, NULL, &pszFileDfltTplName, NULL));
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"resetconfigvariables", 1, eCmdHdlrCustomHandler, resetConfigVariables, NULL, STD_LOADABLE_MODULE_ID));
 ENDmodInit
 /* vi:set ai:

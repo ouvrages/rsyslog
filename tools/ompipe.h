@@ -1,9 +1,9 @@
-/* msggen - a small diagnostic utility that does very quick
- * syslog() calls.
+/* ompipe.h
+ * These are the definitions for the build-in pipe output module.
  *
- * Copyright 2008 Rainer Gerhards and Adiscon GmbH.
+ * Copyright 2007-2010 Rainer Gerhards and Adiscon GmbH.
  *
- * This file is part of rsyslog.
+ * This pipe is part of rsyslog.
  *
  * Rsyslog is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,22 +18,14 @@
  * You should have received a copy of the GNU General Public License
  * along with Rsyslog.  If not, see <http://www.gnu.org/licenses/>.
  *
- * A copy of the GPL can be found in the file "COPYING" in this distribution.
+ * A copy of the GPL can be found in the pipe "COPYING" in this distribution.
  */
+#ifndef	OMPIPE_H_INCLUDED
+#define	OMPIPE_H_INCLUDED 1
 
-#include "config.h"
-#include <stdio.h>
-#include <syslog.h>
+/* prototypes */
+rsRetVal modInitPipe(int iIFVersRequested __attribute__((unused)), int *ipIFVersProvided, rsRetVal (**pQueryEtryPt)(), rsRetVal (*pHostQueryEtryPt)(uchar*, rsRetVal (**)()), modInfo_t*);
 
-int main(int __attribute__((unused)) argc, char __attribute__((unused)) *argv[])
-{
-	int i;
-
-	openlog("msggen", 0 , LOG_LOCAL0);
-
-	for(i = 0 ; i < 10 ; ++i)
-		syslog(LOG_NOTICE, "This is message number %d", i);
-
-	closelog();
-	return 0;
-}
+#endif /* #ifndef OMPIPE_H_INCLUDED */
+/* vi:set ai:
+ */
