@@ -73,11 +73,15 @@ do_reload() {
 }
 
 create_xconsole() {
-	if [ ! -e /dev/xconsole ]
-	then
-		mknod -m 640 /dev/xconsole p
-		chown root:adm /dev/xconsole
-		[ -x /sbin/restorecon ] && /sbin/restorecon /dev/xconsole
+	XCONSOLE=/dev/xconsole
+	if [ "$(uname -s)" = "GNU/kFreeBSD" ]; then
+		XCONSOLE=/var/run/xconsole
+		ln -sf $XCONSOLE /dev/xconsole
+	fi
+	if [ ! -e $XCONSOLE ]; then
+		mknod -m 640 $XCONSOLE p
+		chown root:adm $XCONSOLE
+		[ -x /sbin/restorecon ] && /sbin/restorecon $XCONSOLE
 	fi
 }
 

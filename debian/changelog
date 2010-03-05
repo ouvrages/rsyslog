@@ -19,6 +19,10 @@ rsyslog (4.6.1-1) UNRELEASED; urgency=low
       false positive. See also the corresponding lintian bug: #571280.
   * debian/rules
     - Add call to dh_lintian.
+  * debian/rsyslog.init
+    - GNU/kFreeBSD does not allow to create pipes in /dev. So for xconsole
+      create the pipe as /var/run/xconsole and a /dev/xconsole symlink.
+      Closes: #537170
 
  -- Michael Biebl <biebl@debian.org>  Wed, 24 Feb 2010 20:34:25 +0100
 
