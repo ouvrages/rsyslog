@@ -1,2 +1,2 @@
 # Debian patches for rsyslog
-no_create_db.patch
+01-dont_create_db.patch
