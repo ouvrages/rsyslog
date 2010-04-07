@@ -1,6 +1,9 @@
 rsyslog (4.6.2-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * debian/patches/02-set-correct-default-for-buffered-writing.patch
+    - The default for $OMFileFlushOnTXEnd was wrong ("off"). Patch pulled from
+      upstream Git.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 07 Apr 2010 12:12:47 +0200
 
