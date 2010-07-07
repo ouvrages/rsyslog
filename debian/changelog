@@ -1,4 +1,4 @@
-rsyslog (4.6.3-1) UNRELEASED; urgency=low
+rsyslog (4.6.3-1) unstable; urgency=low
 
   * New upstream release.
   * debian/patches/02-set-correct-default-for-buffered-writing.patch
@@ -16,7 +16,7 @@ rsyslog (4.6.3-1) UNRELEASED; urgency=low
   * Bump Standards-Version to 3.9.0. Use Breaks instead of Conflicts as
     recommended by the new policy.
 
- -- Michael Biebl <biebl@debian.org>  Wed, 07 Jul 2010 15:40:46 +0200
+ -- Michael Biebl <biebl@debian.org>  Wed, 07 Jul 2010 19:07:03 +0200
 
 rsyslog (4.6.2-1) unstable; urgency=low
 
