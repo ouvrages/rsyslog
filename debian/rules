@@ -9,9 +9,6 @@
 # This has to be exported to make some magic below work.
 export DH_OPTIONS
 
-# For quilt patch management.
-include /usr/share/quilt/quilt.make
-
 # These are used for cross-compiling and for saving the configure script
 # from having to guess our platform (since we know it already)
 DEB_HOST_GNU_TYPE   ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
@@ -60,8 +57,7 @@ build-stamp: config.status
 
 	touch $@
 
-clean: clean-source unpatch
-clean-source:
+clean:
 	dh_testdir
 	dh_testroot
 	rm -f build-stamp 
@@ -70,7 +66,7 @@ clean-source:
 	[ ! -f Makefile ] || $(MAKE) distclean
 	rm -f config.sub config.guess
 
-	dh_clean 
+	dh_clean
 
 install: build
 	dh_testdir

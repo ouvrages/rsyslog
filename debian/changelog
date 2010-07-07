@@ -3,6 +3,11 @@ rsyslog (4.6.3-1) UNRELEASED; urgency=low
   * New upstream release.
   * debian/patches/02-set-correct-default-for-buffered-writing.patch
     - Removed, merged upstream.
+  * Switch to source format 3.0 (quilt)
+    - Add debian/source/format.
+    - Drop Build-Depends on quilt.
+    - Remove debian/README.source.
+    - Remove /usr/share/quilt/quilt.make include from debian/rules.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 07 Jul 2010 15:40:46 +0200
 
