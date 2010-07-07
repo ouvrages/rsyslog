@@ -35,7 +35,8 @@ build_triplet = @build@
 host_triplet = @host@
 @ENABLE_TESTBENCH_TRUE@check_PROGRAMS = $(am__EXEEXT_1) \
 @ENABLE_TESTBENCH_TRUE@	ourtail$(EXEEXT) nettester$(EXEEXT) \
-@ENABLE_TESTBENCH_TRUE@	tcpflood$(EXEEXT) chkseq$(EXEEXT)
+@ENABLE_TESTBENCH_TRUE@	tcpflood$(EXEEXT) chkseq$(EXEEXT) \
+@ENABLE_TESTBENCH_TRUE@	randomgen$(EXEEXT)
 @ENABLE_TESTBENCH_TRUE@TESTS = $(am__EXEEXT_1) cfg.sh \
 @ENABLE_TESTBENCH_TRUE@	validation-run.sh imtcp-multiport.sh \
 @ENABLE_TESTBENCH_TRUE@	diskqueue.sh diskqueue-fsync.sh \
@@ -50,7 +51,7 @@ host_triplet = @host@
 @ENABLE_TESTBENCH_TRUE@	dynfile_invld_sync.sh \
 @ENABLE_TESTBENCH_TRUE@	dynfile_invalid2.sh complex1.sh \
 @ENABLE_TESTBENCH_TRUE@	queue-persist.sh pipeaction.sh \
-@ENABLE_TESTBENCH_TRUE@	$(am__append_1)
+@ENABLE_TESTBENCH_TRUE@	$(am__append_1) $(am__append_2)
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_1 = omod-if-array.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 proprepltest.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 parsertest.sh \
@@ -60,6 +61,7 @@ host_triplet = @host@
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 threadingmqaq.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 fieldtest.sh
 
+@ENABLE_EXTENDED_TESTS_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_2 = random.sh 
 subdir = tests
 DIST_COMMON = README $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	INSTALL
@@ -87,6 +89,9 @@ nettester_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_ourtail_OBJECTS = ourtail.$(OBJEXT)
 ourtail_OBJECTS = $(am_ourtail_OBJECTS)
 ourtail_LDADD = $(LDADD)
+am_randomgen_OBJECTS = randomgen.$(OBJEXT)
+randomgen_OBJECTS = $(am_randomgen_OBJECTS)
+randomgen_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am__objects_1 = rscript-runtime-dummy.$(OBJEXT)
 am_rscript_OBJECTS = rscript-rscript.$(OBJEXT) \
 	rscript-getline.$(OBJEXT) $(am__objects_1)
@@ -121,10 +126,11 @@ LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
 SOURCES = $(chkseq_SOURCES) $(nettester_SOURCES) $(ourtail_SOURCES) \
-	$(rscript_SOURCES) $(rt_init_SOURCES) $(tcpflood_SOURCES)
-DIST_SOURCES = $(chkseq_SOURCES) $(nettester_SOURCES) \
-	$(ourtail_SOURCES) $(rscript_SOURCES) $(rt_init_SOURCES) \
+	$(randomgen_SOURCES) $(rscript_SOURCES) $(rt_init_SOURCES) \
 	$(tcpflood_SOURCES)
+DIST_SOURCES = $(chkseq_SOURCES) $(nettester_SOURCES) \
+	$(ourtail_SOURCES) $(randomgen_SOURCES) $(rscript_SOURCES) \
+	$(rt_init_SOURCES) $(tcpflood_SOURCES)
 JAVAC = javac
 CLASSPATH_ENV = CLASSPATH=$(JAVAROOT):$(srcdir)/$(JAVAROOT):$$CLASSPATH
 JAVAROOT = $(top_builddir)
@@ -349,6 +355,7 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/parse3.conf \
 	   testsuites/reallife.parse3 \
 	   testsuites/parse-nodate.conf \
+	   testsuites/samples.parse-nodate \
 	   testsuites/parse_invld_regex.conf \
 	   testsuites/samples.parse_invld_regex \
 	   testsuites/parse-3164-buggyday.conf \
@@ -420,6 +427,8 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/gzipwr_large_dynfile.conf \
 	   complex1.sh \
 	   testsuites/complex1.conf \
+	   random.sh \
+	   testsuites/random.conf \
 	   dynfile_invld_async.sh \
 	   dynfile_invld_sync.sh \
 	   dynfile_cachemiss.sh \
@@ -441,6 +450,8 @@ ourtail_SOURCES = ourtail.c
 chkseq_SOURCES = chkseq.c
 tcpflood_SOURCES = tcpflood.c
 tcpflood_LDADD = $(SOL_LIBS)
+randomgen_SOURCES = randomgen.c
+randomgen_LDADD = $(SOL_LIBS)
 nettester_SOURCES = nettester.c getline.c
 nettester_LDADD = $(SOL_LIBS)
 rt_init_SOURCES = rt-init.c $(test_files)
@@ -503,6 +514,9 @@ nettester$(EXEEXT): $(nettester_OBJECTS) $(nettester_DEPENDENCIES)
 ourtail$(EXEEXT): $(ourtail_OBJECTS) $(ourtail_DEPENDENCIES) 
 	@rm -f ourtail$(EXEEXT)
 	$(LINK) $(ourtail_OBJECTS) $(ourtail_LDADD) $(LIBS)
+randomgen$(EXEEXT): $(randomgen_OBJECTS) $(randomgen_DEPENDENCIES) 
+	@rm -f randomgen$(EXEEXT)
+	$(LINK) $(randomgen_OBJECTS) $(randomgen_LDADD) $(LIBS)
 rscript$(EXEEXT): $(rscript_OBJECTS) $(rscript_DEPENDENCIES) 
 	@rm -f rscript$(EXEEXT)
 	$(rscript_LINK) $(rscript_OBJECTS) $(rscript_LDADD) $(LIBS)
@@ -523,6 +537,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/getline.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nettester.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ourtail.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/randomgen.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rscript-getline.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rscript-rscript.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rscript-runtime-dummy.Po@am__quote@
