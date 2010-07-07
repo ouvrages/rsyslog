@@ -3,11 +3,16 @@ rsyslog (4.6.3-1) UNRELEASED; urgency=low
   * New upstream release.
   * debian/patches/02-set-correct-default-for-buffered-writing.patch
     - Removed, merged upstream.
-  * Switch to source format 3.0 (quilt)
+  * Switch to source format 3.0 (quilt).
     - Add debian/source/format.
     - Drop Build-Depends on quilt.
     - Remove debian/README.source.
     - Remove /usr/share/quilt/quilt.make include from debian/rules.
+  * Switch to dh v7.
+    - Bump Build-Depends on debhelper to (>= 7.0.50).
+    - Bump Build-Depends on autotools-dev to (>= 20100122.1) for the
+      autotools_dev dh addon.
+    - Convert debian/rules to dh.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 07 Jul 2010 15:40:46 +0200
 
