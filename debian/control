@@ -3,7 +3,7 @@ Section: admin
 Priority: important
 Maintainer: Michael Biebl <biebl@debian.org>
 Build-Depends: debhelper (>= 7.0.50), autotools-dev (>= 20100122.1), zlib1g-dev, libmysqlclient-dev, libpq-dev, libkrb5-dev, libgnutls-dev, librelp-dev, pkg-config
-Standards-Version: 3.8.4
+Standards-Version: 3.9.0
 Vcs-Git: git://git.debian.org/git/collab-maint/rsyslog.git
 Vcs-Browser: http://git.debian.org/?p=collab-maint/rsyslog.git;a=summary
 Homepage: http://www.rsyslog.com/
@@ -37,7 +37,7 @@ Package: rsyslog-doc
 Section: doc
 Priority: extra
 Architecture: all
-Conflicts: rsyslog (<< 2.0.1-2)
+Breaks: rsyslog (<< 2.0.1-2)
 Replaces: rsyslog (<< 2.0.1-2)
 Depends: ${misc:Depends}
 Suggests: doc-base, www-browser

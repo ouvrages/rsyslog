@@ -13,6 +13,8 @@ rsyslog (4.6.3-1) UNRELEASED; urgency=low
     - Bump Build-Depends on autotools-dev to (>= 20100122.1) for the
       autotools_dev dh addon.
     - Convert debian/rules to dh.
+  * Bump Standards-Version to 3.9.0. Use Breaks instead of Conflicts as
+    recommended by the new policy.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 07 Jul 2010 15:40:46 +0200
 
