@@ -1,6 +1,8 @@
 rsyslog (4.6.3-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * debian/patches/02-set-correct-default-for-buffered-writing.patch
+    - Removed, merged upstream.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 07 Jul 2010 15:40:46 +0200
 
