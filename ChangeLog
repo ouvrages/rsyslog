@@ -1,5 +1,539 @@
 ---------------------------------------------------------------------------
-Version 4.6.4  [v4-stable] (rgerhards), 2010-08.05
+Version 5.7.0  [V5-DEVEL] (rgerhards), 2010-09-16
+- added module impstat to emit periodic statistics on rsyslog counters
+- support for systemd officially added
+  * acquire /dev/log socket optionally from systemd
+    thanks to Lennart Poettering for this patch
+  * sd-systemd API added as part of rsyslog runtime library
+---------------------------------------------------------------------------
+Version 5.5.7  [V5-BETA] (rgerhards), 2010-08-09
+- changed omudpspoof default spoof address to simplify typical use case
+  thanks to David Lang for suggesting this
+- doc bugfix: pmlastmsg doc samples had errors
+- bugfix[minor]: pmrfc3164sd had invalid name (resided in rsyslog name 
+  space, what should not be the case for a contributed module)
+- added omuxsock, which permits to write message to local Unix sockets
+  this is the counterpart to imuxsock, enabling fast local forwarding
+---------------------------------------------------------------------------
+Version 5.5.6  [DEVEL] (rgerhards), 2010-07-21
+- added parser modules
+  * pmlastmsg, which supports the notoriously malformed "last message
+    repeated n times" messages from some syslogd's (namely sysklogd)
+  * pmrfc3164sd (contributed), supports RFC5424 structured data in 
+    RFC3164 messages [untested]
+- added new module type "string generator", used to speed up output
+  processing. Expected speedup for (typical) rsyslog processing is
+  roughly 5 to 6 percent compared to using string-based templates.
+  They may also be used to do more complex formatting with custom
+  C code, what provided greater flexibility and probably far higher
+  speed, for example if using multiple regular expressions within a 
+  template.
+- added 4 string generators for
+  * RSYSLOG_FileFormat
+  * RSYSLOG_TraditionalFileFormat
+  * RSYSLOG_ForwardFormat
+  * RSYSLOG_TraditionalForwardFormat
+- bugfix: mutexes used to simulate atomic instructions were not destructed
+- bugfix: regression caused more locking action in msg.c than necessary
+- bugfix: "$ActionExecOnlyWhenPreviousIsSuspended on" was broken
+- bugfix: segfault on HUP when "HUPIsRestart" was set to "on"
+  thanks varmojfekoj for the patch
+- bugfix: default for $OMFileFlushOnTXEnd was wrong ("off").
+  This, in default mode, caused buffered writing to be used, what
+  means that it looked like no output were written or partial
+  lines. Thanks to Michael Biebl for pointing out this bug.
+- bugfix: programname filter in ! configuration can not be reset
+  Thanks to Kiss Gabor for the patch.
+---------------------------------------------------------------------------
+Version 5.5.5  [DEVEL] (rgerhards), 2010-05-20
+- added new cancel-reduced action thread termination method
+  We now manage to cancel threads that block inside a retry loop to
+  terminate without the need to cancel the thread. Avoiding cancellation
+  helps keep the system complexity minimal and thus provides for better
+  stability. This also solves some issues with improper shutdown when
+  inside an action retry loop.
+---------------------------------------------------------------------------
+Version 5.5.4  [DEVEL] (rgerhards), 2010-05-03
+- This version offers full support for Solaris on Intel and Sparc
+- bugfix: problems with atomic operations emulation
+  replaced atomic operation emulation with new code. The previous code
+  seemed to have some issue and also limited concurrency severely. The
+  whole atomic operation emulation has been rewritten.
+- bugfix: netstream ptcp support class was not correctly build on systems
+  without epoll() support
+- bugfix: segfault on Solaris/Sparc
+---------------------------------------------------------------------------
+Version 5.5.3  [DEVEL] (rgerhards), 2010-04-09
+- added basic but functional support for Solaris
+- imported many bugfixes from 3.6.2/4.6.1 (see ChangeLog below!)
+- added new property replacer option "date-rfc3164-buggyday" primarily
+  to ease migration from syslog-ng. See property replacer doc for
+  details.
+- added capability to turn off standard LF delimiter in TCP server
+  via new directive "$InputTCPServerDisableLFDelimiter on"
+- bugfix: failed to compile on systems without epoll support
+- bugfix: comment char ('#') in literal terminated script parsing
+  and thus could not be used.
+  but tracker: http://bugzilla.adiscon.com/show_bug.cgi?id=119
+  [merged in from v3.22.2]
+- imported patches from 4.6.0:
+  * improved testbench to contain samples for totally malformed messages
+    which miss parts of the message content
+  * bugfix: some malformed messages could lead to a missing LF inside files
+    or some other missing parts of the template content.
+  * bugfix: if a message ended immediately with a hostname, the hostname
+    was mistakenly interpreted as TAG, and localhost be used as hostname
+---------------------------------------------------------------------------
+Version 5.5.2  [DEVEL] (rgerhards), 2010-02-05
+- applied patches that make rsyslog compile under Apple OS X.
+  Thanks to trey for providing these.
+- replaced data type "bool" by "sbool" because this created some
+  portability issues.
+- added $Escape8BitCharactersOnReceive directive
+  Thanks to David Lang for suggesting it.
+- worked around an issue where omfile failed to compile on 32 bit platforms
+  under some circumstances (this smells like a gcc problem, but a simple
+  solution was available). Thanks to Kenneth Marshall for some advice.
+- extended testbench
+---------------------------------------------------------------------------
+Version 5.5.1  [DEVEL] (rgerhards), 2009-11-27
+- introduced the ablity for netstream drivers to utilize an epoll interface
+  This offers increased performance and removes the select() FDSET size
+  limit from imtcp. Note that we fall back to select() if there is no
+  epoll netstream drivers. So far, an epoll driver has only been
+  implemented for plain tcp syslog, the rest will follow once the code
+  proves well in practice AND there is demand.
+- re-implemented $EscapeControlCharacterTab config directive
+  Based on Jonathan Bond-Caron's patch for v4. This now also includes some
+  automatted tests.
+- bugfix: enabling GSSServer crashes rsyslog startup
+  Thanks to Tomas Kubina for the patch [imgssapi]
+- bugfix (kind of): check if TCP connection is still alive if using TLS
+  Thanks to Jonathan Bond-Caron for the patch.
+---------------------------------------------------------------------------
+Version 5.5.0  [DEVEL] (rgerhards), 2009-11-18
+- moved DNS resolution code out of imudp and into the backend processing
+  Most importantly, DNS resolution now never happens if the resolved name
+  is not required. Note that this applies to imudp - for the other inputs,
+  DNS resolution almost comes for free, so we do not do it there. However,
+  the new method has been implemented in a generic way and as such may 
+  also be used by other modules in the future.
+- added option to use unlimited-size select() calls
+  Thanks to varmjofekoj for the patch
+  This is not done in imudp, as it natively supports epoll().
+- doc: improved description of what loadable modules can do
+---------------------------------------------------------------------------
+Version 5.4.2  [v5-stable] (rgerhards), 2010-03-??
+- bugfix(kind of): output plugin retry behaviour could cause engine to loop
+  The rsyslog engine did not guard itself against output modules that do
+  not properly convey back the tryResume() behaviour. This then leads to
+  what looks like an endless loop. I consider this to be a bug of the 
+  engine not only because it should be hardened against plugin misbehaviour,
+  but also because plugins may not be totally able to avoid this situation
+  (depending on the type of and processing done by the plugin).
+- bugfix: testbench failed when not executed in UTC+1 timezone
+  accidently, the time zone information was kept inside some
+  to-be-checked-for responses
+- temporary bugfix replaced by permanent one for
+  message-induced off-by-one error (potential segfault) (see 4.6.2)
+  The analysis has been completed and a better fix been crafted and 
+  integrated.
+- bugfix(minor): status variable was uninitialized
+  However, this would have caused harm only if NO parser modules at
+  all were loaded, which would lead to a defunctional configuration
+  at all. And, even more important, this is impossible as two parser
+  modules are built-in and thus can not be "not loaded", so we always
+  have a minimum of two.
+---------------------------------------------------------------------------
+Version 5.4.1  [v5-stable] (rgerhards), 2010-03-??
+- added new property replacer option "date-rfc3164-buggyday" primarily
+  to ease migration from syslog-ng. See property replacer doc for
+  details. [backport from 5.5.3 because urgently needed by some]
+- imported all bugfixes vom 4.6.2 (see below)
+---------------------------------------------------------------------------
+Version 5.4.0  [v5-stable] (rgerhards), 2010-03-08
+***************************************************************************
+* This is a new stable v5 version. It contains all fixes and enhancements *
+* made during the 5.3.x phase as well as those listed below.              *
+* Note that the 5.2.x series was quite buggy and as such all users are    *
+* strongly advised to upgrade to 5.4.0.                                   *
+***************************************************************************
+- bugfix: omruleset failed to work in many cases
+  bug tracker: http://bugzilla.adiscon.com/show_bug.cgi?id=179
+  Thanks to Ryan B. Lynch for reporting this issue.
+- bugfix: comment char ('#') in literal terminated script parsing
+  and thus could not be used.
+  but tracker: http://bugzilla.adiscon.com/show_bug.cgi?id=119
+  [merged in from v3.22.2]
+---------------------------------------------------------------------------
+Version 5.3.7  [BETA] (rgerhards), 2010-01-27
+- bugfix: queues in direct mode could case a segfault, especially if an
+  action failed for action queues. The issue was an invalid increment of
+  a stack-based pointer which lead to destruction of the stack frame and
+  thus a segfault on function return.
+  Thanks to Michael Biebl for alerting us on this problem.
+- bugfix: hostname accidently set to IP address for some message sources,
+  for example imudp. Thanks to Anton for reporting this bug. [imported v4]
+- bugfix: ompgsql had problems with transaction support, what actually 
+  rendered it unsuable. Thanks to forum user "horhe" for alerting me
+  on this bug and helping to debug/fix it! [imported from 5.3.6]
+- bugfix: $CreateDirs variable not properly initialized, default thus
+  was random (but most often "on") [imported from v3]
+- bugfix: potential segfaults during queue shutdown
+  (bugs require certain non-standard settings to appear)
+  Thanks to varmojfekoj for the patch [imported from 4.5.8]
+  [backport from 5.5.2]
+- bugfix: wrong memory assignment for a config variable (probably
+  without causing any harm) [backport from 5.2.2]
+- bugfix: rsyslog hangs when writing to a named pipe which nobody was
+  reading. Thanks to Michael Biebl for reporting this bug.
+  Bugzilla entry: http://bugzilla.adiscon.com/show_bug.cgi?id=169
+  [imported from 4.5.8]
+---------------------------------------------------------------------------
+Version 5.3.6  [BETA] (rgerhards), 2010-01-13
+- bugfix: ompgsql did not properly check the server connection in
+  tryResume(), which could lead to rsyslog running in a thight loop
+- bugfix: suspension during beginTransaction() was not properly handled
+  by rsyslog core
+- bugfix: omfile output was only written when buffer was full, not at
+  end of transaction
+- bugfix: commit transaction was not properly conveyed to message layer,
+  potentially resulting in non-message destruction and thus hangs
+- bugfix: enabling GSSServer crashes rsyslog startup
+  Thanks to Tomas Kubina for the patch [imgssapi]
+- bugfix (kind of): check if TCP connection is still alive if using TLS
+  Thanks to Jonathan Bond-Caron for the patch.
+- bugfix: $CreateDirs variable not properly initialized, default thus
+  was random (but most often "on") [imported from v3]
+- bugfix: ompgsql had problems with transaction support, what actually 
+  rendered it unsuable. Thanks to forum user "horhe" for alerting me
+  on this bug and helping to debug/fix it!
+- bugfix: memory leak when sending messages in zip-compressed format
+  Thanks to Naoya Nakazawa for analyzing this issue and providing a patch.
+- worked around an issue where omfile failed to compile on 32 bit platforms
+  under some circumstances (this smells like a gcc problem, but a simple
+  solution was available). Thanks to Kenneth Marshall for some advice.
+  [backported from 5.5.x branch]
+---------------------------------------------------------------------------
+Version 5.3.5  [BETA] (rgerhards), 2009-11-13
+- some light performance enhancement by replacing time() call with much
+  faster (at least under linux) gettimeofday() calls.
+- some improvement of omfile performance with dynafiles
+  saved costly time() calls by employing a logical clock, which is 
+  sufficient for the use case
+- bugfix: omudpspoof miscalculated source and destination ports
+  while this was probably not noticed for source ports, it resulted in
+  almost all destination ports being wrong, except for the default port
+  of 514, which by virtue of its binary representation was calculated 
+  correct (and probably thus the bug not earlier detected).
+- bugfixes imported from earlier releases
+  * bugfix: named pipes did no longer work (they always got an open error)
+    this was a regression from the omfile rewrite in 4.5.0
+  * bugfix(testbench): sequence check was not always performed correctly,
+    that could result in tests reporting success when they actually failed
+- improved testbench: added tests for UDP forwarding and omudpspoof
+- doc bugfix: omudpspoof had wrong config command names ("om" missing)
+- bugfix [imported from 4.4.3]: $ActionExecOnlyOnceEveryInterval did
+  not work.
+- [inport v4] improved testbench, contains now tcp and gzip test cases
+- [import v4] added a so-called "On Demand Debug" mode, in which debug
+  output can be generated only after the process has started, but not right
+  from the beginning. This is assumed to be useful for hard-to-find bugs.
+  Also improved the doc on the debug system.
+- bugfix: segfault on startup when -q or -Q option was given
+  [imported from v3-stable]
+---------------------------------------------------------------------------
+Version 5.3.4  [DEVEL] (rgerhards), 2009-11-04
+- added the ability to create custom message parsers
+- added $RulesetParser config directive that permits to bind specific
+  parsers to specific rulesets
+- added omruleset output module, which provides great flexibility in 
+  action processing. THIS IS A VERY IMPORTANT ADDITION, see its doc
+  for why.
+- added the capability to have ruleset-specific main message queues
+  This offers considerable additional flexibility AND superior performance
+  (in cases where multiple inputs now can avoid lock contention)
+- bugfix: correct default for escape ('#') character restored
+  This was accidently changed to '\\', thanks to David Lang for reporting
+- bugfix(testbench): testcase did not properly wait for rsyslogd shutdown
+  thus some unpredictable behavior and a false negative test result
+  could occur.
+---------------------------------------------------------------------------
+Version 5.3.3  [DEVEL] (rgerhards), 2009-10-27
+- simplified and thus speeded up the queue engine, also fixed some
+  potential race conditions (in very unusual shutdown conditions)
+  along the way. The threading model has seriously changes, so there may
+  be some regressions.
+- enhanced test environment (inlcuding testbench): support for enhancing
+  probability of memory addressing failure by using non-NULL default
+  value for malloced memory (optional, only if requested by configure
+  option). This helps to track down some otherwise undetected issues
+  within the testbench.
+- bugfix: potential abort if inputname property was not set 
+  primarily a problem of imdiag
+- bugfix: message processing states were not set correctly in all cases
+  however, this had no negative effect, as the message processing state
+  was not evaluated when a batch was deleted, and that was the only case
+  where the state could be wrong.
+---------------------------------------------------------------------------
+Version 5.3.2  [DEVEL] (rgerhards), 2009-10-21
+- enhanced omfile to support transactional interface. This will increase
+  performance in many cases.
+- added multi-ruleset support to imudp
+- re-enabled input thread termination handling that does avoid thread
+  cancellation where possible. This provides a more reliable mode of
+  rsyslogd termination (canceling threads my result in not properly
+  freed resouces and potential later hangs, even though we perform
+  proper cancel handling in our code). This is part of an effort to
+  reduce thread cancellation as much as possible in rsyslog.
+  NOTE: the code previously written code for this functionality had a
+  subtle race condition. The new code solves that.
+- enhanced immark to support non-cancel input module termination
+- improved imudp so that epoll can be used in more environments,
+  fixed potential compile time problem if EPOLL_CLOEXEC is not available.
+- some cleanup/slight improvement:
+  * changed imuxsock to no longer use deprecated submitAndParseMsg() IF
+  * changed submitAndParseMsg() interface to be a wrapper around the new
+    way of message creation/submission. This enables older plugins to be
+    used together with the new interface. The removal also enables us to
+    drop a lot of duplicate code, reducing complexity and increasing
+    maintainability.
+- bugfix: segfault when starting up with an invalid .qi file for a disk queue
+  Failed for both pure disk as well as DA queues. Now, we emit an error
+  message and disable disk queueing facility.
+- bugfix: potential segfault on messages with empty MSG part. This was a
+  recently introduced regression.
+- bugfix: debug string larger than 1K were improperly displayed. Max size
+  is now 32K, and if a string is even longer it is meaningfully truncated.
+---------------------------------------------------------------------------
+Version 5.3.1  [DEVEL] (rgerhards), 2009-10-05
+- added $AbortOnUncleanConfig directive - permits to prevent startup when
+  there are problems with the configuration file. See it's doc for
+  details.
+- included some important fixes from v4-stable:
+  * bugfix: invalid handling of zero-sized messages
+  * bugfix: zero-sized UDP messages are no longer processed
+  * bugfix: random data could be appended to message
+  * bugfix: reverse lookup reduction logic in imudp do DNS queries too often
+- bugfixes imported from 4.5.4:
+  * bugfix: potential segfault in stream writer on destruction
+  * bugfix: potential race in object loader (obj.c) during use/release
+  * bugfixes: potential problems in out file zip writer
+---------------------------------------------------------------------------
+Version 5.3.0  [DEVEL] (rgerhards), 2009-09-14
+- begun to add simple GUI programs to gain insight into running rsyslogd
+  instances and help setup and troubleshooting (active via the
+  --enable-gui ./configure switch)
+- changed imudp to utilize epoll(), where available. This shall provide
+  slightly better performance (just slightly because we called select()
+  rather infrequently on a busy system)
+---------------------------------------------------------------------------
+Version 5.2.2  [v5-stable] (rgerhards), 2009-11-??
+- bugfix: enabling GSSServer crashes rsyslog startup
+  Thanks to Tomas Kubina for the patch [imgssapi]
+---------------------------------------------------------------------------
+Version 5.2.1  [v5-stable] (rgerhards), 2009-11-02
+- bugfix [imported from 4.4.3]: $ActionExecOnlyOnceEveryInterval did
+  not work.
+- bugfix: segfault on startup when -q or -Q option was given
+  [imported from v3-stable]
+---------------------------------------------------------------------------
+Version 5.2.0  [v5-stable] (rgerhards), 2009-11-02
+This is a re-release of version 5.1.6 as stable after we did not get any bug 
+reports during the whole beta phase. Still, this first v5-stable may not be 
+as stable as one hopes for, I am not sure if we did not get bug reports
+just because nobody tried it. Anyhow, we need to go forward and so we
+have the initial v5-stable.
+---------------------------------------------------------------------------
+Version 5.1.6  [v5-beta] (rgerhards), 2009-10-15
+- feature imports from v4.5.6
+- bugfix: potential race condition when queue worker threads were
+  terminated
+- bugfix: solved potential (temporary) stall of messages when the queue was
+  almost empty and few new data added (caused testbench to sometimes hang!)
+- fixed some race condition in testbench
+- added more elaborate diagnostics to parts of the testbench
+- bugfixes imported from 4.5.4:
+  * bugfix: potential segfault in stream writer on destruction
+  * bugfix: potential race in object loader (obj.c) during use/release
+  * bugfixes: potential problems in out file zip writer
+- included some important fixes from 4.4.2:
+  * bugfix: invalid handling of zero-sized messages
+  * bugfix: zero-sized UDP messages are no longer processed
+  * bugfix: random data could be appended to message
+  * bugfix: reverse lookup reduction logic in imudp do DNS queries too often
+---------------------------------------------------------------------------
+Version 5.1.5  [v5-beta] (rgerhards), 2009-09-11
+- added new config option $ActionWriteAllMarkMessages
+  this option permites to process mark messages under all circumstances,
+  even if an action was recently called. This can be useful to use mark
+  messages as a kind of heartbeat.
+- added new config option $InputUnixListenSocketCreatePath
+  to permit the auto-creation of pathes to additional log sockets. This
+  turns out to be useful if they reside on temporary file systems and
+  rsyslogd starts up before the daemons that create these sockets
+  (rsyslogd always creates the socket itself if it does not exist).
+- added $LogRSyslogStatusMessages configuration directive
+  permitting to turn off rsyslog start/stop/HUP messages. See Debian
+  ticket http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=463793
+- bugfix: hostnames with dashes in them were incorrectly treated as
+  malformed, thus causing them to be treated as TAG (this was a regression
+  introduced from the "rfc3164 strict" change in 4.5.0). Testbench has been
+  updated to include a smaple message with a hostname containing a dash.
+- bugfix: strings improperly reused, resulting in some message properties
+  be populated with strings from previous messages. This was caused by
+  an improper predicate check.
+- added new config directive $omfileForceChown [import from 4.7.0]
+---------------------------------------------------------------------------
+Version 5.1.4  [DEVEL] (rgerhards), 2009-08-20
+- legacy syslog parser changed so that it now accepts date stamps in
+  wrong case. Some devices seem to create them and I do not see any harm
+  in supporting that.
+- added $InputTCPMaxListeners directive - permits to specify how many 
+  TCP servers shall be possible (default is 20).
+- bugfix: memory leak with some input modules. Those inputs that
+  use parseAndSubmitMsg() leak two small memory blocks with every message.
+  Typically, those process only relatively few messages, so the issue 
+  does most probably not have any effect in practice.
+- bugfix: if tcp listen port could not be created, no error message was
+  emitted
+- bugfix: discard action did not work (did not discard messages)
+- bugfix: discard action caused segfault
+- bugfix: potential segfault in output file writer (omfile)
+  In async write mode, we use modular arithmetic to index the output
+  buffer array. However, the counter variables accidently were signed,
+  thus resulting in negative indizes after integer overflow. That in turn
+  could lead to segfaults, but was depending on the memory layout of 
+  the instance in question (which in turn depended on a number of
+  variables, like compile settings but also configuration). The counters
+  are now unsigned (as they always should have been) and so the dangling
+  mis-indexing does no longer happen. This bug potentially affected all
+  installations, even if only some may actually have seen a segfault.
+---------------------------------------------------------------------------
+Version 5.1.3  [DEVEL] (rgerhards), 2009-07-28
+- architecture change: queue now always has at least one worker thread
+  if not running in direct mode. Previous versions could run without 
+  any active workers. This simplifies the code at a very small expense.
+  See v5 compatibility note document for more in-depth discussion.
+- enhance: UDP spoofing supported via new output module omudpspoof
+  See the omudpspoof documentation for details and samples
+- bugfix: message could be truncated after TAG, often when forwarding
+  This was a result of an internal processing error if maximum field
+  sizes had been specified in the property replacer.
+- bugfix: minor static memory leak while reading configuration
+  did NOT leak based on message volume
+- internal: added ability to terminate input modules not via pthread_cancel
+  but an alternate approach via pthread_kill. This is somewhat safer as we
+  do not need to think about the cancel-safeness of all libraries we use.
+  However, not all inputs can easily supported, so this now is a feature
+  that can be requested by the input module (the most important ones
+  request it).
+---------------------------------------------------------------------------
+Version 5.1.2  [DEVEL] (rgerhards), 2009-07-08
+- bugfix: properties inputname, fromhost, fromhost-ip, msg were lost when
+  working with disk queues
+- some performance enhancements
+- bugfix: abort condition when RecvFrom was not set and message reduction
+  was on. Happend e.g. with imuxsock.
+- added $klogConsoleLogLevel directive which permits to set a new
+  console log level while rsyslog is active
+- some internal code cleanup
+---------------------------------------------------------------------------
+Version 5.1.1  [DEVEL] (rgerhards), 2009-07-03
+- bugfix: huge memory leak in queue engine (made rsyslogd unusable in
+  production). Occured if at least one queue was in direct mode 
+  (the default for action queues)
+- imported many performance optimizations from v4-devel (4.5.0)
+- bugfix: subtle (and usually irrelevant) issue in timout processing
+  timeout could be one second too early if nanoseconds wrapped
+- set a more sensible timeout for shutdow, now 1.5 seconds to complete
+  processing (this also removes those cases where the shutdown message
+  was not written because the termination happened before it)
+---------------------------------------------------------------------------
+Version 5.1.0  [DEVEL] (rgerhards), 2009-05-29
+
+*********************************** NOTE **********************************
+The v5 versions of rsyslog feature a greatly redesigned queue engine. The
+major theme for the v5 release is twofold:
+
+a) greatly improved performance
+b) enable audit-grade processing
+
+Here, audit-grade processing means that rsyslog, if used together with
+audit-grade transports and configured correctly, will never lose messages
+that already have been acknowledged, not even in fatal failure cases like
+sudden loss of power.
+
+Note that large parts of rsyslog's important core components have been
+restructured to support these design goals. As such, early versions of
+the engine will probably be less stable than the v3/v4 engine.
+
+Also note that the initial versions do not cover all and everything. As
+usual, the code will evolve toward the final goal as version numbers
+increase.
+*********************************** NOTE **********************************
+
+- redesigned queue engine so that it supports ultra-reliable operations
+  This resulted in a rewrite of large parts. The new capability can be
+  used to build audit-grade systems on the basis of rsyslog.
+- added $MainMsgQueueDequeueBatchSize and $ActionQueueDequeueBatchSize 
+  configuration directives
+- implemented a new transactional output module interface which provides
+  superior performance (for databases potentially far superior performance)
+- increased ompgsql performance by adapting to new transactional
+  output module interface
+---------------------------------------------------------------------------
+Version 4.7.3  [v4-devel] (rgerhards), 2010-??-??
+- added omuxsock, which permits to write message to local Unix sockets
+  this is the counterpart to imuxsock, enabling fast local forwarding
+- added imptcp, a simplified, Linux-specific and potentielly fast
+  syslog plain tcp input plugin (NOT supporting TLS!)
+---------------------------------------------------------------------------
+Version 4.7.2  [v4-devel] (rgerhards), 2010-05-03
+- bugfix: problems with atomic operations emulaton
+  replaced atomic operation emulation with new code. The previous code
+  seemed to have some issue and also limited concurrency severely. The
+  whole atomic operation emulation has been rewritten.
+- added new $Sleep directive to hold processing for a couple of seconds
+  during startup
+- bugfix: programname filter in ! configuration can not be reset
+  Thanks to Kiss Gabor for the patch.
+---------------------------------------------------------------------------
+Version 4.7.1  [v4-devel] (rgerhards), 2010-04-22
+- Solaris support much improved -- was not truely usable in 4.7.0
+  Solaris is no longer supported in imklog, but rather there is a new
+  plugin imsolaris, which is used to pull local log sources on a Solaris
+  machine.
+- testbench improvement: Java is no longer needed for testing tool creation
+---------------------------------------------------------------------------
+Version 4.7.0  [v4-devel] (rgerhards), 2010-04-14
+- new: support for Solaris added (but not yet the Solaris door API)
+- added function getenv() to RainerScript
+- added new config option $InputUnixListenSocketCreatePath
+  to permit the auto-creation of pathes to additional log sockets. This
+  turns out to be useful if they reside on temporary file systems and
+  rsyslogd starts up before the daemons that create these sockets
+  (rsyslogd always creates the socket itself if it does not exist).
+- added $LogRSyslogStatusMessages configuration directive
+  permitting to turn off rsyslog start/stop/HUP messages. See Debian
+  ticket http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=463793
+- added new config directive $omfileForceChown to (try to) fix some broken
+  system configs.
+  See ticket for details: http://bugzilla.adiscon.com/show_bug.cgi?id=150
+- added $EscapeControlCharacterTab config directive
+  Thanks to Jonathan Bond-Caron for the patch.
+- added option to use unlimited-size select() calls
+  Thanks to varmjofekoj for the patch
+- debugondemand mode caused backgrounding to fail - close to a bug, but I'd
+  consider the ability to background in this mode a new feature...
+- bugfix (kind of): check if TCP connection is still alive if using TLS
+  Thanks to Jonathan Bond-Caron for the patch.
+- imported changes from 4.5.7 and below
+- bugfix: potential segfault when -p command line option was used
+  Thanks for varmojfekoj for pointing me at this bug.
+- imported changes from 4.5.6 and below
+---------------------------------------------------------------------------
+Version 4.6.4  [v4-stable] (rgerhards), 2010-08-05
 - bugfix: zero-sized (empty) messages were processed by imtcp
   they are now dropped as they always should have been
 - bugfix: programname filter in ! configuration can not be reset
@@ -24,12 +558,18 @@ Version 4.6.3  [v4-stable] (rgerhards), 2010-07-07
   message-induced off-by-one error (potential segfault) (see 4.6.2)
   The analysis has been completed and a better fix been crafted and 
   integrated.
+- bugfix: the T/P/E config size specifiers did not work properly under
+  all 32-bit platforms
+- bugfix: local unix system log socket was deleted even when it was
+  not configured
 - some doc fixes; incorrect config samples could cause confusion
   thanks to Anthony Edwards for pointing the problems out
 ---------------------------------------------------------------------------
 Version 4.6.2  [v4-stable] (rgerhards), 2010-03-26
 - new feature: "." action type added to support writing files to relative
   pathes (this is primarily meant as a debug aid)
+- added replacements for atomic instructions on systems that do not
+  support them. [backport of Stefen Sledz' patch for v5)
 - new feature: $OMFileAsyncWriting directive added
   it permits to specifiy if asynchronous writing should be done or not
 - bugfix(temporary): message-induced off-by-one error (potential segfault)
@@ -178,8 +718,7 @@ Version 4.5.8  [v4-beta] (rgerhards), 2010-02-10
   Thanks to Jack for reporting this issue.
 - bugfix: rsyslog hang when writing to a named pipe which nobody was
   reading. Thanks to Michael Biebl for reporting this bug.
-- bugfix: memory leak when sending messages in zip-compressed format
-  Thanks to Naoya Nakazawa for analyzing this issue and providing a patch.
+  Bugzilla entry: http://bugzilla.adiscon.com/show_bug.cgi?id=169
 - bugfix: potential segfaults during queue shutdown
   (bugs require certain non-standard settings to appear)
   Thanks to varmojfekoj for the patch
@@ -4617,6 +5156,21 @@ Initial testing release. Based on the sysklogd package. Thanks to the
 sysklogd maintainers for all their good work!
 ---------------------------------------------------------------------------
 
+----------------------------------------------------------------------
+The following comments were left in the syslogd source. While they provide
+not too much detail, the help to date when Rainer started work on the
+project (which was 2003, now even surprising for Rainer himself ;)).
+ * \author Rainer Gerhards <rgerhards@adiscon.com>
+ * \date 2003-10-17
+ *       Some initial modifications on the sysklogd package to support
+ *       liblogging. These have actually not yet been merged to the
+ *       source you see currently (but they hopefully will)
+ *
+ * \date 2004-10-28
+ *       Restarted the modifications of sysklogd. This time, we
+ *       focus on a simpler approach first. The initial goal is to
+ *       provide MySQL database support (so that syslogd can log
+ *       to the database).
 ----------------------------------------------------------------------
 The following comments are from the stock syslogd.c source. They provide
 some insight into what happened to the source before we forked

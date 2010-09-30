@@ -36,11 +36,14 @@
 #include "dirty.h"
 #include "obj.h"
 #include "errmsg.h"
+#include "strgen.h"
+#include "unicode-helper.h"
 
 /* static data */
 DEFobjCurrIf(obj)
 DEFobjCurrIf(errmsg)
 DEFobjCurrIf(regexp)
+DEFobjCurrIf(strgen)
 
 static int bFirstRegexpErrmsg = 1; /**< did we already do a "can't load regexp" error message? */
 static struct template *tplRoot = NULL;	/* the root of the template list */
@@ -49,9 +52,10 @@ static struct template *tplLastStatic = NULL; /* last static element of the temp
 
 
 
-/* helper to tplToString, extends buffer */
+/* helper to tplToString and strgen's, extends buffer */
 #define ALLOC_INC 128
-static inline rsRetVal ExtendBuf(uchar **pBuf, size_t *pLenBuf, size_t iMinSize)
+rsRetVal
+ExtendBuf(uchar **pBuf, size_t *pLenBuf, size_t iMinSize)
 {
 	uchar *pNewBuf;
 	size_t iNewSize;
@@ -61,7 +65,6 @@ static inline rsRetVal ExtendBuf(uchar **pBuf, size_t *pLenBuf, size_t iMinSize)
 	CHKmalloc(pNewBuf = (uchar*) realloc(*pBuf, iNewSize));
 	*pBuf = pNewBuf;
 	*pLenBuf = iNewSize;
-dbgprintf("extend buf to at least %ld, done %ld\n", iMinSize, iNewSize);
 
 finalize_it:
 	RETiRet;
@@ -92,6 +95,11 @@ rsRetVal tplToString(struct template *pTpl, msg_t *pMsg, uchar **ppBuf, size_t *
 	assert(ppBuf != NULL);
 	assert(pLenBuf != NULL);
 
+	if(pTpl->pStrgen != NULL) {
+		CHKiRet(pTpl->pStrgen(pMsg, ppBuf, pLenBuf));
+		FINALIZE;
+	}
+
 	/* loop through the template. We obtain one value
 	 * and copy it over to our dynamic string buffer. Then, we
 	 * free the obtained value (if requested). We continue this
@@ -118,10 +126,11 @@ rsRetVal tplToString(struct template *pTpl, msg_t *pMsg, uchar **ppBuf, size_t *
 				doSQLEscape(&pVal, &iLenVal, &bMustBeFreed, 0);
 		}
 		/* got source, now copy over */
-		if(iBuf + iLenVal + 1 >= *pLenBuf) /* we reserve one char for the final \0! */
-			CHKiRet(ExtendBuf(ppBuf, pLenBuf, iBuf + iLenVal + 1));
-
 		if(iLenVal > 0) { /* may be zero depending on property */
+			/* first, make sure buffer fits */
+			if(iBuf + iLenVal >= *pLenBuf) /* we reserve one char for the final \0! */
+				CHKiRet(ExtendBuf(ppBuf, pLenBuf, iBuf + iLenVal + 1));
+
 			memcpy(*ppBuf + iBuf, pVal, iLenVal);
 			iBuf += iLenVal;
 		}
@@ -742,7 +751,7 @@ static int do_Parameter(unsigned char **pp, struct template *pTpl)
 				/* We get here ONLY if the regex end was found */
 				longitud = regex_end - p;
 				/* Malloc for the regex string */
-				regex_char = (unsigned char *) malloc(longitud + 1);
+				regex_char = (unsigned char *) MALLOC(longitud + 1);
 				if(regex_char == NULL) {
 					dbgprintf("Could not allocate memory for template parameter!\n");
 					pTpe->data.field.has_regex = 0;
@@ -830,16 +839,45 @@ static int do_Parameter(unsigned char **pp, struct template *pTpl)
 }
 
 
+/* Add a new entry for a template module.
+ * returns pointer to new object if it succeeds, NULL otherwise.
+ * rgerhards, 2010-05-31
+ */
+static rsRetVal
+tplAddTplMod(struct template *pTpl, uchar** ppRestOfConfLine)
+{
+	uchar *pSrc, *pDst;
+	uchar szMod[2048];
+	strgen_t *pStrgen;
+	DEFiRet;
+
+	pSrc = *ppRestOfConfLine;
+	pDst = szMod;
+	while(*pSrc && !isspace(*pSrc) && pDst < &(szMod[sizeof(szMod) - 1])) {
+		*pDst++ = *pSrc++;
+	}
+	*pDst = '\0';
+	*ppRestOfConfLine = pSrc;
+	CHKiRet(strgen.FindStrgen(&pStrgen, szMod));
+	pTpl->pStrgen = pStrgen->pModule->mod.sm.strgen;
+	dbgprintf("template bound to strgen '%s'\n", szMod);
+
+finalize_it:
+	RETiRet;
+}
+
+
 /* Add a new template line
  * returns pointer to new object if it succeeds, NULL otherwise.
  */
-struct template *tplAddLine(char* pName, unsigned char** ppRestOfConfLine)
+struct template *tplAddLine(char* pName, uchar** ppRestOfConfLine)
 {
 	struct template *pTpl;
  	unsigned char *p;
 	int bDone;
 	char optBuf[128]; /* buffer for options - should be more than enough... */
 	size_t i;
+	rsRetVal localRet;
 
 	assert(pName != NULL);
 	assert(ppRestOfConfLine != NULL);
@@ -848,7 +886,7 @@ struct template *tplAddLine(char* pName, unsigned char** ppRestOfConfLine)
 		return NULL;
 	
 	pTpl->iLenName = strlen(pName);
-	pTpl->pszName = (char*) malloc(sizeof(char) * (pTpl->iLenName + 1));
+	pTpl->pszName = (char*) MALLOC(sizeof(char) * (pTpl->iLenName + 1));
 	if(pTpl->pszName == NULL) {
 		dbgprintf("tplAddLine could not alloc memory for template name!");
 		pTpl->iLenName = 0;
@@ -867,7 +905,25 @@ struct template *tplAddLine(char* pName, unsigned char** ppRestOfConfLine)
 	while(isspace((int)*p))/* skip whitespace */
 		++p;
 	
-	if(*p != '"') {
+	switch(*p) {
+	case '"': /* just continue */
+		break;
+	case '=':
+		*ppRestOfConfLine = p + 1;
+		localRet = tplAddTplMod(pTpl, ppRestOfConfLine);
+		if(localRet != RS_RET_OK) {
+			errmsg.LogError(0, localRet, "Template '%s': error %d defining template via strgen module",
+					pTpl->pszName, localRet);
+			/* we simply make the template defunct in this case by setting
+			 * its name to a zero-string. We do not free it, as this would
+			 * require additional code and causes only a very small memory
+			 * consumption. Memory is freed, however, in normal operation
+			 * and most importantly by HUPing syslogd.
+			 */
+			*pTpl->pszName = '\0';
+		}
+		return NULL;
+	default:
 		dbgprintf("Template '%s' invalid, does not start with '\"'!\n", pTpl->pszName);
 		/* we simply make the template defunct in this case by setting
 		 * its name to a zero-string. We do not free it, as this would
@@ -943,6 +999,7 @@ struct template *tplAddLine(char* pName, unsigned char** ppRestOfConfLine)
 	}
 
 	*ppRestOfConfLine = p;
+
 	return(pTpl);
 }
 
@@ -1195,11 +1252,8 @@ rsRetVal templateInit()
 	DEFiRet;
 	CHKiRet(objGetObjInterface(&obj));
 	CHKiRet(objUse(errmsg, CORE_COMPONENT));
+	CHKiRet(objUse(strgen, CORE_COMPONENT));
 
 finalize_it:
 	RETiRet;
 }
-
-/*
- * vi:set ai:
- */

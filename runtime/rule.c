@@ -39,8 +39,8 @@
 #include "vm.h"
 #include "var.h"
 #include "srUtils.h"
+#include "batch.h"
 #include "unicode-helper.h"
-#include "dirty.h" /* for getFIOPName */
 
 /* static data */
 DEFobjStaticHelpers
@@ -48,6 +48,35 @@ DEFobjCurrIf(errmsg)
 DEFobjCurrIf(expr)
 DEFobjCurrIf(var)
 DEFobjCurrIf(vm)
+
+
+/* support for simple textual representation of FIOP names
+ * rgerhards, 2005-09-27
+ */
+static char*
+getFIOPName(unsigned iFIOP)
+{
+	char *pRet;
+	switch(iFIOP) {
+		case FIOP_CONTAINS:
+			pRet = "contains";
+			break;
+		case FIOP_ISEQUAL:
+			pRet = "isequal";
+			break;
+		case FIOP_STARTSWITH:
+			pRet = "startswith";
+			break;
+		case FIOP_REGEX:
+			pRet = "regex";
+			break;
+		default:
+			pRet = "NOP";
+			break;
+	}
+	return pRet;
+}
+
 
 /* iterate over all actions, this is often needed, for example when HUP processing 
  * must be done or a shutdown is pending.
@@ -59,40 +88,20 @@ iterateAllActions(rule_t *pThis, rsRetVal (*pFunc)(void*, void*), void* pParam)
 }
 
 
-
 /* helper to processMsg(), used to call the configured actions. It is
  * executed from within llExecFunc() of the action list.
  * rgerhards, 2007-08-02
  */
-typedef struct processMsgDoActions_s {
-	int bPrevWasSuspended; /* was the previous action suspended? */
-	msg_t *pMsg;
-} processMsgDoActions_t;
-DEFFUNC_llExecFunc(processMsgDoActions)
+DEFFUNC_llExecFunc(processBatchDoActions)
 {
 	DEFiRet;
 	rsRetVal iRetMod;	/* return value of module - we do not always pass that back */
 	action_t *pAction = (action_t*) pData;
-	processMsgDoActions_t *pDoActData = (processMsgDoActions_t*) pParam;
+	batch_t *pBatch = (batch_t*) pParam;
 
-	assert(pAction != NULL);
+	DBGPRINTF("Processing next action\n");
+	iRetMod = pAction->submitToActQ(pAction, pBatch);
 
-	if((pAction->bExecWhenPrevSusp  == 1) && (pDoActData->bPrevWasSuspended == 0)) {
-		dbgprintf("not calling action because the previous one is not suspended\n");
-		ABORT_FINALIZE(RS_RET_OK);
-	}
-
-	iRetMod = actionCallAction(pAction, pDoActData->pMsg);
-	if(iRetMod == RS_RET_DISCARDMSG) {
-		ABORT_FINALIZE(RS_RET_DISCARDMSG);
-	} else if(iRetMod == RS_RET_SUSPENDED) {
-		/* indicate suspension for next module to be called */
-		pDoActData->bPrevWasSuspended = 1;
-	} else {
-		pDoActData->bPrevWasSuspended = 0;
-	}
-
-finalize_it:
 	RETiRet;
 }
 
@@ -101,7 +110,7 @@ finalize_it:
  * provided filter condition.
  */
 static rsRetVal
-shouldProcessThisMessage(rule_t *pRule, msg_t *pMsg, int *bProcessMsg)
+shouldProcessThisMessage(rule_t *pRule, msg_t *pMsg, sbool *bProcessMsg)
 {
 	DEFiRet;
 	unsigned short pbMustBeFreed;
@@ -250,26 +259,29 @@ finalize_it:
 
 
 
-/* Process (consume) a received message. Calls the actions configured.
+/* Process (consume) a batch of messages. Calls the actions configured.
  * rgerhards, 2005-10-13
  */
 static rsRetVal
-processMsg(rule_t *pThis, msg_t *pMsg)
+processBatch(rule_t *pThis, batch_t *pBatch)
 {
-	int bProcessMsg;
-	processMsgDoActions_t DoActData;
+	int i;
 	DEFiRet;
 
 	ISOBJ_TYPE_assert(pThis, rule);
-	assert(pMsg != NULL);
+	assert(pBatch != NULL);
 
-	/* first check the filters... */
-	CHKiRet(shouldProcessThisMessage(pThis, pMsg, &bProcessMsg));
-	if(bProcessMsg) {
-		DoActData.pMsg = pMsg;
-		DoActData.bPrevWasSuspended = 0;
-		CHKiRet(llExecFunc(&pThis->llActList, processMsgDoActions, (void*)&DoActData));
+	/* first check the filters and reset status variables */
+	for(i = 0 ; i < batchNumMsgs(pBatch) && !*(pBatch->pbShutdownImmediate) ; ++i) {
+		CHKiRet(shouldProcessThisMessage(pThis, (msg_t*)(pBatch->pElem[i].pUsrp),
+						 &(pBatch->pElem[i].bFilterOK)));
+		// TODO: really abort on error? 2010-06-10
+		if(pBatch->pElem[i].bFilterOK) {
+			/* re-init only when actually needed (cache write cost!) */
+			pBatch->pElem[i].bPrevWasSuspended = 0;
+		}
 	}
+	CHKiRet(llExecFunc(&pThis->llActList, processBatchDoActions, pBatch));
 
 finalize_it:
 	RETiRet;
@@ -412,7 +424,7 @@ CODESTARTobjQueryInterface(rule)
 	pIf->DebugPrint = ruleDebugPrint;
 
 	pIf->IterateAllActions = iterateAllActions;
-	pIf->ProcessMsg = processMsg;
+	pIf->ProcessBatch = processBatch;
 	pIf->SetAssRuleset = setAssRuleset;
 	pIf->GetAssRuleset = getAssRuleset;
 finalize_it:

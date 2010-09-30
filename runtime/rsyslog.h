@@ -27,6 +27,12 @@
 #define INCLUDED_RSYSLOG_H
 
 /* ############################################################# *
+ * #                 Some constant values                      # *
+ * ############################################################# */
+#define CONST_LEN_TIMESTAMP_3164 15 		/* number of chars (excluding \0!) in a RFC3164 timestamp */
+#define CONST_LEN_TIMESTAMP_3339 32 		/* number of chars (excluding \0!) in a RFC3339 timestamp */
+
+/* ############################################################# *
  * #                    Config Settings                        # *
  * ############################################################# */
 #define RS_STRINGBUF_ALLOC_INCREMENT	128
@@ -40,7 +46,27 @@
 #define CONF_TAG_BUFSIZE		32
 #define CONF_HOSTNAME_BUFSIZE		32
 #define CONF_PROP_BUFSIZE		16	/* should be close to sizeof(ptr) or lighly above it */
+#define	CONF_MIN_SIZE_FOR_COMPRESS	60 	/* config param: minimum message size to try compression. The smaller
+						 * the message, the less likely is any compression gain. We check for
+						 * gain before we submit the message. But to do so we still need to
+						 * do the (costly) compress() call. The following setting sets a size
+						 * for which no call to compress() is done at all. This may result in
+						 * a few more bytes being transmited but better overall performance.
+						 * Note: I have not yet checked the minimum UDP packet size. It might be
+						 * that we do not save anything by compressing very small messages, because
+						 * UDP might need to pad ;)
+						 * rgerhards, 2006-11-30
+						 */
 
+#define CONF_OMOD_NUMSTRINGS_MAXSIZE	2	/* cache for pointers to output module buffer pointers. All
+						 * rsyslog-provided plugins do NOT need more than two buffers. If
+						 * more are needed (future developments, third-parties), rsyslog 
+						 * must be recompiled with a larger parameter. Hardcoding this
+						 * saves us some overhead, both in runtime in code complexity. As
+						 * it is doubtful if ever more than 2 parameters are needed, the
+						 * approach taken here is considered appropriate.
+						 * rgerhards, 2010-06-24
+						 */
 
 /* ############################################################# *
  * #                  End Config Settings                      # *
@@ -60,8 +86,29 @@
 #endif
 
 
+/* the rsyslog core provides information about present feature to plugins
+ * asking it. Below are feature-test macros which must be used to query 
+ * features. Note that this must be powers of two, so that multiple queries
+ * can be combined. -- rgerhards, 2009-04-27
+ */
+#define CORE_FEATURE_BATCHING	1
+/*#define CORE_FEATURE_whatever 2 ... and so on ... */
+
+/* under Solaris (actually only SPARC), we need to redefine some types
+ * to be void, so that we get void* pointers. Otherwise, we will see
+ * alignment errors.
+ */
+/* some universal fixed size integer defines ... */
+typedef long long int64;
+typedef long long unsigned uint64;
+typedef int64 number_t; /* type to use for numbers - TODO: maybe an autoconf option? */
+typedef char intTiny; 	/* 0..127! */
+typedef unsigned char uintTiny;	/* 0..255! */
+
 /* define some base data types */
+
 typedef unsigned char uchar;/* get rid of the unhandy "unsigned char" */
+typedef struct aUsrp_s aUsrp_t;
 typedef struct thrdInfo thrdInfo_t;
 typedef struct obj_s obj_t;
 typedef struct ruleset_s ruleset_t;
@@ -71,6 +118,7 @@ typedef struct NetAddr netAddr_t;
 typedef struct netstrms_s netstrms_t;
 typedef struct netstrm_s netstrm_t;
 typedef struct nssel_s nssel_t;
+typedef struct nspoll_s nspoll_t;
 typedef enum nsdsel_waitOp_e nsdsel_waitOp_t;
 typedef struct nsd_ptcp_s nsd_ptcp_t;
 typedef struct nsd_gtls_s nsd_gtls_t;
@@ -78,9 +126,10 @@ typedef struct nsd_gsspi_s nsd_gsspi_t;
 typedef struct nsd_nss_s nsd_nss_t;
 typedef struct nsdsel_ptcp_s nsdsel_ptcp_t;
 typedef struct nsdsel_gtls_s nsdsel_gtls_t;
-typedef obj_t nsd_t;
-typedef obj_t nsdsel_t;
+typedef struct nsdpoll_ptcp_s nsdpoll_ptcp_t;
+typedef struct wti_s wti_t;
 typedef struct msg msg_t;
+typedef struct queue_s qqueue_t;
 typedef struct prop_s prop_t;
 typedef struct interface_s interface_t;
 typedef struct objInfo_s objInfo_t;
@@ -93,24 +142,47 @@ typedef struct tcps_sess_s tcps_sess_t;
 typedef struct strmsrv_s strmsrv_t;
 typedef struct strms_sess_s strms_sess_t;
 typedef struct vmstk_s vmstk_t;
+typedef struct batch_obj_s batch_obj_t;
+typedef struct batch_s batch_t;
+typedef struct wtp_s wtp_t;
+typedef struct modInfo_s modInfo_t;
+typedef struct parser_s parser_t;
+typedef struct parserList_s parserList_t;
+typedef struct strgen_s strgen_t;
+typedef struct strgenList_s strgenList_t;
+typedef struct statsobj_s statsobj_t;
+typedef struct statsctr_s statsctr_t;
 typedef rsRetVal (*prsf_t)(struct vmstk_s*, int);	/* pointer to a RainerScript function */
+typedef uint64 qDeqID;	/* queue Dequeue order ID. 32 bits is considered dangerously few */
 
 typedef struct tcpLstnPortList_s tcpLstnPortList_t; // TODO: rename?
 typedef struct strmLstnPortList_s strmLstnPortList_t; // TODO: rename?
 
-/* some universal 64 bit define... */
-typedef long long int64;
-typedef long long unsigned uint64;
-typedef int64 number_t; /* type to use for numbers - TODO: maybe an autoconf option? */
-typedef char intTiny; 	/* 0..127! */
-typedef uchar uintTiny;	/* 0..255! */
+/* under Solaris (actually only SPARC), we need to redefine some types
+ * to be void, so that we get void* pointers. Otherwise, we will see
+ * alignment errors.
+ */
+#ifdef OS_SOLARIS
+	typedef void * obj_t_ptr;
+	typedef void nsd_t;
+	typedef void nsdsel_t;
+	typedef void nsdpoll_t;
+#else
+	typedef obj_t *obj_t_ptr;
+	typedef obj_t nsd_t;
+	typedef obj_t nsdsel_t;
+	typedef obj_t nsdpoll_t;
+#endif
+
 
 #ifdef __hpux
 typedef unsigned int u_int32_t; /* TODO: is this correct? */
 typedef int socklen_t;
 #endif
 
-typedef char bool;		/* I intentionally use char, to keep it slim so that many fit into the CPU cache! */
+typedef struct epoll_event epoll_event_t;
+
+typedef char sbool;		/* (small bool) I intentionally use char, to keep it slim so that many fit into the CPU cache! */
 
 /* settings for flow control
  * TODO: is there a better place for them? -- rgerhards, 2008-03-14
@@ -350,7 +422,7 @@ enum rsRetVal_				/** return value. All methods return this if not specified oth
 	RS_RET_RSCORE_TOO_OLD = -2120, /**< rsyslog core is too old for ... (eg this plugin) */
 	RS_RET_DEFER_COMMIT = -2121, /**< output plugin status: not yet committed (an OK state!) */
 	RS_RET_PREVIOUS_COMMITTED = -2122, /**< output plugin status: previous record was committed (an OK state!) */
-	RS_RET_ACTION_FAILED = -2123, /**< action failed and is now suspended (consider this permanent for the time being) */
+	RS_RET_ACTION_FAILED = -2123, /**< action failed and is now suspended */
 	RS_RET_NONFATAL_CONFIG_ERR = -2124, /**< non-fatal error during config processing */
 	RS_RET_NON_SIZELIMITCMD = -2125, /**< size limit for file defined, but no size limit command given */
 	RS_RET_SIZELIMITCMD_DIDNT_RESOLVE = -2126, /**< size limit command did not resolve situation */
@@ -360,15 +432,41 @@ enum rsRetVal_				/** return value. All methods return this if not specified oth
 	RS_RET_VAR_NOT_FOUND = -2142, /**< variable not found */
 	RS_RET_EMPTY_MSG = -2143, /**< provided (raw) MSG is empty */
 	RS_RET_PEER_CLOSED_CONN = -2144, /**< remote peer closed connection (information, no error) */
+	RS_RET_ERR_OPEN_KLOG = -2145, /**< error opening the kernel log socket (primarily solaris) */
+	RS_RET_ERR_AQ_CONLOG = -2146, /**< error aquiring console log (on solaris) */
+	RS_RET_ERR_DOOR = -2147, /**< some problems with handling the Solaris door functionality */
+	RS_RET_NO_SRCNAME_TPL = -2150, /**< sourcename template was not specified where one was needed (omudpspoof spoof addr) */
+	RS_RET_HOST_NOT_SPECIFIED = -2151, /**< (target) host was not specified where it was needed */
+	RS_RET_ERR_LIBNET_INIT = -2152, /**< error initializing libnet */
+	RS_RET_FORCE_TERM = -2153,	/**< thread was forced to terminate by bShallShutdown, a state, not an error */
+	RS_RET_RULES_QUEUE_EXISTS = -2154,/**< we were instructed to create a new ruleset queue, but one already exists */
+	RS_RET_NO_CURR_RULESET = -2155,/**< no current ruleset exists (but one is required) */
+	RS_RET_NO_MSG_PASSING = -2156,/**< output module interface parameter passing mode "MSG" is not available but required */
+	RS_RET_RULESET_NOT_FOUND = -2157,/**< a required ruleset could not be found */
+	RS_RET_NO_RULESET= -2158,/**< no ruleset name as specified where one was needed */
+	RS_RET_PARSER_NOT_FOUND = -2159,/**< parser with the specified name was not found */
+	RS_RET_COULD_NOT_PARSE = -2160,/**< (this) parser could not parse the message (no error, means try next one) */
+	RS_RET_EINTR = -2161,		/**< EINTR occured during a system call (not necessarily an error) */
+	RS_RET_ERR_EPOLL = -2162,	/**< epoll() returned with an unexpected error code */
+	RS_RET_ERR_EPOLL_CTL = -2163,	/**< epol_ctll() returned with an unexpected error code */
+	RS_RET_TIMEOUT = -2164,		/**< timeout occured during operation */
+	RS_RET_RCV_ERR = -2165,		/**< error occured during socket rcv operation */
+	RS_RET_NO_SOCK_CONFIGURED = -2166, /**< no socket (name) was configured where one is required */
+	RS_RET_NO_LSTN_DEFINED = -2172, /**< no listener defined (e.g. inside an input module) */
+	RS_RET_EPOLL_CR_FAILED = -2173, /**< epoll_create() failed */
+	RS_RET_EPOLL_CTL_FAILED = -2174, /**< epoll_ctl() failed */
+	RS_RET_INTERNAL_ERROR = -2175, /**< rsyslogd internal error, unexpected code path reached */
 
 	/* RainerScript error messages (range 1000.. 1999) */
 	RS_RET_SYSVAR_NOT_FOUND = 1001, /**< system variable could not be found (maybe misspelled) */
 
 	/* some generic error/status codes */
+	RS_RET_OK = 0,			/**< operation successful */
 	RS_RET_OK_DELETE_LISTENTRY = 1,	/**< operation successful, but callee requested the deletion of an entry (special state) */
 	RS_RET_TERMINATE_NOW = 2,	/**< operation successful, function is requested to terminate (mostly used with threads) */
 	RS_RET_NO_RUN = 3,		/**< operation successful, but function does not like to be executed */
-	RS_RET_OK = 0			/**< operation successful */
+	RS_RET_IDLE = 4,		/**< operation successful, but callee is idle (e.g. because queue is empty) */
+	RS_RET_TERMINATE_WHEN_IDLE = 5	/**< operation successful, function is requested to terminate when idle */
 };
 
 /* some helpful macros to work with srRetVals.

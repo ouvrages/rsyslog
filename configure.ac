@@ -2,8 +2,11 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[4.6.4],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[5.7.0],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE
+
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
+
 AC_CONFIG_SRCDIR([ChangeLog])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS([config.h])
@@ -12,7 +15,7 @@ AC_GNU_SOURCE
 
 # check for Java compiler
 AC_CHECK_PROG(HAVE_JAVAC, [javac], [yes])
-if test x"$HAVE_JAVAC" = x"yes"; then
+if test x"$HAVE_JAVAC" = x""; then
         AC_MSG_WARN([no javac found, disabling features depending on it])
 fi
 
@@ -84,6 +87,7 @@ AC_TYPE_UINT8_T
 AC_HEADER_TIME
 AC_STRUCT_TM
 AC_C_VOLATILE
+AC_C_TYPEOF
 
 sa_includes="\
 $ac_includes_default
@@ -104,7 +108,7 @@ AC_TYPE_SIGNAL
 AC_FUNC_STAT
 AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS([flock basename alarm clock_gettime gethostbyname gethostname gettimeofday localtime_r memset mkdir regcomp select setid socket strcasecmp strchr strdup strerror strndup strnlen strrchr strstr strtol strtoul uname ttyname_r epoll_wait getline malloc_trim prctl fdatasync])
+AC_CHECK_FUNCS([flock basename alarm clock_gettime gethostbyname gethostname gettimeofday localtime_r memset mkdir regcomp select setid socket strcasecmp strchr strdup strerror strndup strnlen strrchr strstr strtol strtoul uname ttyname_r getline malloc_trim prctl epoll_create epoll_create1 fdatasync])
 
 # Check for MAXHOSTNAMELEN
 AC_MSG_CHECKING(for MAXHOSTNAMELEN)
@@ -125,6 +129,10 @@ AC_TRY_COMPILE([
 
 # check for availability of atomic operations
 RS_ATOMIC_OPERATIONS
+RS_ATOMIC_OPERATIONS_64BIT
+
+# fall back to POSIX sems for atomic operations (cpu expensive)
+AC_CHECK_HEADERS([semaphore.h])
 
 
 # Additional module directories
@@ -173,6 +181,7 @@ AM_CONDITIONAL(ENABLE_REGEXP, test x$enable_regexp = xyes)
 if test "$enable_regexp" = "yes"; then
         AC_DEFINE(FEATURE_REGEXP, 1, [Regular expressions support enabled.])
 fi
+
 
 
 # zlib compression
@@ -232,7 +241,7 @@ AC_ARG_ENABLE(pthreads,
 )
 
 if test "x$enable_pthreads" = "xno"; then
-	AC_MSG_ERROR(rsyslog v3 does no longer support single threading mode -- use a previous version for that);
+	AC_MSG_ERROR(rsyslog v3+ does no longer support single threading mode -- use a previous version for that);
 fi
 
 if test "x$enable_pthreads" != "xno"; then
@@ -274,6 +283,7 @@ AC_ARG_ENABLE(klog,
 AM_CONDITIONAL(ENABLE_IMKLOG, test x$enable_klog = xyes)
 AM_CONDITIONAL(ENABLE_IMKLOG_BSD, test x$os_type = xbsd)
 AM_CONDITIONAL(ENABLE_IMKLOG_LINUX, test x$os_type = xlinux)
+AM_CONDITIONAL(ENABLE_IMKLOG_SOLARIS, test x$os_type = xsolaris)
 
 
 #
@@ -335,6 +345,21 @@ AC_ARG_ENABLE([fsstnd],
   ])
 
 
+# support for unlimited select() syscall
+AC_ARG_ENABLE(unlimited_select,
+        [AS_HELP_STRING([--enable-unlimited-select],[Enable unlimited select() syscall @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_unlimited_select="yes" ;;
+          no) enable_unlimited_select="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-unlimited-select) ;;
+         esac],
+        [enable_unlimited_select="no"]
+)
+if test "$enable_unlimited_select" = "yes"; then
+        AC_DEFINE(USE_UNLIMITED_SELECT, 1, [If defined, the select() syscall won't be limited to a particular number of file descriptors.])
+fi
+
+
 # debug
 AC_ARG_ENABLE(debug,
         [AS_HELP_STRING([--enable-debug],[Enable debug mode @<:@default=no@:>@])],
@@ -380,6 +405,21 @@ AC_ARG_ENABLE(valgrind,
 )
 if test "$enable_valgrind" = "yes"; then
         AC_DEFINE(VALGRIND, 1, [Defined if valgrind support settings are to be enabled (e.g. prevents dlclose()).])
+fi
+
+
+# memcheck
+AC_ARG_ENABLE(memcheck,
+        [AS_HELP_STRING([--enable-memcheck],[Enable extended memory check support @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_memcheck="yes" ;;
+          no) enable_memcheck="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-memcheck) ;;
+         esac],
+        [enable_memcheck="no"]
+)
+if test "$enable_memcheck" = "yes"; then
+        AC_DEFINE(MEMCHECK, 1, [Defined if memcheck support settings are to be enabled (e.g. prevents dlclose()).])
 fi
 
 
@@ -727,6 +767,44 @@ AC_ARG_ENABLE(imfile,
 AM_CONDITIONAL(ENABLE_IMFILE, test x$enable_imfile = xyes)
 
 
+# settings for the door input module (under solaris, thus default off)
+AC_ARG_ENABLE(imsolaris,
+        [AS_HELP_STRING([--enable-imsolaris],[door input module enabled @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_imsolaris="yes" ;;
+          no) enable_imsolaris="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-imsolaris) ;;
+         esac],
+        [enable_imsolaris=no]
+)
+AM_CONDITIONAL(ENABLE_IMSOLARIS, test x$enable_imsolaris = xyes)
+
+# settings for the ptcp input module
+AC_ARG_ENABLE(imptcp,
+        [AS_HELP_STRING([--enable-imptcp],[plain tcp input module enabled @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_imptcp="yes" ;;
+          no) enable_imptcp="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-imptcp) ;;
+         esac],
+        [enable_imptcp=no]
+)
+AM_CONDITIONAL(ENABLE_IMPTCP, test x$enable_imptcp = xyes)
+
+
+# settings for the pstats input module
+AC_ARG_ENABLE(impstats,
+        [AS_HELP_STRING([--enable-impstats],[periodic statistics module enabled @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_impstats="yes" ;;
+          no) enable_impstats="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-impstats) ;;
+         esac],
+        [enable_impstats=no]
+)
+AM_CONDITIONAL(ENABLE_IMPSTATS, test x$enable_impstats = xyes)
+
+
 # settings for the omprog output module
 AC_ARG_ENABLE(omprog,
         [AS_HELP_STRING([--enable-omprog],[Compiles omprog module @<:@default=no@:>@])],
@@ -740,6 +818,36 @@ AC_ARG_ENABLE(omprog,
 AM_CONDITIONAL(ENABLE_OMPROG, test x$enable_omprog = xyes)
 
 
+# settings for omudpspoof
+AC_ARG_ENABLE(omudpspoof,
+        [AS_HELP_STRING([--enable-omudpspoof],[Compiles omudpspoof module @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_omudpspoof="yes" ;;
+          no) enable_omudpspoof="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-omudpspoof) ;;
+         esac],
+        [enable_omudpspoof=no]
+)
+
+if test "x$enable_omudpspoof" = "xyes"; then
+  AC_CHECK_HEADERS(
+    [libnet.h],,
+    [AC_MSG_FAILURE([libnet is missing])]
+  )
+  AC_CHECK_LIB(
+    [net],
+    [libnet_init],
+    [UDPSPOOF_CFLAGS=""
+     UDPSPOOF_LIBS="-lnet"
+    ],
+    [AC_MSG_FAILURE([libnet is missing])]
+  )
+fi
+AM_CONDITIONAL(ENABLE_OMUDPSPOOF, test x$enable_omudpspoof = xyes)
+AC_SUBST(UDPSPOOF_CFLAGS)
+AC_SUBST(UDPSPOOF_LIBS)
+
+
 # settings for omstdout
 AC_ARG_ENABLE(omstdout,
         [AS_HELP_STRING([--enable-omstdout],[Compiles stdout module @<:@default=no@:>@])],
@@ -751,6 +859,94 @@ AC_ARG_ENABLE(omstdout,
         [enable_omstdout=no]
 )
 AM_CONDITIONAL(ENABLE_OMSTDOUT, test x$enable_omstdout = xyes)
+
+
+# settings for pmlastmsg
+AC_ARG_ENABLE(pmlastmsg,
+        [AS_HELP_STRING([--enable-pmlastmsg],[Compiles lastmsg parser module @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_pmlastmsg="yes" ;;
+          no) enable_pmlastmsg="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-pmlastmsg) ;;
+         esac],
+        [enable_pmlastmsg=no]
+)
+AM_CONDITIONAL(ENABLE_PMLASTMSG, test x$enable_pmlastmsg = xyes)
+
+
+# settings for pmrfc3164sd
+AC_ARG_ENABLE(pmrfc3164sd,
+        [AS_HELP_STRING([--enable-pmrfc3164sd],[Compiles rfc3164sd parser module @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_pmrfc3164sd="yes" ;;
+          no) enable_pmrfc3164sd="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-pmrfc3164sd) ;;
+         esac],
+        [enable_pmrfc3164sd=no]
+)
+AM_CONDITIONAL(ENABLE_PMRFC3164SD, test x$enable_pmrfc3164sd = xyes)
+
+
+# settings for omruleset
+AC_ARG_ENABLE(omruleset,
+        [AS_HELP_STRING([--enable-omruleset],[Compiles ruleset forwarding module @<:@default=yes@:>@])],
+        [case "${enableval}" in
+         yes) enable_omruleset="yes" ;;
+          no) enable_omruleset="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-omruleset) ;;
+         esac],
+        [enable_omruleset=yes]
+)
+AM_CONDITIONAL(ENABLE_OMRULESET, test x$enable_omruleset = xyes)
+
+
+# settings for omdbalerting
+AC_ARG_ENABLE(omdbalerting,
+        [AS_HELP_STRING([--enable-omdbalerting],[Compiles omdbalerting module @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_omdbalerting="yes" ;;
+          no) enable_omdbalerting="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-omdbalerting) ;;
+         esac],
+        [enable_omdbalerting=no]
+)
+AM_CONDITIONAL(ENABLE_OMDBALERTING, test x$enable_omdbalerting = xyes)
+
+
+
+# building the GUI (mostly for diagnostic reasons)
+AC_ARG_ENABLE(gui,
+        [AS_HELP_STRING([--enable-gui],[Enable GUI programs @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_gui="yes" ;;
+          no) enable_gui="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-gui) ;;
+         esac],
+        [enable_gui=no]
+)
+if test "x$enable_gui" = "xyes"; then
+	if test x$HAVE_JAVAC = x; then
+	   AC_MSG_ERROR([GUI components need Java, but Java development system is not installed on this system])
+	fi
+fi
+AM_CONDITIONAL(ENABLE_GUI, test x$enable_gui = xyes)
+
+
+AC_SUBST(RELP_CFLAGS)
+AC_SUBST(RELP_LIBS)
+
+# settings for omuxsock
+AC_ARG_ENABLE(omuxsock,
+        [AS_HELP_STRING([--enable-omuxsock],[Compiles stdout module @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_omuxsock="yes" ;;
+          no) enable_omuxsock="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-omuxsock) ;;
+         esac],
+        [enable_omuxsock=no]
+)
+AM_CONDITIONAL(ENABLE_OMUXSOCK, test x$enable_omuxsock = xyes)
+
 
 # This provides a vehicle to integrate custom modules, that are not
 # part of rsyslog, into the build process. It is named cust1, so that
@@ -807,12 +1003,7 @@ AM_CONDITIONAL(ENABLE_OMTEMPLATE, test x$enable_omtemplate = xyes)
 # end of copy template - be sure to search for omtemplate to find everything!
 
 
-SHAVE_INIT
-
-
 AC_CONFIG_FILES([Makefile \
-		shave \
-		shave-libtool \
 		runtime/Makefile \
 		tools/Makefile \
 		doc/Makefile \
@@ -827,7 +1018,15 @@ AC_CONFIG_FILES([Makefile \
 		plugins/omtemplate/Makefile \
 		plugins/omprog/Makefile \
 		plugins/omstdout/Makefile \
+		plugins/pmrfc3164sd/Makefile \
+		plugins/pmlastmsg/Makefile \
+		plugins/omruleset/Makefile \
+		plugins/omdbalerting/Makefile \
+		plugins/omuxsock/Makefile \
 		plugins/imfile/Makefile \
+		plugins/imsolaris/Makefile \
+		plugins/imptcp/Makefile \
+		plugins/impstats/Makefile \
 		plugins/imrelp/Makefile \
 		plugins/imdiag/Makefile \
 		plugins/omtesting/Makefile \
@@ -839,33 +1038,47 @@ AC_CONFIG_FILES([Makefile \
 		plugins/ommail/Makefile \
 		plugins/omsnmp/Makefile \
 		plugins/omoracle/Makefile \
+		plugins/omudpspoof/Makefile \
 		plugins/cust1/Makefile \
+		java/Makefile \
 		tests/Makefile])
 AC_OUTPUT
 
 echo "****************************************************"
 echo "rsyslog will be compiled with the following settings:"
 echo
-echo "    Multithreading support enabled:           $enable_pthreads"
 echo "    Large file support enabled:               $enable_largefile"
 echo "    Networking support enabled:               $enable_inet"
 echo "    Regular expressions support enabled:      $enable_regexp"
 echo "    Zlib compression support enabled:         $enable_zlib"
 echo "    rsyslog runtime will be built:            $enable_rsyslogrt"
 echo "    rsyslogd will be built:                   $enable_rsyslogd"
+echo "    GUI components will be built:             $enable_gui"
 echo "    custom module 1 will be built:            $enable_cust1"
+echo "    Unlimited select() support enabled:       $enable_unlimited_select"
 echo
 echo "---{ input plugins }---"
 echo "    Klog functionality enabled:               $enable_klog ($os_type)"
+echo "    plain tcp input module enabled:           $enable_imptcp"
 echo "    imdiag enabled:                           $enable_imdiag"
 echo "    file input module enabled:                $enable_imfile"
+echo "    Solaris input module enabled:             $enable_imsolaris"
+echo "    periodic statistics module enabled:       $enable_impstats"
 echo "    input template module will be compiled:   $enable_imtemplate"
 echo
 echo "---{ output plugins }---"
 echo "    Mail support enabled:                     $enable_mail"
 echo "    omprog module will be compiled:           $enable_omprog"
 echo "    omstdout module will be compiled:         $enable_omstdout"
+echo "    omruleset module will be compiled:        $enable_omruleset"
+echo "    omdbalerting module will be compiled:     $enable_omdbalerting"
+echo "    omudpspoof module will be compiled:       $enable_omudpspoof"
+echo "    omuxsock module will be compiled:         $enable_omuxsock"
 echo "    output template module will be compiled:  $enable_omtemplate"
+echo
+echo "---{ parser modules }---"
+echo "    pmrfc3164sd module will be compiled:      $enable_pmrfc3164sd"
+echo "    pmlastmsg module will be compiled:        $enable_pmlastmsg"
 echo
 echo "---{ database support }---"
 echo "    MySql support enabled:                    $enable_mysql"
@@ -885,5 +1098,6 @@ echo "    Extended Testbench enabled:               $enable_extended_tests"
 echo "    Debug mode enabled:                       $enable_debug"
 echo "    Runtime Instrumentation enabled:          $enable_rtinst"
 echo "    Diagnostic tools enabled:                 $enable_diagtools"
+echo "    Enhanced memory checking enabled:         $enable_memcheck"
 echo "    Valgrind support settings enabled:        $enable_valgrind"
 echo

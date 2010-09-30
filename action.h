@@ -36,18 +36,30 @@
 extern int glbliActionResumeRetryCount;
 
 
+typedef enum {
+	ACT_STATE_DIED = 0,	/* action permanently failed and now disabled  - MUST BE ZEO! */
+	ACT_STATE_RDY  = 1,	/* action ready, waiting for new transaction */
+	ACT_STATE_ITX  = 2,	/* transaction active, waiting for new data or commit */
+	ACT_STATE_COMM = 3, 	/* transaction finished (a transient state) */
+	ACT_STATE_RTRY = 4,	/* failure occured, trying to restablish ready state */
+	ACT_STATE_SUSP = 5	/* suspended due to failure (return fail until timeout expired) */
+} action_state_t;
+
 /* the following struct defines the action object data structure
  */
+typedef struct action_s action_t;
 struct action_s {
 	time_t	f_time;		/* used for "message repeated n times" - be careful, old, old code */
 	time_t	tActNow;	/* the current time for an action execution. Initially set to -1 and
 				   populated on an as-needed basis. This is a performance optimization. */
 	time_t	tLastExec;	/* time this action was last executed */
-	bool	bExecWhenPrevSusp;/* execute only when previous action is suspended? */
+	sbool	bExecWhenPrevSusp;/* execute only when previous action is suspended? */
+	sbool	bWriteAllMarkMsgs;/* should all mark msgs be written (not matter how recent the action was executed)? */
 	int	iSecsExecOnceInterval; /* if non-zero, minimum seconds to wait until action is executed again */
-	short	bEnabled;	/* is the related action enabled (1) or disabled (0)? */
-	bool	bSuspended;	/* is the related action temporarily suspended? */
+	action_state_t eState;	/* current state of action */
+	sbool	bHadAutoCommit;	/* did an auto-commit happen during doAction()? */
 	time_t	ttResumeRtry;	/* when is it time to retry the resume? */
+	int	iResumeOKinRow;	/* number of times in a row that resume said OK with an immediate failure following */
 	int	iResumeInterval;/* resume interval for this action */
 	int	iResumeRetryCount;/* how often shall we retry a suspended action? (-1 --> eternal) */
 	int	iNbrResRtry;	/* number of retries since last suspend */
@@ -57,11 +69,13 @@ struct action_s {
 	time_t  tLastOccur;	/* time last occurence was seen (for timing them out) */
 	struct modInfo_s *pMod;/* pointer to output module handling this selector */
 	void	*pModData;	/* pointer to module data - content is module-specific */
-	bool	bRepMsgHasMsg;	/* "message repeated..." has msg fragment in it (0-no, 1-yes) */
+	sbool	bRepMsgHasMsg;	/* "message repeated..." has msg fragment in it (0-no, 1-yes) */
 	short	f_ReduceRepeated;/* reduce repeated lines 0 - no, 1 - yes */
 	int	f_prevcount;	/* repetition cnt of prevline */
 	int	f_repeatcount;	/* number of "repeated" msgs */
-	enum 	{ ACT_STRING_PASSING = 0, ACT_ARRAY_PASSING = 1 }
+	rsRetVal (*submitToActQ)(action_t *, batch_t *);/* function submit message to action queue */
+	rsRetVal (*qConstruct)(struct queue_s *pThis);
+	enum 	{ ACT_STRING_PASSING = 0, ACT_ARRAY_PASSING = 1, ACT_MSG_PASSING }
 		eParamPassing;	/* mode of parameter passing to action */
 	int	iNumTpls;	/* number of array entries for template element below */
 	struct template **ppTpl;/* array of template to use - strings must be passed to doAction
@@ -74,10 +88,9 @@ struct action_s {
 	SYNC_OBJ_TOOL;		/* required for mutex support */
 	pthread_mutex_t mutActExec; /* mutex to guard actual execution of doAction for single-threaded modules */
 	uchar *pszName;		/* action name (for documentation) */
-	uchar **ppMsgs;		/* pointer to action-calling parameters (kept in structure to save alloc() time!) */
-	size_t *lenMsgs;	/* length of message in ppMsgs */
+	int *pbShutdownImmediate;/* to facilitate shutdown, if var is 1, shut down immediately */
+	DEF_ATOMIC_HELPER_MUT(mutCAS);
 };
-typedef struct action_s action_t;
 
 
 /* function prototypes
@@ -85,11 +98,9 @@ typedef struct action_s action_t;
 rsRetVal actionConstruct(action_t **ppThis);
 rsRetVal actionConstructFinalize(action_t *pThis);
 rsRetVal actionDestruct(action_t *pThis);
-rsRetVal actionAddCfSysLineHdrl(void);
 rsRetVal actionDbgPrint(action_t *pThis);
 rsRetVal actionSetGlobalResumeInterval(int iNewVal);
 rsRetVal actionDoAction(action_t *pAction);
-rsRetVal actionCallAction(action_t *pAction, msg_t *pMsg);
 rsRetVal actionWriteToAction(action_t *pAction);
 rsRetVal actionCallHUPHdlr(action_t *pAction);
 rsRetVal actionClassInit(void);

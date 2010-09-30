@@ -35,6 +35,8 @@
 #include <string.h>
 #include <assert.h>
 #include <ctype.h>
+#include <sys/socket.h>
+#include <netdb.h>
 #if HAVE_MALLOC_H
 #  include <malloc.h>
 #endif
@@ -51,6 +53,7 @@
 #include "unicode-helper.h"
 #include "ruleset.h"
 #include "prop.h"
+#include "net.h"
 
 /* static data */
 DEFobjStaticHelpers
@@ -59,6 +62,7 @@ DEFobjCurrIf(datetime)
 DEFobjCurrIf(glbl)
 DEFobjCurrIf(regexp)
 DEFobjCurrIf(prop)
+DEFobjCurrIf(net)
 
 static struct {
 	uchar *pszName;
@@ -274,8 +278,13 @@ static char *syslog_severity_names[8] = { "emerg", "alert", "crit", "err", "warn
 static char *syslog_number_names[24] = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14",
 					 "15", "16", "17", "18", "19", "20", "21", "22", "23" };
 
+/* global variables */
+#if defined(HAVE_MALLOC_TRIM) && !defined(HAVE_ATOMIC_BUILTINS)
+static pthread_mutex_t mutTrimCtr;	 /* mutex to handle malloc trim */
+#endif
+
 /* some forward declarations */
-static int getAPPNAMELen(msg_t *pM, bool bLockMutex);
+static int getAPPNAMELen(msg_t *pM, sbool bLockMutex);
 
 
 static inline int getProtocolVersion(msg_t *pM)
@@ -284,11 +293,46 @@ static inline int getProtocolVersion(msg_t *pM)
 }
 
 
+/* do a DNS reverse resolution, if not already done, reflect status
+ * rgerhards, 2009-11-16
+ */
+static inline rsRetVal
+resolveDNS(msg_t *pMsg) {
+	rsRetVal localRet;
+	prop_t *propFromHost = NULL;
+	prop_t *propFromHostIP = NULL;
+	uchar fromHost[NI_MAXHOST];
+	uchar fromHostIP[NI_MAXHOST];
+	uchar fromHostFQDN[NI_MAXHOST];
+	DEFiRet;
+
+	CHKiRet(objUse(net, CORE_COMPONENT));
+	if(pMsg->msgFlags & NEEDS_DNSRESOL) {
+		localRet = net.cvthname(pMsg->rcvFrom.pfrominet, fromHost, fromHostFQDN, fromHostIP);
+		if(localRet == RS_RET_OK) {
+			MsgSetRcvFromStr(pMsg, fromHost, ustrlen(fromHost), &propFromHost);
+			CHKiRet(MsgSetRcvFromIPStr(pMsg, fromHostIP, ustrlen(fromHostIP), &propFromHostIP));
+		}
+	}
+finalize_it:
+	if(iRet != RS_RET_OK) {
+		/* best we can do: remove property */
+		MsgSetRcvFromStr(pMsg, UCHAR_CONSTANT(""), 0, &propFromHost);
+		prop.Destruct(&propFromHost);
+	}
+	if(propFromHost != NULL)
+		prop.Destruct(&propFromHost);
+	if(propFromHostIP != NULL)
+		prop.Destruct(&propFromHostIP);
+	RETiRet;
+}
+
+
 static inline void
 getInputName(msg_t *pM, uchar **ppsz, int *plen)
 {
 	BEGINfunc
-	if(pM == NULL) {
+	if(pM == NULL || pM->pInputName == NULL) {
 		*ppsz = UCHAR_CONSTANT("");
 		*plen = 0;
 	} else {
@@ -307,6 +351,7 @@ getRcvFromIP(msg_t *pM)
 	if(pM == NULL) {
 		psz = UCHAR_CONSTANT("");
 	} else {
+		resolveDNS(pM); /* make sure we have a resolved entry */
 		if(pM->pRcvFromIP == NULL)
 			psz = UCHAR_CONSTANT("");
 		else
@@ -626,13 +671,12 @@ static inline rsRetVal msgBaseConstruct(msg_t **ppThis)
 	msg_t *pM;
 
 	assert(ppThis != NULL);
-	CHKmalloc(pM = malloc(sizeof(msg_t)));
+	CHKmalloc(pM = MALLOC(sizeof(msg_t)));
 	objConstructSetObjInfo(pM); /* intialize object helper entities */
 
 	/* initialize members in ORDER they appear in structure (think "cache line"!) */
 	pM->flowCtlType = 0;
 	pM->bDoLock = 0;
-	pM->bParseHOSTNAME = 0;
 	pM->iRefCount = 1;
 	pM->iSeverity = -1;
 	pM->iFacility = -1;
@@ -661,7 +705,7 @@ static inline rsRetVal msgBaseConstruct(msg_t **ppThis)
 	pM->pCSMSGID = NULL;
 	pM->pInputName = NULL;
 	pM->pRcvFromIP = NULL;
-	pM->pRcvFrom = NULL;
+	pM->rcvFrom.pRcvFrom = NULL;
 	pM->pRuleset = NULL;
 	memset(&pM->tRcvdAt, 0, sizeof(pM->tRcvdAt));
 	memset(&pM->tTIMESTAMP, 0, sizeof(pM->tTIMESTAMP));
@@ -745,10 +789,13 @@ static inline void freeHOSTNAME(msg_t *pThis)
 
 BEGINobjDestruct(msg) /* be sure to specify the object type also in END and CODESTART macros! */
 	int currRefCount;
+#	if HAVE_MALLOC_TRIM
+	int currCnt;
+#	endif
 CODESTARTobjDestruct(msg)
 	/* DEV Debugging only ! dbgprintf("msgDestruct\t0x%lx, Ref now: %d\n", (unsigned long)pThis, pThis->iRefCount - 1); */
 #	ifdef HAVE_ATOMIC_BUILTINS
-		currRefCount = ATOMIC_DEC_AND_FETCH(pThis->iRefCount);
+		currRefCount = ATOMIC_DEC_AND_FETCH(&pThis->iRefCount, NULL);
 #	else
 		MsgLock(pThis);
 		currRefCount = --pThis->iRefCount;
@@ -762,8 +809,12 @@ CODESTARTobjDestruct(msg)
 		freeHOSTNAME(pThis);
 		if(pThis->pInputName != NULL)
 			prop.Destruct(&pThis->pInputName);
-		if(pThis->pRcvFrom != NULL)
-			prop.Destruct(&pThis->pRcvFrom);
+		if((pThis->msgFlags & NEEDS_DNSRESOL) == 0) {
+			if(pThis->rcvFrom.pRcvFrom != NULL)
+				prop.Destruct(&pThis->rcvFrom.pRcvFrom);
+		} else {
+			free(pThis->rcvFrom.pfrominet);
+		}
 		if(pThis->pRcvFromIP != NULL)
 			prop.Destruct(&pThis->pRcvFromIP);
 		free(pThis->pszRcvdAt3164);
@@ -800,7 +851,8 @@ CODESTARTobjDestruct(msg)
 			 * that we trim too often when the counter wraps.
 			 */
 			static unsigned iTrimCtr = 1;
-			if(ATOMIC_INC_AND_FETCH(iTrimCtr) % 100000 == 0) {
+			currCnt = ATOMIC_INC_AND_FETCH(&iTrimCtr, &mutTrimCtr);
+			if(currCnt % 100000 == 0) {
 				malloc_trim(128*1024);
 			}
 		}
@@ -849,6 +901,7 @@ ENDobjDestruct(msg)
 msg_t* MsgDup(msg_t* pOld)
 {
 	msg_t* pNew;
+	rsRetVal localRet;
 
 	assert(pOld != NULL);
 
@@ -861,7 +914,6 @@ msg_t* MsgDup(msg_t* pOld)
 	pNew->iRefCount = 1;
 	pNew->iSeverity = pOld->iSeverity;
 	pNew->iFacility = pOld->iFacility;
-	pNew->bParseHOSTNAME = pOld->bParseHOSTNAME;
 	pNew->msgFlags = pOld->msgFlags;
 	pNew->iProtocolVersion = pOld->iProtocolVersion;
 	pNew->ttGenTime = pOld->ttGenTime;
@@ -870,9 +922,19 @@ msg_t* MsgDup(msg_t* pOld)
 	pNew->iLenMSG = pOld->iLenMSG;
 	pNew->iLenTAG = pOld->iLenTAG;
 	pNew->iLenHOSTNAME = pOld->iLenHOSTNAME;
-	if(pOld->pRcvFrom != NULL) {
-		pNew->pRcvFrom = pOld->pRcvFrom;
-		prop.AddRef(pNew->pRcvFrom);
+	if((pOld->msgFlags & NEEDS_DNSRESOL) == 1) {
+			localRet = msgSetFromSockinfo(pNew, pOld->rcvFrom.pfrominet);
+			if(localRet != RS_RET_OK) {
+				/* if something fails, we accept loss of this property, it is
+				 * better than losing the whole message.
+				 */
+				pNew->msgFlags &= ~NEEDS_DNSRESOL;
+			}
+	} else {
+		if(pOld->rcvFrom.pRcvFrom != NULL) {
+			pNew->rcvFrom.pRcvFrom = pOld->rcvFrom.pRcvFrom;
+			prop.AddRef(pNew->rcvFrom.pRcvFrom);
+		}
 	}
 	if(pOld->pRcvFromIP != NULL) {
 		pNew->pRcvFromIP = pOld->pRcvFromIP;
@@ -935,7 +997,7 @@ msg_t* MsgDup(msg_t* pOld)
  * We do not serialize the cache properties. We re-create them when needed.
  * This saves us a lot of memory. Performance is no concern, as serializing
  * is a so slow operation that recration of the caches does not count. Also,
- * we do not serialize bParseHOSTNAME, as this is only a helper variable
+ * we do not serialize --currently none--, as this is only a helper variable
  * during msg construction - and never again used later.
  * rgerhards, 2008-01-03
  */
@@ -1002,7 +1064,7 @@ msg_t *MsgAddRef(msg_t *pM)
 {
 	assert(pM != NULL);
 #	ifdef HAVE_ATOMIC_BUILTINS
-		ATOMIC_INC(pM->iRefCount);
+		ATOMIC_INC(&pM->iRefCount, NULL);
 #	else
 		MsgLock(pM);
 		pM->iRefCount++;
@@ -1136,15 +1198,21 @@ char *getProtocolVersionString(msg_t *pM)
 }
 
 
-static char *getRawMsg(msg_t *pM)
+static inline void
+getRawMsg(msg_t *pM, uchar **pBuf, int *piLen)
 {
-	if(pM == NULL)
-		return "";
-	else
-		if(pM->pszRawMsg == NULL)
-			return "";
-		else
-			return (char*)pM->pszRawMsg;
+	if(pM == NULL) {
+		*pBuf=  UCHAR_CONSTANT("");
+		*piLen = 0;
+	} else {
+		if(pM->pszRawMsg == NULL) {
+			*pBuf=  UCHAR_CONSTANT("");
+			*piLen = 0;
+		} else {
+			*pBuf = pM->pszRawMsg;
+			*piLen = pM->iLenRawMsg;
+		}
+	}
 }
 
 
@@ -1189,7 +1257,8 @@ static int getPRIi(msg_t *pM)
 
 /* Get PRI value in text form
  */
-static inline char *getPRI(msg_t *pM)
+char *
+getPRI(msg_t *pM)
 {
 	/* PRI is a number in the range 0..191. Thus, we use a simple lookup table to obtain the
 	 * string value. It looks a bit clumpsy here in code ;)
@@ -1204,7 +1273,8 @@ static inline char *getPRI(msg_t *pM)
 }
 
 
-static inline char *getTimeReported(msg_t *pM, enum tplFormatTypes eFmt)
+char *
+getTimeReported(msg_t *pM, enum tplFormatTypes eFmt)
 {
 	BEGINfunc
 	if(pM == NULL)
@@ -1225,7 +1295,7 @@ static inline char *getTimeReported(msg_t *pM, enum tplFormatTypes eFmt)
 	case tplFmtMySQLDate:
 		MsgLock(pM);
 		if(pM->pszTIMESTAMP_MySQL == NULL) {
-			if((pM->pszTIMESTAMP_MySQL = malloc(15)) == NULL) {
+			if((pM->pszTIMESTAMP_MySQL = MALLOC(15)) == NULL) {
 				MsgUnlock(pM);
 				return "";
 			}
@@ -1236,7 +1306,7 @@ static inline char *getTimeReported(msg_t *pM, enum tplFormatTypes eFmt)
         case tplFmtPgSQLDate:
                 MsgLock(pM);
                 if(pM->pszTIMESTAMP_PgSQL == NULL) {
-                        if((pM->pszTIMESTAMP_PgSQL = malloc(21)) == NULL) {
+                        if((pM->pszTIMESTAMP_PgSQL = MALLOC(21)) == NULL) {
                                 MsgUnlock(pM);
                                 return "";
                         }
@@ -1277,7 +1347,7 @@ static inline char *getTimeGenerated(msg_t *pM, enum tplFormatTypes eFmt)
 	case tplFmtDefault:
 		MsgLock(pM);
 		if(pM->pszRcvdAt3164 == NULL) {
-			if((pM->pszRcvdAt3164 = malloc(16)) == NULL) {
+			if((pM->pszRcvdAt3164 = MALLOC(16)) == NULL) {
 				MsgUnlock(pM);
 				return "";
 			}
@@ -1288,7 +1358,7 @@ static inline char *getTimeGenerated(msg_t *pM, enum tplFormatTypes eFmt)
 	case tplFmtMySQLDate:
 		MsgLock(pM);
 		if(pM->pszRcvdAt_MySQL == NULL) {
-			if((pM->pszRcvdAt_MySQL = malloc(15)) == NULL) {
+			if((pM->pszRcvdAt_MySQL = MALLOC(15)) == NULL) {
 				MsgUnlock(pM);
 				return "";
 			}
@@ -1299,7 +1369,7 @@ static inline char *getTimeGenerated(msg_t *pM, enum tplFormatTypes eFmt)
         case tplFmtPgSQLDate:
                 MsgLock(pM);
                 if(pM->pszRcvdAt_PgSQL == NULL) {
-                        if((pM->pszRcvdAt_PgSQL = malloc(21)) == NULL) {
+                        if((pM->pszRcvdAt_PgSQL = MALLOC(21)) == NULL) {
                                 MsgUnlock(pM);
                                 return "";
                         }
@@ -1311,7 +1381,7 @@ static inline char *getTimeGenerated(msg_t *pM, enum tplFormatTypes eFmt)
 	case tplFmtRFC3164BuggyDate:
 		MsgLock(pM);
 		if(pM->pszRcvdAt3164 == NULL) {
-			if((pM->pszRcvdAt3164 = malloc(16)) == NULL) {
+			if((pM->pszRcvdAt3164 = MALLOC(16)) == NULL) {
 					MsgUnlock(pM);
 					return "";
 				}
@@ -1323,7 +1393,7 @@ static inline char *getTimeGenerated(msg_t *pM, enum tplFormatTypes eFmt)
 	case tplFmtRFC3339Date:
 		MsgLock(pM);
 		if(pM->pszRcvdAt3339 == NULL) {
-			if((pM->pszRcvdAt3339 = malloc(33)) == NULL) {
+			if((pM->pszRcvdAt3339 = MALLOC(33)) == NULL) {
 				MsgUnlock(pM);
 				return "";
 			}
@@ -1488,7 +1558,7 @@ finalize_it:
  * This must be called WITHOUT the message lock being held.
  * rgerhards, 2009-06-26
  */
-static inline void preparePROCID(msg_t *pM, bool bLockMutex)
+static inline void preparePROCID(msg_t *pM, sbool bLockMutex)
 {
 	if(pM->pCSPROCID == NULL) {
 		if(bLockMutex == LOCK_MUTEX)
@@ -1505,7 +1575,7 @@ static inline void preparePROCID(msg_t *pM, bool bLockMutex)
 #if 0
 /* rgerhards, 2005-11-24
  */
-static inline int getPROCIDLen(msg_t *pM, bool bLockMutex)
+static inline int getPROCIDLen(msg_t *pM, sbool bLockMutex)
 {
 	assert(pM != NULL);
 	preparePROCID(pM, bLockMutex);
@@ -1516,7 +1586,7 @@ static inline int getPROCIDLen(msg_t *pM, bool bLockMutex)
 
 /* rgerhards, 2005-11-24
  */
-char *getPROCID(msg_t *pM, bool bLockMutex)
+char *getPROCID(msg_t *pM, sbool bLockMutex)
 {
 	ISOBJ_TYPE_assert(pM, msg);
 	preparePROCID(pM, bLockMutex);
@@ -1574,7 +1644,7 @@ void MsgSetTAG(msg_t *pMsg, uchar* pszBuf, size_t lenBuf)
 		/* small enough: use fixed buffer (faster!) */
 		pBuf = pMsg->TAG.szBuf;
 	} else {
-		if((pBuf = (uchar*) malloc(pMsg->iLenTAG + 1)) == NULL) {
+		if((pBuf = (uchar*) MALLOC(pMsg->iLenTAG + 1)) == NULL) {
 			/* truncate message, better than completely loosing it... */
 			pBuf = pMsg->TAG.szBuf;
 			pMsg->iLenTAG = CONF_TAG_BUFSIZE - 1;
@@ -1595,7 +1665,7 @@ void MsgSetTAG(msg_t *pMsg, uchar* pszBuf, size_t lenBuf)
  * if there is a TAG and, if not, if it can emulate it.
  * rgerhards, 2005-11-24
  */
-static inline void tryEmulateTAG(msg_t *pM, bool bLockMutex)
+static inline void tryEmulateTAG(msg_t *pM, sbool bLockMutex)
 {
 	size_t lenTAG;
 	uchar bufTAG[CONF_TAG_MAXSIZE];
@@ -1623,7 +1693,7 @@ static inline void tryEmulateTAG(msg_t *pM, bool bLockMutex)
 }
 
 
-static inline void
+void
 getTAG(msg_t *pM, uchar **ppBuf, int *piLen)
 {
 	if(pM == NULL) {
@@ -1648,12 +1718,13 @@ int getHOSTNAMELen(msg_t *pM)
 	if(pM == NULL)
 		return 0;
 	else
-		if(pM->pszHOSTNAME == NULL)
-			if(pM->pRcvFrom == NULL)
+		if(pM->pszHOSTNAME == NULL) {
+			resolveDNS(pM);
+			if(pM->rcvFrom.pRcvFrom == NULL)
 				return 0;
 			else
-				return prop.GetStringLen(pM->pRcvFrom);
-		else
+				return prop.GetStringLen(pM->rcvFrom.pRcvFrom);
+		} else
 			return pM->iLenHOSTNAME;
 }
 
@@ -1664,12 +1735,13 @@ char *getHOSTNAME(msg_t *pM)
 		return "";
 	else
 		if(pM->pszHOSTNAME == NULL) {
-			if(pM->pRcvFrom == NULL) {
+			resolveDNS(pM);
+			if(pM->rcvFrom.pRcvFrom == NULL) {
 				return "";
 			} else {
 				uchar *psz;
 				int len;
-				prop.GetString(pM->pRcvFrom, &psz, &len);
+				prop.GetString(pM->rcvFrom.pRcvFrom, &psz, &len);
 				return (char*) psz;
 			}
 		} else {
@@ -1683,13 +1755,15 @@ uchar *getRcvFrom(msg_t *pM)
 	uchar *psz;
 	int len;
 	BEGINfunc
+
 	if(pM == NULL) {
 		psz = UCHAR_CONSTANT("");
 	} else {
-		if(pM->pRcvFrom == NULL)
+		resolveDNS(pM);
+		if(pM->rcvFrom.pRcvFrom == NULL)
 			psz = UCHAR_CONSTANT("");
 		else
-			prop.GetString(pM->pRcvFrom, &psz, &len);
+			prop.GetString(pM->rcvFrom.pRcvFrom, &psz, &len);
 	}
 	ENDfunc
 	return psz;
@@ -1736,7 +1810,7 @@ static inline char *getStructuredData(msg_t *pM)
 /* check if we have a ProgramName, and, if not, try to aquire/emulate it.
  * rgerhards, 2009-06-26
  */
-static inline void prepareProgramName(msg_t *pM, bool bLockMutex)
+static inline void prepareProgramName(msg_t *pM, sbool bLockMutex)
 {
 	if(pM->pCSProgName == NULL) {
 		if(bLockMutex == LOCK_MUTEX)
@@ -1755,7 +1829,7 @@ static inline void prepareProgramName(msg_t *pM, bool bLockMutex)
 /* get the length of the "programname" sz string
  * rgerhards, 2005-10-19
  */
-int getProgramNameLen(msg_t *pM, bool bLockMutex)
+int getProgramNameLen(msg_t *pM, sbool bLockMutex)
 {
 	assert(pM != NULL);
 	prepareProgramName(pM, bLockMutex);
@@ -1766,10 +1840,10 @@ int getProgramNameLen(msg_t *pM, bool bLockMutex)
 /* get the "programname" as sz string
  * rgerhards, 2005-10-19
  */
-char *getProgramName(msg_t *pM, bool bLockMutex)
+uchar *getProgramName(msg_t *pM, sbool bLockMutex)
 {
 	prepareProgramName(pM, bLockMutex);
-	return (pM->pCSProgName == NULL) ? "" : (char*) rsCStrGetSzStrNoNULL(pM->pCSProgName);
+	return (pM->pCSProgName == NULL) ? UCHAR_CONSTANT("") : rsCStrGetSzStrNoNULL(pM->pCSProgName);
 }
 
 
@@ -1786,7 +1860,7 @@ static void tryEmulateAPPNAME(msg_t *pM)
 
 	if(getProtocolVersion(pM) == 0) {
 		/* only then it makes sense to emulate */
-		MsgSetAPPNAME(pM, getProgramName(pM, MUTEX_ALREADY_LOCKED));
+		MsgSetAPPNAME(pM, (char*)getProgramName(pM, MUTEX_ALREADY_LOCKED));
 	}
 }
 
@@ -1796,7 +1870,7 @@ static void tryEmulateAPPNAME(msg_t *pM)
  * This must be called WITHOUT the message lock being held.
  * rgerhards, 2009-06-26
  */
-static inline void prepareAPPNAME(msg_t *pM, bool bLockMutex)
+static inline void prepareAPPNAME(msg_t *pM, sbool bLockMutex)
 {
 	if(pM->pCSAPPNAME == NULL) {
 		if(bLockMutex == LOCK_MUTEX)
@@ -1813,7 +1887,7 @@ static inline void prepareAPPNAME(msg_t *pM, bool bLockMutex)
 
 /* rgerhards, 2005-11-24
  */
-char *getAPPNAME(msg_t *pM, bool bLockMutex)
+char *getAPPNAME(msg_t *pM, sbool bLockMutex)
 {
 	assert(pM != NULL);
 	prepareAPPNAME(pM, bLockMutex);
@@ -1822,7 +1896,7 @@ char *getAPPNAME(msg_t *pM, bool bLockMutex)
 
 /* rgerhards, 2005-11-24
  */
-static int getAPPNAMELen(msg_t *pM, bool bLockMutex)
+static int getAPPNAMELen(msg_t *pM, sbool bLockMutex)
 {
 	assert(pM != NULL);
 	prepareAPPNAME(pM, bLockMutex);
@@ -1845,6 +1919,28 @@ void MsgSetInputName(msg_t *pThis, prop_t *inputName)
 }
 
 
+/* Set the pfrominet socket store, so that we can obtain the peer at some
+ * later time. Note that we do not check if pRcvFrom is already set, so this
+ * function must only be called during message creation.
+ * NOTE: msgFlags is NOT set. While this is somewhat a violation of layers,
+ * it is done because it gains us some performance. So the caller must make
+ * sure the message flags are properly maintained. For all current callers,
+ * this is always the case and without extra effort required.
+ * rgerhards, 2009-11-17
+ */
+rsRetVal
+msgSetFromSockinfo(msg_t *pThis, struct sockaddr_storage *sa){ 
+	DEFiRet;
+	assert(pThis->rcvFrom.pRcvFrom == NULL);
+
+	CHKmalloc(pThis->rcvFrom.pfrominet = malloc(sizeof(struct sockaddr_storage)));
+	memcpy(pThis->rcvFrom.pfrominet, sa, sizeof(struct sockaddr_storage));
+
+finalize_it:
+	RETiRet;
+}
+
+
 /* rgerhards 2008-09-10: set RcvFrom name in msg object. This calls AddRef()
  * on the property, because this must be done in all current cases and there
  * is no case expected where this may not be necessary.
@@ -1855,9 +1951,15 @@ void MsgSetRcvFrom(msg_t *pThis, prop_t *new)
 	assert(pThis != NULL);
 
 	prop.AddRef(new);
-	if(pThis->pRcvFrom != NULL)
-		prop.Destruct(&pThis->pRcvFrom);
-	pThis->pRcvFrom = new;
+	if(pThis->msgFlags & NEEDS_DNSRESOL) {
+		if(pThis->rcvFrom.pfrominet != NULL)
+		free(pThis->rcvFrom.pfrominet);
+		pThis->msgFlags &= ~NEEDS_DNSRESOL;
+	} else {
+		if(pThis->rcvFrom.pRcvFrom != NULL)
+			prop.Destruct(&pThis->rcvFrom.pRcvFrom);
+	}
+	pThis->rcvFrom.pRcvFrom = new;
 }
 
 
@@ -1939,7 +2041,7 @@ void MsgSetHOSTNAME(msg_t *pThis, uchar* pszHOSTNAME, int lenHOSTNAME)
 	if(pThis->iLenHOSTNAME < CONF_HOSTNAME_BUFSIZE) {
 		/* small enough: use fixed buffer (faster!) */
 		pThis->pszHOSTNAME = pThis->szHOSTNAME;
-	} else if((pThis->pszHOSTNAME = (uchar*) malloc(pThis->iLenHOSTNAME + 1)) == NULL) {
+	} else if((pThis->pszHOSTNAME = (uchar*) MALLOC(pThis->iLenHOSTNAME + 1)) == NULL) {
 		/* truncate message, better than completely loosing it... */
 		pThis->pszHOSTNAME = pThis->szHOSTNAME;
 		pThis->iLenHOSTNAME = CONF_HOSTNAME_BUFSIZE - 1;
@@ -1991,7 +2093,7 @@ rsRetVal MsgReplaceMSG(msg_t *pThis, uchar* pszMSG, int lenMSG)
 	lenNew = pThis->iLenRawMsg + lenMSG - pThis->iLenMSG;
 	if(lenMSG > pThis->iLenMSG && lenNew >= CONF_RAWMSG_BUFSIZE) {
 		/*  we have lost our "bet" and need to alloc a new buffer ;) */
-		CHKmalloc(bufNew = malloc(lenNew + 1));
+		CHKmalloc(bufNew = MALLOC(lenNew + 1));
 		memcpy(bufNew, pThis->pszRawMsg, pThis->offMSG);
 		if(pThis->pszRawMsg != pThis->szRawMsg)
 			free(pThis->pszRawMsg);
@@ -2024,7 +2126,7 @@ void MsgSetRawMsg(msg_t *pThis, char* pszRawMsg, size_t lenMsg)
 	if(pThis->iLenRawMsg < CONF_RAWMSG_BUFSIZE) {
 		/* small enough: use fixed buffer (faster!) */
 		pThis->pszRawMsg = pThis->szRawMsg;
-	} else if((pThis->pszRawMsg = (uchar*) malloc(pThis->iLenRawMsg + 1)) == NULL) {
+	} else if((pThis->pszRawMsg = (uchar*) MALLOC(pThis->iLenRawMsg + 1)) == NULL) {
 		/* truncate message, better than completely loosing it... */
 		pThis->pszRawMsg = pThis->szRawMsg;
 		pThis->iLenRawMsg = CONF_RAWMSG_BUFSIZE - 1;
@@ -2080,7 +2182,7 @@ static uchar *getNOW(eNOWType eNow)
 	uchar *pBuf;
 	struct syslogTime t;
 
-	if((pBuf = (uchar*) malloc(sizeof(uchar) * tmpBUFSIZE)) == NULL) {
+	if((pBuf = (uchar*) MALLOC(sizeof(uchar) * tmpBUFSIZE)) == NULL) {
 		return NULL;
 	}
 
@@ -2191,12 +2293,13 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			break;
 		case PROP_HOSTNAME:
 			pRes = (uchar*)getHOSTNAME(pMsg);
+			bufLen = getHOSTNAMELen(pMsg);
 			break;
 		case PROP_SYSLOGTAG:
 			getTAG(pMsg, &pRes, &bufLen);
 			break;
 		case PROP_RAWMSG:
-			pRes = (uchar*)getRawMsg(pMsg);
+			getRawMsg(pMsg, &pRes, &bufLen);
 			break;
 		/* enable this, if someone actually uses UxTradMsg, delete after some  time has
 		 * passed and nobody complained -- rgerhards, 2009-06-16
@@ -2217,7 +2320,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			pRes = (uchar*)getPRI(pMsg);
 			break;
 		case PROP_PRI_TEXT:
-			pBuf = malloc(20 * sizeof(uchar));
+			pBuf = MALLOC(20 * sizeof(uchar));
 			if(pBuf == NULL) {
 				RET_OUT_OF_MEMORY;
 			} else {
@@ -2227,6 +2330,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			break;
 		case PROP_IUT:
 			pRes = UCHAR_CONSTANT("1"); /* always 1 for syslog messages (a MonitorWare thing;)) */
+			bufLen = 1;
 			break;
 		case PROP_SYSLOGFACILITY:
 			pRes = (uchar*)getFacility(pMsg);
@@ -2244,7 +2348,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			pRes = (uchar*)getTimeGenerated(pMsg, pTpe->data.field.eDateFormat);
 			break;
 		case PROP_PROGRAMNAME:
-			pRes = (uchar*)getProgramName(pMsg, LOCK_MUTEX);
+			pRes = getProgramName(pMsg, LOCK_MUTEX);
 			break;
 		case PROP_PROTOCOL_VERSION:
 			pRes = (uchar*)getProtocolVersionString(pMsg);
@@ -2372,7 +2476,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			/* we got our end pointer, now do the copy */
 			/* TODO: code copied from below, this is a candidate for a separate function */
 			iLen = pFldEnd - pFld + 1; /* the +1 is for an actual char, NOT \0! */
-			pBufStart = pBuf = malloc((iLen + 1) * sizeof(char));
+			pBufStart = pBuf = MALLOC((iLen + 1) * sizeof(char));
 			if(pBuf == NULL) {
 				if(*pbMustBeFreed == 1)
 					free(pRes);
@@ -2418,7 +2522,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			; /*DO NOTHING*/
 		} else {
 			iLen = iTo - iFrom + 1; /* the +1 is for an actual char, NOT \0! */
-			pBufStart = pBuf = malloc((iLen + 1) * sizeof(char));
+			pBufStart = pBuf = MALLOC((iLen + 1) * sizeof(char));
 			if(pBuf == NULL) {
 				if(*pbMustBeFreed == 1)
 					free(pRes);
@@ -2538,7 +2642,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 
 					iLenBuf = pmatch[pTpe->data.field.iSubMatchToUse].rm_eo
 						  - pmatch[pTpe->data.field.iSubMatchToUse].rm_so;
-					pB = malloc((iLenBuf + 1) * sizeof(uchar));
+					pB = MALLOC((iLenBuf + 1) * sizeof(uchar));
 
 					if (pB == NULL) {
 						if (*pbMustBeFreed == 1)
@@ -2595,7 +2699,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			uchar *pBStart;
 			uchar *pB;
 			uchar *pSrc;
-			pBStart = pB = malloc((bufLen + 1) * sizeof(char));
+			pBStart = pB = MALLOC((bufLen + 1) * sizeof(char));
 			if(pB == NULL) {
 				if(*pbMustBeFreed == 1)
 					free(pRes);
@@ -2641,7 +2745,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			}
 
 			if(bDropped) {
-				pDst = pDstStart = malloc(iLenBuf + 1);
+				pDst = pDstStart = MALLOC(iLenBuf + 1);
 				if(pDst == NULL) {
 					if(*pbMustBeFreed == 1)
 						free(pRes);
@@ -2676,7 +2780,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			} else {
 				if(bufLen == -1)
 					bufLen = ustrlen(pRes);
-				pDst = pDstStart = malloc(bufLen + 1);
+				pDst = pDstStart = MALLOC(bufLen + 1);
 				if(pDst == NULL) {
 					if(*pbMustBeFreed == 1)
 						free(pRes);
@@ -2715,7 +2819,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 				int i;
 
 				iLenBuf += iNumCC * 4;
-				pBStart = pB = malloc((iLenBuf + 1) * sizeof(uchar));
+				pBStart = pB = MALLOC((iLenBuf + 1) * sizeof(uchar));
 				if(pB == NULL) {
 					if(*pbMustBeFreed == 1)
 						free(pRes);
@@ -2760,7 +2864,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			}
 			
 			if(bDropped) {
-				pDst = pDstStart = malloc(iLenBuf + 1);
+				pDst = pDstStart = MALLOC(iLenBuf + 1);
 				if(pDst == NULL) {
 					if(*pbMustBeFreed == 1)
 						free(pRes);
@@ -2795,7 +2899,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			} else {
 				if(bufLen == -1)
 					bufLen = ustrlen(pRes);
-				pDst = pDstStart = malloc(bufLen + 1);
+				pDst = pDstStart = MALLOC(bufLen + 1);
 				if(pDst == NULL) {
 					if(*pbMustBeFreed == 1)
 						free(pRes);
@@ -2851,7 +2955,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			/* check if we need to obtain a private copy */
 			if(*pbMustBeFreed == 0) {
 				/* ok, original copy, need a private one */
-				pB = malloc((iLn + 1) * sizeof(uchar));
+				pB = MALLOC((iLn + 1) * sizeof(uchar));
 				if(pB == NULL) {
 					RET_OUT_OF_MEMORY;
 				}
@@ -2880,7 +2984,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			bufLen = ustrlen(pRes);
 		iBufLen = bufLen;
 		/* the malloc may be optimized, we currently use the worst case... */
-		pBStart = pDst = malloc((2 * iBufLen + 3) * sizeof(uchar));
+		pBStart = pDst = MALLOC((2 * iBufLen + 3) * sizeof(uchar));
 		if(pDst == NULL) {
 			if(*pbMustBeFreed == 1)
 				free(pRes);
@@ -3048,7 +3152,7 @@ static rsRetVal msgConstructFinalizer(msg_t *pThis)
  * rgerhards, 2008-01-14
  */
 static rsRetVal
-MsgGetSeverity(obj_t *pThis, int *piSeverity)
+MsgGetSeverity(obj_t_ptr pThis, int *piSeverity)
 {
 	ISOBJ_TYPE_assert(pThis, msg);
 	assert(piSeverity != NULL);
@@ -3081,6 +3185,10 @@ BEGINObjClassInit(msg, 1, OBJ_IS_CORE_MODULE)
 	funcUnlock = MsgLockingDummy;
 	funcDeleteMutex = MsgLockingDummy;
 	funcMsgPrepareEnqueue = MsgLockingDummy;
+	/* some more inits */
+#	if HAVE_MALLOC_TRIM
+	INIT_ATOMIC_HELPER_MUT(mutTrimCtr);
+#	endif
 ENDObjClassInit(msg)
 /* vim:set ai:
  */

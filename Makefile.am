@@ -59,6 +59,14 @@ if ENABLE_IMKLOG
 SUBDIRS += plugins/imklog
 endif
 
+if ENABLE_IMPSTATS
+SUBDIRS += plugins/impstats
+endif
+
+if ENABLE_IMSOLARIS
+SUBDIRS += plugins/imsolaris
+endif
+
 if ENABLE_GSSAPI
 SUBDIRS += plugins/omgssapi plugins/imgssapi
 endif
@@ -95,12 +103,40 @@ if ENABLE_OMSTDOUT
 SUBDIRS += plugins/omstdout
 endif
 
+if ENABLE_PMLASTMSG
+SUBDIRS += plugins/pmlastmsg
+endif
+
+if ENABLE_PMRFC3164SD
+SUBDIRS += plugins/pmrfc3164sd
+endif
+
+if ENABLE_OMRULESET
+SUBDIRS += plugins/omruleset
+endif
+
+if ENABLE_OMDBALERTING
+SUBDIRS += plugins/omdbalerting
+endif
+
+if ENABLE_OMUDPSPOOF
+SUBDIRS += plugins/omudpspoof
+endif
+
+if ENABLE_OMUXSOCK
+SUBDIRS += plugins/omuxsock
+endif
+
 if ENABLE_OMTEMPLATE
 SUBDIRS += plugins/omtemplate
 endif
 
 if ENABLE_IMFILE
 SUBDIRS += plugins/imfile
+endif
+
+if ENABLE_IMPTCP
+SUBDIRS += plugins/imptcp
 endif
 
 if ENABLE_IMDIAG
@@ -123,6 +159,10 @@ if ENABLE_ORACLE
 SUBDIRS += plugins/omoracle
 endif
 
+if ENABLE_GUI
+SUBDIRS += java
+endif
+
 # tests are added as last element, because tests may need different
 # modules that need to be generated first
 SUBDIRS += tests
@@ -134,5 +174,27 @@ SUBDIRS += tests
 # temporarily be removed below. The intent behind forcing everthing to compile
 # in a make distcheck is so that we detect code that accidently was not updated
 # when some global update happened.
-DISTCHECK_CONFIGURE_FLAGS=--enable-gssapi_krb5 --enable-imfile --enable-snmp --enable-pgsql --enable-libdbi --enable-mysql --enable-omtemplate --enable-imtemplate --enable-relp --enable-rsyslogd --enable-mail --enable-klog  --enable-diagtools --enable-gnutls --enable-omstdout --enable-omprog --enable-imdiag --enable-shave --enable-extended-tests
+DISTCHECK_CONFIGURE_FLAGS=	--enable-gssapi_krb5 \
+				--enable-imfile \
+				--enable-snmp \
+				--enable-pgsql \
+				--enable-libdbi \
+				--enable-mysql \
+				--enable-relp \
+				--enable-rsyslogd \
+				--enable-mail \
+				--enable-klog \
+				--enable-diagtools \
+				--enable-gnutls \
+				--enable-omstdout \
+				--enable-pmlastmsg \
+				--enable-omruleset \
+				--enable-omprog \
+				--enable-imdiag \
+				--enable-imptcp \
+				--enable-omuxsock \
+				--enable-shave \
+				--enable-extended-tests \
+				--enable-impstats \
+				--enable-memcheck
 ACLOCAL_AMFLAGS = -I m4

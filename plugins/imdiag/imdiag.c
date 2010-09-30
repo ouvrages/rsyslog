@@ -213,7 +213,6 @@ doInjectMsg(int iNum)
 	MsgSetInputName(pMsg, pInputName);
 	MsgSetFlowControlType(pMsg, eFLOWCTL_NO_DELAY);
 	pMsg->msgFlags  = NEEDS_PARSING | PARSE_HOSTNAME;
-	pMsg->bParseHOSTNAME = 1;
 	MsgSetRcvFrom(pMsg, pRcvDummy);
 	CHKiRet(MsgSetRcvFromIP(pMsg, pRcvIPDummy));
 	CHKiRet(submitMsg(pMsg));
@@ -246,7 +245,7 @@ injectMsg(uchar *pszCmd, tcps_sess_t *pSess)
 		doInjectMsg(i + iFrom);
 	}
 
-	CHKiRet(sendResponse(pSess, "messages injected\n"));
+	CHKiRet(sendResponse(pSess, "%d messages injected\n", nMsgs));
 
 finalize_it:
 	RETiRet;
@@ -259,12 +258,23 @@ static rsRetVal
 waitMainQEmpty(tcps_sess_t *pSess)
 {
 	int iMsgQueueSize;
+	int iPrint = 0;
 	DEFiRet;
 
 	CHKiRet(diagGetMainMsgQSize(&iMsgQueueSize));
 	while(iMsgQueueSize > 0) {
+		/* DEV DEBUG ONLY if(iPrint++ % 500)
+			printf("imdiag: main msg queue size: %d\n", iMsgQueueSize);
+		*/
+		if(iPrint++ % 500 == 0) 
+			dbgprintf("imdiag sleeping, wait mainq drain, curr size %d\n", iMsgQueueSize);
 		srSleep(0,2);	/* wait a little bit */
 		CHKiRet(diagGetMainMsgQSize(&iMsgQueueSize));
+		if(iMsgQueueSize == 0) {
+			/* verify that queue is still empty (else it could just be a race!) */
+			srSleep(1,5);	/* wait a little bit */
+			CHKiRet(diagGetMainMsgQSize(&iMsgQueueSize));
+		}
 	}
 
 	CHKiRet(sendResponse(pSess, "mainqueue empty\n"));
@@ -291,12 +301,13 @@ OnMsgReceived(tcps_sess_t *pSess, uchar *pRcv, int iLenMsg)
 	 * WITHOUT a termination \0 char. So we need to convert it to one
 	 * before proceeding.
 	 */
-	CHKmalloc(pszMsg = malloc(sizeof(uchar) * (iLenMsg + 1)));
+	CHKmalloc(pszMsg = MALLOC(sizeof(uchar) * (iLenMsg + 1)));
 	memcpy(pszMsg, pRcv, iLenMsg);
 	pszMsg[iLenMsg] = '\0';
 
 	getFirstWord(&pszMsg, cmdBuf, sizeof(cmdBuf)/sizeof(uchar), TO_LOWERCASE);
 
+	dbgprintf("imdiag received command '%s'\n", cmdBuf);
 	if(!ustrcmp(cmdBuf, UCHAR_CONSTANT("getmainmsgqueuesize"))) {
 		CHKiRet(diagGetMainMsgQSize(&iMsgQueueSize));
 		CHKiRet(sendResponse(pSess, "%d\n", iMsgQueueSize));
@@ -443,10 +454,17 @@ resetConfigVariables(uchar __attribute__((unused)) *pp, void __attribute__((unus
 }
 
 
+BEGINisCompatibleWithFeature
+CODESTARTisCompatibleWithFeature
+	if(eFeat == sFEATURENonCancelInputTermination)
+		iRet = RS_RET_OK;
+ENDisCompatibleWithFeature
+
 
 BEGINqueryEtryPt
 CODESTARTqueryEtryPt
 CODEqueryEtryPt_STD_IMOD_QUERIES
+CODEqueryEtryPt_IsCompatibleWithFeature_IF_OMOD_QUERIES
 ENDqueryEtryPt
 
 

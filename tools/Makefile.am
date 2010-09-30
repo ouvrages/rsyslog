@@ -1,5 +1,5 @@
 sbin_PROGRAMS =
-man_MANS = rsyslogd.8 rsyslog.conf.5 
+man_MANS = rsyslogd.8 rsyslog.conf.5
 
 sbin_PROGRAMS += rsyslogd
 rsyslogd_SOURCES = \
@@ -17,6 +17,18 @@ rsyslogd_SOURCES = \
 	ompipe.h \
 	omdiscard.c \
 	omdiscard.h \
+	pmrfc5424.c \
+	pmrfc5424.h \
+	pmrfc3164.c \
+	pmrfc3164.h \
+	smtradfile.c \
+	smtradfile.h \
+	smfile.c \
+	smfile.h \
+	smfwd.c \
+	smfwd.h \
+	smtradfwd.c \
+	smtradfwd.h \
 	iminternal.c \
 	iminternal.h \
 	pidfile.c \

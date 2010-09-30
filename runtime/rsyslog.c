@@ -80,6 +80,10 @@
 #include "prop.h"
 #include "rule.h"
 #include "ruleset.h"
+#include "parser.h"
+#include "strgen.h"
+#include "statsobj.h"
+#include "atomic.h"
 
 /* forward definitions */
 static rsRetVal dfltErrLogger(int, uchar *errMsg);
@@ -147,12 +151,12 @@ rsrtInit(char **ppErrObj, obj_if_t *pObjIF)
 		 * class immediately after it is initialized. And, of course, we load those classes
 		 * first that we use ourselfs... -- rgerhards, 2008-03-07
 		 */
+		if(ppErrObj != NULL) *ppErrObj = "statsobj";
+		CHKiRet(statsobjClassInit(NULL));
 		if(ppErrObj != NULL) *ppErrObj = "prop";
 		CHKiRet(propClassInit(NULL));
 		if(ppErrObj != NULL) *ppErrObj = "glbl";
 		CHKiRet(glblClassInit(NULL));
-		if(ppErrObj != NULL) *ppErrObj = "datetime";
-		CHKiRet(datetimeClassInit(NULL));
 		if(ppErrObj != NULL) *ppErrObj = "msg";
 		CHKiRet(msgClassInit(NULL));
 		if(ppErrObj != NULL) *ppErrObj = "ctok_token";
@@ -183,6 +187,10 @@ rsrtInit(char **ppErrObj, obj_if_t *pObjIF)
 		CHKiRet(qqueueClassInit(NULL));
 		if(ppErrObj != NULL) *ppErrObj = "conf";
 		CHKiRet(confClassInit(NULL));
+		if(ppErrObj != NULL) *ppErrObj = "parser";
+		CHKiRet(parserClassInit(NULL));
+		if(ppErrObj != NULL) *ppErrObj = "strgen";
+		CHKiRet(strgenClassInit(NULL));
 
 		/* dummy "classes" */
 		if(ppErrObj != NULL) *ppErrObj = "str";
@@ -215,6 +223,7 @@ rsrtExit(void)
 		glblClassExit();
 		rulesetClassExit();
 		ruleClassExit();
+
 		objClassExit(); /* *THIS* *MUST/SHOULD?* always be the first class initilizer being called (except debug)! */
 	}
 

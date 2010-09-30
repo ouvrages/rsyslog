@@ -41,8 +41,10 @@ BEGINinterface(datetime) /* name must also be changed in ENDinterface macro! */
 	int (*formatTimestamp3339)(struct syslogTime *ts, char* pBuf);
 	int (*formatTimestamp3164)(struct syslogTime *ts, char* pBuf, int);
 	int (*formatTimestampSecFrac)(struct syslogTime *ts, char* pBuf);
+	/* v3, 2009-11-12 */
+	time_t (*GetTime)(time_t *ttSeconds);
 ENDinterface(datetime)
-#define datetimeCURR_IF_VERSION 4 /* increment whenever you change the interface structure! */
+#define datetimeCURR_IF_VERSION 5 /* increment whenever you change the interface structure! */
 /* interface changes:
  * 1 - initial version
  * 2 - not compatible to 1 - bugfix required ParseTIMESTAMP3164 to accept char ** as
@@ -50,6 +52,7 @@ ENDinterface(datetime)
  *     third-party module should call. -- rgerhards, 2008.-09-12
  * 3 - taken by v5 branch!
  * 4 - formatTimestamp3164 takes a third int parameter
+ * 5 - merge of versions 3 + 4 (2010-03-09)
  */
 
 /* prototypes */

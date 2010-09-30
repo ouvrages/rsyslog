@@ -37,20 +37,18 @@ BEGINinterface(conf) /* name must also be changed in ENDinterface macro! */
 	rsRetVal (*doIncludeLine)(uchar **pp, __attribute__((unused)) void* pVal);
 	rsRetVal (*cfline)(uchar *line, rule_t **pfCurr);
 	rsRetVal (*processConfFile)(uchar *pConfFile);
-	rsRetVal (*ReInitConf)(void);
 	rsRetVal (*GetNbrActActions)(int *);
 ENDinterface(conf)
-#define confCURR_IF_VERSION 2 /* increment whenever you change the interface structure! */
+#define confCURR_IF_VERSION 3 /* increment whenever you change the interface structure! */
+/* in Version 3, entry point "ReInitConf()" was removed, as we do not longer need
+ * to support restart-type HUP -- rgerhards, 2009-07-15
+ */
 
 
 /* prototypes */
 PROTOTYPEObj(conf);
 
 
-/* TODO: remove them below (means move the config init code) -- rgerhards, 2008-02-19 */
-extern EHostnameCmpMode eDfltHostnameCmpMode;
-extern cstr_t *pDfltHostnameCmp;
-extern cstr_t *pDfltProgNameCmp;
 /* TODO: the following 2 need to go in conf obj interface... */
 rsRetVal cflineParseTemplateName(uchar** pp, omodStringRequest_t *pOMSR, int iEntry, int iTplOpts, uchar *dfltTplName);
 rsRetVal cflineParseFileName(uchar* p, uchar *pFileName, omodStringRequest_t *pOMSR, int iEntry, int iTplOpts, uchar *pszTpl);

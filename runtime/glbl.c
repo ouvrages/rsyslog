@@ -39,6 +39,7 @@
 #include "cfsysline.h"
 #include "glbl.h"
 #include "prop.h"
+#include "atomic.h"
 
 /* some defaults */
 #ifndef DFLT_NETSTRM_DRVR
@@ -55,7 +56,7 @@ DEFobjCurrIf(prop)
  */
 static uchar *pszWorkDir = NULL;
 static int bOptimizeUniProc = 1;	/* enable uniprocessor optimizations */
-static int bHUPisRestart = 0;		/* should SIGHUP cause a full system restart? */
+static int bParseHOSTNAMEandTAG = 1;	/* parser modification (based on startup params!) */
 static int bPreserveFQDN = 0;		/* should FQDNs always be preserved? */
 static int iMaxLine = 2048;		/* maximum length of a syslog message */
 static int iDefPFFamily = PF_UNSPEC;     /* protocol family (IPv4, IPv6 or both) */
@@ -72,6 +73,13 @@ static uchar *pszDfltNetstrmDrvr = NULL; /* module name of default netstream dri
 static uchar *pszDfltNetstrmDrvrCAF = NULL; /* default CA file for the netstrm driver */
 static uchar *pszDfltNetstrmDrvrKeyFile = NULL; /* default key file for the netstrm driver (server) */
 static uchar *pszDfltNetstrmDrvrCertFile = NULL; /* default cert file for the netstrm driver (server) */
+static int bTerminateInputs = 0;		/* global switch that inputs shall terminate ASAP (1=> terminate) */
+#ifndef HAVE_ATOMIC_BUILTINS
+static DEF_ATOMIC_HELPER_MUT(mutTerminateInputs);
+#endif
+#ifdef USE_UNLIMITED_SELECT
+static int iFdSetSize = howmany(FD_SETSIZE, __NFDBITS) * sizeof (fd_mask); /* size of select() bitmask in bytes */
+#endif
 
 
 /* define a macro for the simple properties' set and get functions
@@ -93,9 +101,9 @@ static dataType Get##nameFunc(void) \
 	return(nameVar); \
 }
 
+SIMP_PROP(ParseHOSTNAMEandTAG, bParseHOSTNAMEandTAG, int)
 SIMP_PROP(OptimizeUniProc, bOptimizeUniProc, int)
 SIMP_PROP(PreserveFQDN, bPreserveFQDN, int)
-SIMP_PROP(HUPisRestart, bHUPisRestart, int)
 SIMP_PROP(MaxLine, iMaxLine, int)
 SIMP_PROP(DefPFFamily, iDefPFFamily, int) /* note that in the future we may check the family argument */
 SIMP_PROP(DropMalPTRMsgs, bDropMalPTRMsgs, int)
@@ -104,6 +112,9 @@ SIMP_PROP(DisableDNS, bDisableDNS, int)
 SIMP_PROP(LocalDomain, LocalDomain, uchar*)
 SIMP_PROP(StripDomains, StripDomains, char**)
 SIMP_PROP(LocalHosts, LocalHosts, char**)
+#ifdef USE_UNLIMITED_SELECT
+SIMP_PROP(FdSetSize, iFdSetSize, int)
+#endif
 
 SIMP_PROP_SET(LocalFQDNName, LocalFQDNName, uchar*)
 SIMP_PROP_SET(LocalHostName, LocalHostName, uchar*)
@@ -115,6 +126,24 @@ SIMP_PROP_SET(DfltNetstrmDrvrCertFile, pszDfltNetstrmDrvrCertFile, uchar*) /* TO
 #undef SIMP_PROP
 #undef SIMP_PROP_SET
 #undef SIMP_PROP_GET
+
+
+/* return global input termination status
+ * rgerhards, 2009-07-20
+ */
+static int GetGlobalInputTermState(void)
+{
+	return ATOMIC_FETCH_32BIT(&bTerminateInputs, &mutTerminateInputs);
+}
+
+
+/* set global termiantion state to "terminate". Note that this is a
+ * "once in a lifetime" action which can not be undone. -- gerhards, 2009-07-20
+ */
+static void SetGlobalInputTermination(void)
+{
+	ATOMIC_STORE_1_TO_INT(&bTerminateInputs, &mutTerminateInputs);
+}
 
 
 /* return our local hostname. if it is not set, "[localhost]" is returned
@@ -164,6 +193,7 @@ GenerateLocalHostNameProperty(void)
 finalize_it:
 	RETiRet;
 }
+
 
 /* return our local hostname as a string property
  */
@@ -241,13 +271,15 @@ CODESTARTobjQueryInterface(glbl)
 	pIf->GetWorkDir = GetWorkDir;
 	pIf->GenerateLocalHostNameProperty = GenerateLocalHostNameProperty;
 	pIf->GetLocalHostNameProp = GetLocalHostNameProp;
+	pIf->SetGlobalInputTermination = SetGlobalInputTermination;
+	pIf->GetGlobalInputTermState = GetGlobalInputTermState;
 #define SIMP_PROP(name) \
 	pIf->Get##name = Get##name; \
 	pIf->Set##name = Set##name;
 	SIMP_PROP(MaxLine);
 	SIMP_PROP(OptimizeUniProc);
+	SIMP_PROP(ParseHOSTNAMEandTAG);
 	SIMP_PROP(PreserveFQDN);
-	SIMP_PROP(HUPisRestart);
 	SIMP_PROP(DefPFFamily);
 	SIMP_PROP(DropMalPTRMsgs);
 	SIMP_PROP(Option_DisallowWarning);
@@ -261,6 +293,9 @@ CODESTARTobjQueryInterface(glbl)
 	SIMP_PROP(DfltNetstrmDrvrCAF)
 	SIMP_PROP(DfltNetstrmDrvrKeyFile)
 	SIMP_PROP(DfltNetstrmDrvrCertFile)
+#ifdef USE_UNLIMITED_SELECT
+	SIMP_PROP(FdSetSize)
+#endif
 #undef	SIMP_PROP
 finalize_it:
 ENDobjQueryInterface(glbl)
@@ -293,8 +328,10 @@ static rsRetVal resetConfigVariables(uchar __attribute__((unused)) *pp, void __a
 	}
 	bDropMalPTRMsgs = 0;
 	bOptimizeUniProc = 1;
-	bHUPisRestart = 0;
 	bPreserveFQDN = 0;
+#ifdef USE_UNLIMITED_SELECT
+	iFdSetSize = howmany(FD_SETSIZE, __NFDBITS) * sizeof (fd_mask);
+#endif
 	return RS_RET_OK;
 }
 
@@ -316,9 +353,10 @@ BEGINAbstractObjClassInit(glbl, 1, OBJ_IS_CORE_MODULE) /* class, version */
 	CHKiRet(regCfSysLineHdlr((uchar *)"defaultnetstreamdriverkeyfile", 0, eCmdHdlrGetWord, NULL, &pszDfltNetstrmDrvrKeyFile, NULL));
 	CHKiRet(regCfSysLineHdlr((uchar *)"defaultnetstreamdrivercertfile", 0, eCmdHdlrGetWord, NULL, &pszDfltNetstrmDrvrCertFile, NULL));
 	CHKiRet(regCfSysLineHdlr((uchar *)"optimizeforuniprocessor", 0, eCmdHdlrBinary, NULL, &bOptimizeUniProc, NULL));
-	CHKiRet(regCfSysLineHdlr((uchar *)"hupisrestart", 0, eCmdHdlrBinary, NULL, &bHUPisRestart, NULL));
 	CHKiRet(regCfSysLineHdlr((uchar *)"preservefqdn", 0, eCmdHdlrBinary, NULL, &bPreserveFQDN, NULL));
 	CHKiRet(regCfSysLineHdlr((uchar *)"resetconfigvariables", 1, eCmdHdlrCustomHandler, resetConfigVariables, NULL, NULL));
+
+	INIT_ATOMIC_HELPER_MUT(mutTerminateInputs);
 ENDObjClassInit(glbl)
 
 
@@ -341,6 +379,7 @@ BEGINObjClassExit(glbl, OBJ_IS_CORE_MODULE) /* class, version */
 	if(LocalFQDNName != NULL)
 		free(LocalFQDNName);
 	objRelease(prop, CORE_COMPONENT);
+	DESTROY_ATOMIC_HELPER_MUT(mutTerminateInputs);
 ENDObjClassExit(glbl)
 
 /* vi:set ai:
