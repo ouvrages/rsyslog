@@ -48,6 +48,7 @@
 #include "netstrms.h"
 #include "netstrm.h"
 #include "nsdsel_ptcp.h"
+#include "nsdpoll_ptcp.h"
 #include "nsd_ptcp.h"
 
 MODULE_TYPE_LIB
@@ -296,12 +297,12 @@ FillRemHost(nsd_ptcp_t *pThis, struct sockaddr *pAddr)
 	 * memory consumption)
 	 */
 	len = strlen((char*)szIP) + 1; /* +1 for \0 byte */
-	if((pThis->pRemHostIP = malloc(len)) == NULL)
+	if((pThis->pRemHostIP = MALLOC(len)) == NULL)
 		ABORT_FINALIZE(RS_RET_OUT_OF_MEMORY);
 	memcpy(pThis->pRemHostIP, szIP, len);
 
 	len = strlen((char*)szHname) + 1; /* +1 for \0 byte */
-	if((pThis->pRemHostName = malloc(len)) == NULL) {
+	if((pThis->pRemHostName = MALLOC(len)) == NULL) {
 		free(pThis->pRemHostIP); /* prevent leak */
 		pThis->pRemHostIP = NULL;
 		ABORT_FINALIZE(RS_RET_OUT_OF_MEMORY);
@@ -562,6 +563,7 @@ finalize_it:
 static rsRetVal
 Rcv(nsd_t *pNsd, uchar *pRcvBuf, ssize_t *pLenBuf)
 {
+	char errStr[1024];
 	DEFiRet;
 	nsd_ptcp_t *pThis = (nsd_ptcp_t*) pNsd;
 	ISOBJ_TYPE_assert(pThis, nsd_ptcp);
@@ -571,7 +573,9 @@ Rcv(nsd_t *pNsd, uchar *pRcvBuf, ssize_t *pLenBuf)
 	if(*pLenBuf == 0) {
 		ABORT_FINALIZE(RS_RET_CLOSED);
 	} else if (*pLenBuf < 0) {
-		ABORT_FINALIZE(RS_RET_ERR);
+		rs_strerror_r(errno, errStr, sizeof(errStr));
+		dbgprintf("error during recv on NSD %p: %s\n", pNsd, errStr);
+		ABORT_FINALIZE(RS_RET_RCV_ERR);
 	}
 
 finalize_it:
@@ -821,6 +825,9 @@ ENDObjClassInit(nsd_ptcp)
 
 BEGINmodExit
 CODESTARTmodExit
+#	ifdef HAVE_EPOLL_CREATE /* module only available if epoll() is supported! */
+	nsdpoll_ptcpClassExit();
+#	endif
 	nsdsel_ptcpClassExit();
 	nsd_ptcpClassExit();
 ENDmodExit
@@ -839,6 +846,9 @@ CODESTARTmodInit
 	/* Initialize all classes that are in our module - this includes ourselfs */
 	CHKiRet(nsd_ptcpClassInit(pModInfo)); /* must be done after tcps_sess, as we use it */
 	CHKiRet(nsdsel_ptcpClassInit(pModInfo)); /* must be done after tcps_sess, as we use it */
+#	ifdef HAVE_EPOLL_CREATE /* module only available if epoll() is supported! */
+	CHKiRet(nsdpoll_ptcpClassInit(pModInfo)); /* must be done after tcps_sess, as we use it */
+#	endif
 ENDmodInit
 /* vi:set ai:
  */

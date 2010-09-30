@@ -93,19 +93,18 @@ DEFobjCurrIf(net)
 DEFobjCurrIf(rule)
 DEFobjCurrIf(ruleset)
 
-static int iNbrActions; /* number of actions the running config has. Needs to be init on ReInitConf() */
+static int iNbrActions = 0; /* number of currently defined actions */
 
-/* The following global variables are used for building
+/* The following module-global variables are used for building
  * tag and host selector lines during startup and config reload.
  * This is stored as a global variable pool because of its ease. It is
  * also fairly compatible with multi-threading as the stratup code must
- * be run in a single thread anyways. So there can be no race conditions. These
- * variables are no longer used once the configuration has been loaded (except,
- * of course, during a reload). rgerhards 2005-10-18
+ * be run in a single thread anyways. So there can be no race conditions.
+ * rgerhards 2005-10-18
  */
-EHostnameCmpMode eDfltHostnameCmpMode;
-cstr_t *pDfltHostnameCmp;
-cstr_t *pDfltProgNameCmp;
+static EHostnameCmpMode eDfltHostnameCmpMode = HN_NO_COMP;
+static cstr_t *pDfltHostnameCmp = NULL;
+static cstr_t *pDfltProgNameCmp = NULL;
 
 
 /* process a directory and include all of its files into
@@ -1041,7 +1040,7 @@ static rsRetVal cflineDoFilter(uchar **pp, rule_t *f)
 	DEFiRet;
 
 	ASSERT(pp != NULL);
-	ASSERT(f != NULL);
+	ISOBJ_TYPE_assert(f, rule);
 
 	/* check which filter we need to pull... */
 	switch(**pp) {
@@ -1063,6 +1062,7 @@ static rsRetVal cflineDoFilter(uchar **pp, rule_t *f)
 	 * and, if so, we copy them over. rgerhards, 2005-10-18
 	 */
 	if(pDfltProgNameCmp != NULL) {
+RUNLOG_STR("dflt ProgNameCmp != NULL, setting opCSProgNameComp");
 		CHKiRet(rsCStrConstructFromCStr(&(f->pCSProgNameComp), pDfltProgNameCmp));
 	}
 
@@ -1105,7 +1105,7 @@ static rsRetVal cflineDoAction(uchar **p, action_t **ppAction)
 					dbgprintf("module is incompatible with RepeatedMsgReduction - turned off\n");
 					pAction->f_ReduceRepeated = 0;
 				}
-				pAction->bEnabled = 1; /* action is enabled */
+				pAction->eState = ACT_STATE_RDY; /* action is enabled */
 				iNbrActions++;	/* one more active action! */
 			}
 			break;
@@ -1207,21 +1207,6 @@ cfline(uchar *line, rule_t **pfCurr)
 }
 
 
-/* Reinitialize the configuration subsystem. This is a "work-around" to the fact
- * that we do not yet have actual config objects. This method is to be called
- * whenever a totally new config is started (which means on startup and HUP).
- * Note that it MUST NOT be called for an included config file.
- * rgerhards, 2008-07-28
- */
-static rsRetVal
-ReInitConf(void)
-{
-	DEFiRet;
-	iNbrActions = 0;	/* this is what we created the function for ;) - action count is reset */
-	RETiRet;
-}
-
-
 /* return the current number of active actions
  * rgerhards, 2008-07-28
  */
@@ -1255,7 +1240,6 @@ CODESTARTobjQueryInterface(conf)
 	pIf->doIncludeLine = doIncludeLine;
 	pIf->cfline = cfline;
 	pIf->processConfFile = processConfFile;
-	pIf->ReInitConf = ReInitConf;
 	pIf->GetNbrActActions = GetNbrActActions;
 
 finalize_it:
@@ -1267,6 +1251,15 @@ ENDobjQueryInterface(conf)
  */
 BEGINObjClassExit(conf, OBJ_IS_CORE_MODULE) /* CHANGE class also in END MACRO! */
 CODESTARTObjClassExit(conf)
+	/* free no-longer needed module-global variables */
+	if(pDfltHostnameCmp != NULL) {
+		rsCStrDestruct(&pDfltHostnameCmp);
+	}
+
+	if(pDfltProgNameCmp != NULL) {
+		rsCStrDestruct(&pDfltProgNameCmp);
+	}
+
 	/* release objects we no longer need */
 	objRelease(expr, CORE_COMPONENT);
 	objRelease(ctok, CORE_COMPONENT);

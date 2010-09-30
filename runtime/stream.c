@@ -215,7 +215,8 @@ doPhysOpen(strm_t *pThis)
 	}
 
 	pThis->fd = open((char*)pThis->pszCurrFName, iFlags, pThis->tOpenMode);
-	DBGPRINTF("file '%s' opened as #%d with mode %d\n", pThis->pszCurrFName, pThis->fd, pThis->tOpenMode);
+	DBGPRINTF("file '%s' opened as #%d with mode %d\n", pThis->pszCurrFName,
+		  pThis->fd, (int) pThis->tOpenMode);
 	if(pThis->fd == -1) {
 		char errStr[1024];
 		int err = errno;
@@ -260,7 +261,7 @@ static rsRetVal strmOpenFile(strm_t *pThis)
 				    pThis->pszFName, pThis->lenFName, pThis->iCurrFNum, pThis->iFileNumDigits));
 	} else {
 		if(pThis->pszDir == NULL) {
-			if((pThis->pszCurrFName = (uchar*) strdup((char*) pThis->pszFName)) == NULL)
+			if((pThis->pszCurrFName = ustrdup(pThis->pszFName)) == NULL)
 				ABORT_FINALIZE(RS_RET_OUT_OF_MEMORY);
 		} else {
 			CHKiRet(genFileName(&pThis->pszCurrFName, pThis->pszDir, pThis->lenDir,
@@ -625,7 +626,7 @@ static rsRetVal strmConstructFinalize(strm_t *pThis)
 			 * to make sure we can write out everything with a SINGLE api call!
 			 * We add another 128 bytes to take care of the gzip header and "all eventualities".
 			 */
-			CHKmalloc(pThis->pZipBuf = (Bytef*) malloc(sizeof(uchar) * (pThis->sIOBufSize + 128)));
+			CHKmalloc(pThis->pZipBuf = (Bytef*) MALLOC(sizeof(uchar) * (pThis->sIOBufSize + 128)));
 		}
 	}
 
@@ -657,7 +658,7 @@ static rsRetVal strmConstructFinalize(strm_t *pThis)
 		pthread_cond_init(&pThis->isEmpty, 0);
 		pThis->iCnt = pThis->iEnq = pThis->iDeq = 0;
 		for(i = 0 ; i < STREAM_ASYNC_NUMBUFS ; ++i) {
-			CHKmalloc(pThis->asyncBuf[i].pBuf = (uchar*) malloc(sizeof(uchar) * pThis->sIOBufSize));
+			CHKmalloc(pThis->asyncBuf[i].pBuf = (uchar*) MALLOC(sizeof(uchar) * pThis->sIOBufSize));
 		}
 		pThis->pIOBuf = pThis->asyncBuf[0].pBuf;
 		pThis->bStopWriter = 0;
@@ -665,7 +666,7 @@ static rsRetVal strmConstructFinalize(strm_t *pThis)
 			DBGPRINTF("ERROR: stream %p cold not create writer thread\n", pThis);
 	} else {
 		/* we work synchronously, so we need to alloc a fixed pIOBuf */
-		CHKmalloc(pThis->pIOBuf = (uchar*) malloc(sizeof(uchar) * pThis->sIOBufSize));
+		CHKmalloc(pThis->pIOBuf = (uchar*) MALLOC(sizeof(uchar) * pThis->sIOBufSize));
 	}
 
 finalize_it:
@@ -923,7 +924,7 @@ asyncWriterThread(void *pPtr)
 {
 	int iDeq;
 	struct timespec t;
-	bool bTimedOut = 0;
+	sbool bTimedOut = 0;
 	strm_t *pThis = (strm_t*) pPtr;
 	ISOBJ_TYPE_assert(pThis, strm);
 
@@ -936,7 +937,6 @@ asyncWriterThread(void *pPtr)
 
 	while(1) { /* loop broken inside */
 		d_pthread_mutex_lock(&pThis->mut);
-dbgprintf("XXX: asyncWriterThread iterating %s\n", pThis->pszFName);
 		while(pThis->iCnt == 0) {
 			if(pThis->bStopWriter) {
 				pthread_cond_broadcast(&pThis->isEmpty);
@@ -952,7 +952,6 @@ dbgprintf("XXX: asyncWriterThread iterating %s\n", pThis->pszFName);
 			bTimedOut = 0;
 			timeoutComp(&t, pThis->iFlushInterval * 2000); /* *1000 millisconds */ // TODO: check the 2000?!?
 			if(pThis->bDoTimedWait) {
-dbgprintf("asyncWriter thread going to timeout sleep\n");
 				if(pthread_cond_timedwait(&pThis->notEmpty, &pThis->mut, &t) != 0) {
 					int err = errno;
 					if(err == ETIMEDOUT) {
@@ -966,16 +965,13 @@ dbgprintf("asyncWriter thread going to timeout sleep\n");
 					}
 				}
 			} else {
-dbgprintf("asyncWriter thread going to eternal sleep\n");
 				d_pthread_cond_wait(&pThis->notEmpty, &pThis->mut);
 			}
-dbgprintf("asyncWriter woke up\n");
 		}
 
 		bTimedOut = 0; /* we may have timed out, but there *is* work to do... */
 
 		iDeq = pThis->iDeq++ % STREAM_ASYNC_NUMBUFS;
-dbgprintf("asyncWriter writes data\n");
 		doWriteInternal(pThis, pThis->asyncBuf[iDeq].pBuf, pThis->asyncBuf[iDeq].lenBuf);
 		// TODO: error check????? 2009-07-06
 
@@ -1090,7 +1086,7 @@ doZipWrite(strm_t *pThis, uchar *pBuf, size_t lenBuf)
 {
 	z_stream zstrm;
 	int zRet;	/* zlib return state */
-	bool bzInitDone = FALSE;
+	sbool bzInitDone = FALSE;
 	DEFiRet;
 	assert(pThis != NULL);
 	assert(pBuf != NULL);
@@ -1384,7 +1380,7 @@ strmSetFName(strm_t *pThis, uchar *pszName, size_t iLenName)
 	if(pThis->pszFName != NULL)
 		free(pThis->pszFName);
 
-	if((pThis->pszFName = malloc(sizeof(uchar) * (iLenName + 1))) == NULL)
+	if((pThis->pszFName = MALLOC(sizeof(uchar) * (iLenName + 1))) == NULL)
 		ABORT_FINALIZE(RS_RET_OUT_OF_MEMORY);
 
 	memcpy(pThis->pszFName, pszName, iLenName + 1); /* always think about the \0! */
@@ -1411,7 +1407,7 @@ strmSetDir(strm_t *pThis, uchar *pszDir, size_t iLenDir)
 	if(iLenDir < 1)
 		ABORT_FINALIZE(RS_RET_FILE_PREFIX_MISSING);
 
-	CHKmalloc(pThis->pszDir = malloc(sizeof(uchar) * iLenDir + 1));
+	CHKmalloc(pThis->pszDir = MALLOC(sizeof(uchar) * (iLenDir + 1)));
 
 	memcpy(pThis->pszDir, pszDir, iLenDir + 1); /* always think about the \0! */
 	pThis->lenDir = iLenDir;
@@ -1509,6 +1505,46 @@ finalize_it:
 }
 
 
+/* duplicate a stream object excluding dynamic properties. This function is
+ * primarily meant to provide a duplicate that later on can be used to access
+ * the data. This is needed, for example, for a restart of the disk queue.
+ * Note that ConstructFinalize() is NOT called. So our caller may change some
+ * properties before finalizing things.
+ * rgerhards, 2009-05-26
+ */
+rsRetVal
+strmDup(strm_t *pThis, strm_t **ppNew)
+{
+	strm_t *pNew = NULL;
+	DEFiRet;
+
+	ISOBJ_TYPE_assert(pThis, strm);
+	assert(ppNew != NULL);
+
+	CHKiRet(strmConstruct(&pNew));
+	pNew->sType = pThis->sType;
+	pNew->iCurrFNum = pThis->iCurrFNum;
+	CHKmalloc(pNew->pszFName = ustrdup(pThis->pszFName));
+	pNew->lenFName = pThis->lenFName;
+	CHKmalloc(pNew->pszDir = ustrdup(pThis->pszDir));
+	pNew->lenDir = pThis->lenDir;
+	pNew->tOperationsMode = pThis->tOperationsMode;
+	pNew->tOpenMode = pThis->tOpenMode;
+	pNew->iMaxFileSize = pThis->iMaxFileSize;
+	pNew->iMaxFiles = pThis->iMaxFiles;
+	pNew->iFileNumDigits = pThis->iFileNumDigits;
+	pNew->bDeleteOnClose = pThis->bDeleteOnClose;
+	pNew->iCurrOffs = pThis->iCurrOffs;
+	
+	*ppNew = pNew;
+	pNew = NULL;
+
+finalize_it:
+	if(pNew != NULL)
+		strmDestruct(&pNew);
+
+	RETiRet;
+}
 
 /* set a user write-counter. This counter is initialized to zero and
  * receives the number of bytes written. It is accurate only after a
@@ -1624,6 +1660,7 @@ CODESTARTobjQueryInterface(strm)
 	pIf->RecordEnd = strmRecordEnd;
 	pIf->Serialize = strmSerialize;
 	pIf->GetCurrOffset = strmGetCurrOffset;
+	pIf->Dup = strmDup;
 	pIf->SetWCntr = strmSetWCntr;
 	/* set methods */
 	pIf->SetbDeleteOnClose = strmSetbDeleteOnClose;

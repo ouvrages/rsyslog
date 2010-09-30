@@ -1,6 +1,6 @@
 /* Definition of the worker thread instance (wti) class.
  *
- * Copyright 2008 Rainer Gerhards and Adiscon GmbH.
+ * Copyright 2008, 2009 by Rainer Gerhards and Adiscon GmbH.
  *
  * This file is part of the rsyslog runtime library.
  *
@@ -27,21 +27,20 @@
 #include <pthread.h>
 #include "wtp.h"
 #include "obj.h"
+#include "batch.h"
+
 
 /* the worker thread instance class */
-typedef struct wti_s {
+struct wti_s {
 	BEGINobjInstance;
-	pthread_t thrdID;  /* thread ID */
-	qWrkCmd_t tCurrCmd; /* current command to be carried out by worker */
-	obj_t *pUsrp;		/* pointer to an object meaningful for current user pointer (e.g. queue pUsr data elemt) */
+	pthread_t thrdID; 	/* thread ID */
+	int bIsRunning;	/* is this thread currently running? (must be int for atomic op!) */
+	sbool bAlwaysRunning;	/* should this thread always run? */
 	wtp_t *pWtp; /* my worker thread pool (important if only the work thread instance is passed! */
-	pthread_cond_t condExitDone; /* signaled when the thread exit is done (once per thread existance) */
-	pthread_mutex_t mut;
-	bool bShutdownRqtd;	/* shutdown for this thread requested? 0 - no , 1 - yes */
+	batch_t batch; /* pointer to an object array meaningful for current user pointer (e.g. queue pUsr data elemt) */
 	uchar *pszDbgHdr;	/* header string for debug messages */
-} wti_t;
-
-/* some symbolic constants for easier reference */
+	DEF_ATOMIC_HELPER_MUT(mutIsRunning);
+};
 
 
 /* prototypes */
@@ -49,12 +48,12 @@ rsRetVal wtiConstruct(wti_t **ppThis);
 rsRetVal wtiConstructFinalize(wti_t *pThis);
 rsRetVal wtiDestruct(wti_t **ppThis);
 rsRetVal wtiWorker(wti_t *pThis);
-rsRetVal wtiProcessThrdChanges(wti_t *pThis, int bLockMutex);
 rsRetVal wtiSetDbgHdr(wti_t *pThis, uchar *pszMsg, size_t lenMsg);
-rsRetVal wtiSetState(wti_t *pThis, qWrkCmd_t tCmd, int bActiveOnly, int bLockMutex);
-rsRetVal wtiJoinThrd(wti_t *pThis);
 rsRetVal wtiCancelThrd(wti_t *pThis);
-qWrkCmd_t wtiGetState(wti_t *pThis, int bLockMutex);
+rsRetVal wtiSetAlwaysRunning(wti_t *pThis);
+rsRetVal wtiSetState(wti_t *pThis, sbool bNew);
+rsRetVal wtiWakeupThrd(wti_t *pThis);
+sbool wtiGetState(wti_t *pThis);
 PROTOTYPEObjClassInit(wti);
 PROTOTYPEpropSetMeth(wti, pszDbgHdr, uchar*);
 PROTOTYPEpropSetMeth(wti, pWtp, wtp_t*);
