@@ -4,5 +4,5 @@
 # -x disables DNS lookups on messages received with -r
 # -c compatibility mode
 # See rsyslogd(8) for more details
-RSYSLOGD_OPTIONS="-c4"
+RSYSLOGD_OPTIONS="-c5"
 
