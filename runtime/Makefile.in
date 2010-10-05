@@ -119,6 +119,7 @@ am_librsyslog_la_OBJECTS = librsyslog_la-rsyslog.lo \
 	librsyslog_la-prop.lo librsyslog_la-cfsysline.lo \
 	librsyslog_la-sd-daemon.lo librsyslog_la-action.lo \
 	librsyslog_la-threads.lo librsyslog_la-parse.lo \
+	librsyslog_la-hashtable.lo librsyslog_la-hashtable_itr.lo \
 	librsyslog_la-outchannel.lo librsyslog_la-template.lo
 librsyslog_la_OBJECTS = $(am_librsyslog_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
@@ -377,6 +378,7 @@ sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
 sysconfdir = @sysconfdir@
+systemdsystemunitdir = @systemdsystemunitdir@
 target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
@@ -476,6 +478,12 @@ librsyslog_la_SOURCES = \
 	\
 	../parse.c \
 	../parse.h \
+	\
+	hashtable.c \
+	hashtable.h \
+	hashtable_itr.c \
+	hashtable_itr.h \
+	hashtable_private.h \
 	\
 	../outchannel.c \
 	../outchannel.h \
@@ -679,6 +687,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-errmsg.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-expr.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-glbl.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-hashtable.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-hashtable_itr.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-linkedlist.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-modules.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-msg.Plo@am__quote@
@@ -1059,6 +1069,22 @@ librsyslog_la-parse.lo: ../parse.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../parse.c' object='librsyslog_la-parse.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-parse.lo `test -f '../parse.c' || echo '$(srcdir)/'`../parse.c
+
+librsyslog_la-hashtable.lo: hashtable.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-hashtable.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-hashtable.Tpo -c -o librsyslog_la-hashtable.lo `test -f 'hashtable.c' || echo '$(srcdir)/'`hashtable.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librsyslog_la-hashtable.Tpo $(DEPDIR)/librsyslog_la-hashtable.Plo
+@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hashtable.c' object='librsyslog_la-hashtable.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-hashtable.lo `test -f 'hashtable.c' || echo '$(srcdir)/'`hashtable.c
+
+librsyslog_la-hashtable_itr.lo: hashtable_itr.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-hashtable_itr.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-hashtable_itr.Tpo -c -o librsyslog_la-hashtable_itr.lo `test -f 'hashtable_itr.c' || echo '$(srcdir)/'`hashtable_itr.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librsyslog_la-hashtable_itr.Tpo $(DEPDIR)/librsyslog_la-hashtable_itr.Plo
+@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hashtable_itr.c' object='librsyslog_la-hashtable_itr.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-hashtable_itr.lo `test -f 'hashtable_itr.c' || echo '$(srcdir)/'`hashtable_itr.c
 
 librsyslog_la-outchannel.lo: ../outchannel.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-outchannel.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-outchannel.Tpo -c -o librsyslog_la-outchannel.lo `test -f '../outchannel.c' || echo '$(srcdir)/'`../outchannel.c

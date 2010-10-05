@@ -34,7 +34,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-subdir = plugins/immark
+subdir = plugins/omhdfs
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/atomic_operations.m4 \
@@ -71,15 +71,16 @@ am__base_list = \
   sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
 am__installdirs = "$(DESTDIR)$(pkglibdir)"
 LTLIBRARIES = $(pkglib_LTLIBRARIES)
-immark_la_DEPENDENCIES =
-am_immark_la_OBJECTS = immark_la-immark.lo
-immark_la_OBJECTS = $(am_immark_la_OBJECTS)
+am__DEPENDENCIES_1 =
+omhdfs_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
+am_omhdfs_la_OBJECTS = omhdfs_la-omhdfs.lo
+omhdfs_la_OBJECTS = $(am_omhdfs_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
 am__v_lt_0 = --silent
-immark_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+omhdfs_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
-	$(immark_la_LDFLAGS) $(LDFLAGS) -o $@
+	$(omhdfs_la_LDFLAGS) $(LDFLAGS) -o $@
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -106,8 +107,8 @@ am__v_CCLD_0 = @echo "  CCLD  " $@;
 AM_V_GEN = $(am__v_GEN_$(V))
 am__v_GEN_ = $(am__v_GEN_$(AM_DEFAULT_VERBOSITY))
 am__v_GEN_0 = @echo "  GEN   " $@;
-SOURCES = $(immark_la_SOURCES)
-DIST_SOURCES = $(immark_la_SOURCES)
+SOURCES = $(omhdfs_la_SOURCES)
+DIST_SOURCES = $(omhdfs_la_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -257,11 +258,11 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-pkglib_LTLIBRARIES = immark.la
-immark_la_SOURCES = immark.c immark.h
-immark_la_CPPFLAGS = $(RSRT_CFLAGS) -I$(top_srcdir) $(PTHREADS_CFLAGS)
-immark_la_LDFLAGS = -module -avoid-version
-immark_la_LIBADD = 
+pkglib_LTLIBRARIES = omhdfs.la
+omhdfs_la_SOURCES = omhdfs.c
+omhdfs_la_CPPFLAGS = -I$(top_srcdir) $(PTHREADS_CFLAGS) $(RSRT_CFLAGS) $(JAVA_INCLUDES)
+omhdfs_la_LDFLAGS = -module -avoid-version -lhdfs $(JAVA_LIBS)
+omhdfs_la_LIBADD = $(RSRT_LIBS)
 all: all-am
 
 .SUFFIXES:
@@ -275,9 +276,9 @@ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu plugins/immark/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu plugins/omhdfs/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu plugins/immark/Makefile
+	  $(AUTOMAKE) --gnu plugins/omhdfs/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -327,8 +328,8 @@ clean-pkglibLTLIBRARIES:
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
-immark.la: $(immark_la_OBJECTS) $(immark_la_DEPENDENCIES) 
-	$(AM_V_CCLD)$(immark_la_LINK) -rpath $(pkglibdir) $(immark_la_OBJECTS) $(immark_la_LIBADD) $(LIBS)
+omhdfs.la: $(omhdfs_la_OBJECTS) $(omhdfs_la_DEPENDENCIES) 
+	$(AM_V_CCLD)$(omhdfs_la_LINK) -rpath $(pkglibdir) $(omhdfs_la_OBJECTS) $(omhdfs_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -336,7 +337,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/immark_la-immark.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/omhdfs_la-omhdfs.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -362,13 +363,13 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LTCOMPILE) -c -o $@ $<
 
-immark_la-immark.lo: immark.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(immark_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT immark_la-immark.lo -MD -MP -MF $(DEPDIR)/immark_la-immark.Tpo -c -o immark_la-immark.lo `test -f 'immark.c' || echo '$(srcdir)/'`immark.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/immark_la-immark.Tpo $(DEPDIR)/immark_la-immark.Plo
+omhdfs_la-omhdfs.lo: omhdfs.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(omhdfs_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT omhdfs_la-omhdfs.lo -MD -MP -MF $(DEPDIR)/omhdfs_la-omhdfs.Tpo -c -o omhdfs_la-omhdfs.lo `test -f 'omhdfs.c' || echo '$(srcdir)/'`omhdfs.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/omhdfs_la-omhdfs.Tpo $(DEPDIR)/omhdfs_la-omhdfs.Plo
 @am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='immark.c' object='immark_la-immark.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='omhdfs.c' object='omhdfs_la-omhdfs.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(immark_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o immark_la-immark.lo `test -f 'immark.c' || echo '$(srcdir)/'`immark.c
+@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(omhdfs_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o omhdfs_la-omhdfs.lo `test -f 'omhdfs.c' || echo '$(srcdir)/'`omhdfs.c
 
 mostlyclean-libtool:
 	-rm -f *.lo
