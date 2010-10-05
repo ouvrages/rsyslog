@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[5.7.0],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[5.7.1],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -358,6 +358,16 @@ AC_ARG_ENABLE(unlimited_select,
 if test "$enable_unlimited_select" = "yes"; then
         AC_DEFINE(USE_UNLIMITED_SELECT, 1, [If defined, the select() syscall won't be limited to a particular number of file descriptors.])
 fi
+
+
+# support for systemd unit files
+AC_ARG_WITH([systemdsystemunitdir],
+        AS_HELP_STRING([--with-systemdsystemunitdir=DIR], [Directory for systemd service files]),
+        [], [with_systemdsystemunitdir=$($PKG_CONFIG --variable=systemdsystemunitdir systemd)])
+if test "x$with_systemdsystemunitdir" != xno; then
+        AC_SUBST([systemdsystemunitdir], [$with_systemdsystemunitdir])
+fi
+AM_CONDITIONAL(HAVE_SYSTEMD, [test -n "$with_systemdsystemunitdir" -a "x$with_systemdsystemunitdir" != xno ])
 
 
 # debug
@@ -1003,6 +1013,23 @@ AM_CONDITIONAL(ENABLE_OMTEMPLATE, test x$enable_omtemplate = xyes)
 # end of copy template - be sure to search for omtemplate to find everything!
 
 
+# settings for the omhdfs;
+AC_ARG_ENABLE(omhdfs,
+        [AS_HELP_STRING([--enable-omhdfs],[Compiles omhdfs template module @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_omhdfs="yes" ;;
+          no) enable_omhdfs="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-omhdfs) ;;
+         esac],
+        [enable_omhdfs=no]
+)
+#
+# you may want to do some library checks here - see snmp, mysql, pgsql modules
+# for samples
+#
+AM_CONDITIONAL(ENABLE_OMHDFS, test x$enable_omhdfs = xyes)
+
+
 AC_CONFIG_FILES([Makefile \
 		runtime/Makefile \
 		tools/Makefile \
@@ -1016,6 +1043,7 @@ AC_CONFIG_FILES([Makefile \
 		plugins/imklog/Makefile \
 		plugins/imtemplate/Makefile \
 		plugins/omtemplate/Makefile \
+		plugins/omhdfs/Makefile \
 		plugins/omprog/Makefile \
 		plugins/omstdout/Makefile \
 		plugins/pmrfc3164sd/Makefile \
@@ -1070,6 +1098,7 @@ echo "---{ output plugins }---"
 echo "    Mail support enabled:                     $enable_mail"
 echo "    omprog module will be compiled:           $enable_omprog"
 echo "    omstdout module will be compiled:         $enable_omstdout"
+echo "    omhdfs module will be compiled:           $enable_omhdfs"
 echo "    omruleset module will be compiled:        $enable_omruleset"
 echo "    omdbalerting module will be compiled:     $enable_omdbalerting"
 echo "    omudpspoof module will be compiled:       $enable_omudpspoof"

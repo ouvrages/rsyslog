@@ -253,13 +253,14 @@ sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
 sysconfdir = @sysconfdir@
+systemdsystemunitdir = @systemdsystemunitdir@
 target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 pkglib_LTLIBRARIES = imuxsock.la
 imuxsock_la_SOURCES = imuxsock.c
-imuxsock_la_CPPFLAGS = -DSD_EXPORT_SYMBOLS -I$(top_srcdir) $(PTHREADS_CFLAGS) $(RSRT_CFLAGS)
+imuxsock_la_CPPFLAGS = -DSD_EXPORT_SYMBOLS -I../../runtime/hashtable -I$(top_srcdir) $(PTHREADS_CFLAGS) $(RSRT_CFLAGS)
 imuxsock_la_LDFLAGS = -module -avoid-version
 imuxsock_la_LIBADD = $(RSRT_LIBS)
 all: all-am

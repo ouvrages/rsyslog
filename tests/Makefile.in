@@ -37,7 +37,8 @@ host_triplet = @host@
 @ENABLE_TESTBENCH_TRUE@	ourtail$(EXEEXT) nettester$(EXEEXT) \
 @ENABLE_TESTBENCH_TRUE@	tcpflood$(EXEEXT) chkseq$(EXEEXT) \
 @ENABLE_TESTBENCH_TRUE@	msleep$(EXEEXT) randomgen$(EXEEXT) \
-@ENABLE_TESTBENCH_TRUE@	diagtalker$(EXEEXT) uxsockrcvr$(EXEEXT)
+@ENABLE_TESTBENCH_TRUE@	diagtalker$(EXEEXT) uxsockrcvr$(EXEEXT) \
+@ENABLE_TESTBENCH_TRUE@	syslog_caller$(EXEEXT)
 @ENABLE_TESTBENCH_TRUE@TESTS = $(am__EXEEXT_1) cfg.sh arrayqueue.sh \
 @ENABLE_TESTBENCH_TRUE@	linkedlistqueue.sh da-mainmsg-q.sh \
 @ENABLE_TESTBENCH_TRUE@	validation-run.sh imtcp-multiport.sh \
@@ -144,6 +145,9 @@ rt_init_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 rt_init_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(rt_init_LDFLAGS) $(LDFLAGS) -o $@
+am_syslog_caller_OBJECTS = syslog_caller.$(OBJEXT)
+syslog_caller_OBJECTS = $(am_syslog_caller_OBJECTS)
+syslog_caller_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_tcpflood_OBJECTS = tcpflood.$(OBJEXT)
 tcpflood_OBJECTS = $(am_tcpflood_OBJECTS)
 tcpflood_DEPENDENCIES = $(am__DEPENDENCIES_1)
@@ -178,12 +182,13 @@ am__v_GEN_ = $(am__v_GEN_$(AM_DEFAULT_VERBOSITY))
 am__v_GEN_0 = @echo "  GEN   " $@;
 SOURCES = $(chkseq_SOURCES) $(diagtalker_SOURCES) $(msleep_SOURCES) \
 	$(nettester_SOURCES) $(ourtail_SOURCES) $(randomgen_SOURCES) \
-	$(rscript_SOURCES) $(rt_init_SOURCES) $(tcpflood_SOURCES) \
-	$(uxsockrcvr_SOURCES)
+	$(rscript_SOURCES) $(rt_init_SOURCES) $(syslog_caller_SOURCES) \
+	$(tcpflood_SOURCES) $(uxsockrcvr_SOURCES)
 DIST_SOURCES = $(chkseq_SOURCES) $(diagtalker_SOURCES) \
 	$(msleep_SOURCES) $(nettester_SOURCES) $(ourtail_SOURCES) \
 	$(randomgen_SOURCES) $(rscript_SOURCES) $(rt_init_SOURCES) \
-	$(tcpflood_SOURCES) $(uxsockrcvr_SOURCES)
+	$(syslog_caller_SOURCES) $(tcpflood_SOURCES) \
+	$(uxsockrcvr_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 am__tty_colors = \
@@ -330,6 +335,7 @@ sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
 sysconfdir = @sysconfdir@
+systemdsystemunitdir = @systemdsystemunitdir@
 target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
@@ -572,6 +578,8 @@ msleep_SOURCES = msleep.c
 chkseq_SOURCES = chkseq.c
 tcpflood_SOURCES = tcpflood.c
 tcpflood_LDADD = $(SOL_LIBS)
+syslog_caller_SOURCES = syslog_caller.c
+syslog_caller_LDADD = $(SOL_LIBS)
 diagtalker_SOURCES = diagtalker.c
 diagtalker_LDADD = $(SOL_LIBS)
 randomgen_SOURCES = randomgen.c
@@ -653,6 +661,9 @@ rscript$(EXEEXT): $(rscript_OBJECTS) $(rscript_DEPENDENCIES)
 rt_init$(EXEEXT): $(rt_init_OBJECTS) $(rt_init_DEPENDENCIES) 
 	@rm -f rt_init$(EXEEXT)
 	$(AM_V_CCLD)$(rt_init_LINK) $(rt_init_OBJECTS) $(rt_init_LDADD) $(LIBS)
+syslog_caller$(EXEEXT): $(syslog_caller_OBJECTS) $(syslog_caller_DEPENDENCIES) 
+	@rm -f syslog_caller$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(syslog_caller_OBJECTS) $(syslog_caller_LDADD) $(LIBS)
 tcpflood$(EXEEXT): $(tcpflood_OBJECTS) $(tcpflood_DEPENDENCIES) 
 	@rm -f tcpflood$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(tcpflood_OBJECTS) $(tcpflood_LDADD) $(LIBS)
@@ -678,6 +689,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rscript-runtime-dummy.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rt_init-rt-init.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rt_init-runtime-dummy.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/syslog_caller.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tcpflood.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/uxsockrcvr.Po@am__quote@
 
