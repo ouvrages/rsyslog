@@ -5,6 +5,8 @@ rsyslog (5.7.1-1) UNRELEASED; urgency=low
     - Install omruleset.so plugin: http://www.rsyslog.com/doc/omruleset.html
   * debian/rsyslog.default
     - Start rsyslogd with native -c5 mode.
+  * Install systemd unit files which allow to run rsyslog in socket activation
+    mode when systemd is used.
 
  -- Michael Biebl <biebl@debian.org>  Thu, 30 Sep 2010 14:07:38 +0200
 
