@@ -10,8 +10,9 @@ rsyslog (5.7.1-1) UNRELEASED; urgency=low
   * debian/patches/02-install_also_rsyslog_socket.patch
     - When enabling rsyslog.service also enable rsyslog.socket. Patch
       cherry-picked from upstream Git.
+  * Bump debhelper compatibility level to 8. Update Build-Depends accordingly.
 
- -- Michael Biebl <biebl@debian.org>  Wed, 20 Oct 2010 01:33:50 +0200
+ -- Michael Biebl <biebl@debian.org>  Wed, 20 Oct 2010 01:38:51 +0200
 
 rsyslog (4.6.4-1) unstable; urgency=low
 
