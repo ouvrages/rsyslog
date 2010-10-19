@@ -1,0 +1,18 @@
+commit ed324a9a610f91f54514eb713ff5593bde1012e6
+Author: Michael Biebl <biebl@debian.org>
+Date:   Tue Oct 5 17:41:09 2010 +0200
+
+    Enable rsyslog.socket together with rsyslog.service
+    
+    When the rsyslog service is enabled via
+    "systemctl enable rsyslog.service" also enable the socket unit.
+
+diff --git a/rsyslog.service.in b/rsyslog.service.in
+index ea966cc..b3c5551 100644
+--- a/rsyslog.service.in
++++ b/rsyslog.service.in
+@@ -6,3 +6,4 @@ ExecStart=@sbindir@/rsyslogd -n -c5
+ 
+ [Install]
+ WantedBy=multi-user.target
++Also=rsyslog.socket
