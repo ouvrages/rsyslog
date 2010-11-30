@@ -1358,7 +1358,7 @@ doSubmitToActionQNotAllMarkBatch(action_t *pAction, batch_t *pBatch)
 	time_t now = 0;
 	time_t lastAct;
 	int i;
-	int bProcessMarkMsgs;
+	int bProcessMarkMsgs = 0;
 	int bModifiedFilter;
 	sbool FilterSave[128];
 	sbool *pFilterSave;
@@ -1388,7 +1388,7 @@ doSubmitToActionQNotAllMarkBatch(action_t *pAction, batch_t *pBatch)
 					} else {
 						bProcessMarkMsgs = 1;
 					}
-				} while(ATOMIC_CAS(&pAction->f_time, lastAct,
+				} while(ATOMIC_CAS_time_t(&pAction->f_time, lastAct,
 					((msg_t*)(pBatch->pElem[i].pUsrp))->ttGenTime, &pAction->mutCAS) == 0);
 			}
 			if(bProcessMarkMsgs) {
