@@ -1,3 +1,12 @@
+rsyslog (4.6.4-2) UNRELEASED; urgency=low
+
+  * debian/patches/02-tls_loop_fix.patch
+    - Fix bug in TLS handling which could cause rsyslog to loop in a tight
+      loop and eating up all CPU and RAM resources. Closes: #549168
+      Patch cherry-picked from upstream Git.
+
+ -- Michael Biebl <biebl@debian.org>  Tue, 30 Nov 2010 14:43:00 +0100
+
 rsyslog (4.6.4-1) unstable; urgency=low
 
   * New upstream release.
