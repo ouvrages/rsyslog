@@ -1,6 +1,9 @@
 rsyslog (5.7.2-1) UNRELEASED; urgency=low
 
   * New upstream development release.
+  * Remove patches, merged upstream
+    - debian/patches/02-install_also_rsyslog_socket.patch
+    - debian/patches/02-tls_loop_fix.patch
 
  -- Michael Biebl <biebl@debian.org>  Tue, 30 Nov 2010 15:11:44 +0100
 
