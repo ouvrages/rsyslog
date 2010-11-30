@@ -851,7 +851,7 @@ CODESTARTobjDestruct(msg)
 			 * that we trim too often when the counter wraps.
 			 */
 			static unsigned iTrimCtr = 1;
-			currCnt = ATOMIC_INC_AND_FETCH(&iTrimCtr, &mutTrimCtr);
+			currCnt = ATOMIC_INC_AND_FETCH_unsigned(&iTrimCtr, &mutTrimCtr);
 			if(currCnt % 100000 == 0) {
 				malloc_trim(128*1024);
 			}
@@ -2588,7 +2588,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 							bFound = 1;
 						} else {
 							dbgprintf("regex found at offset %d, new offset %d, tries %d\n",
-								  iOffs, iOffs + pmatch[0].rm_eo, iTry);
+								  iOffs, (int) (iOffs + pmatch[0].rm_eo), iTry);
 							iOffs += pmatch[0].rm_eo;
 							++iTry;
 						}

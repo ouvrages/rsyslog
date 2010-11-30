@@ -45,9 +45,7 @@ host_triplet = @host@
 @ENABLE_TESTBENCH_TRUE@	daqueue-persist.sh diskqueue.sh \
 @ENABLE_TESTBENCH_TRUE@	diskqueue-fsync.sh rulesetmultiqueue.sh \
 @ENABLE_TESTBENCH_TRUE@	manytcp.sh rsf_getenv.sh manyptcp.sh \
-@ENABLE_TESTBENCH_TRUE@	imptcp_large.sh \
-@ENABLE_TESTBENCH_TRUE@	imptcp_addtlframedelim.sh \
-@ENABLE_TESTBENCH_TRUE@	imptcp_conndrop.sh imtcp_conndrop.sh \
+@ENABLE_TESTBENCH_TRUE@	imtcp_conndrop.sh \
 @ENABLE_TESTBENCH_TRUE@	imtcp_addtlframedelim.sh sndrcv.sh \
 @ENABLE_TESTBENCH_TRUE@	sndrcv_gzip.sh sndrcv_udp.sh \
 @ENABLE_TESTBENCH_TRUE@	sndrcv_udp_nonstdpt.sh asynwr_simple.sh \
@@ -68,11 +66,17 @@ host_triplet = @host@
 @ENABLE_TESTBENCH_TRUE@	pipe_noreader.sh dircreate_dflt.sh \
 @ENABLE_TESTBENCH_TRUE@	dircreate_off.sh queue-persist.sh \
 @ENABLE_TESTBENCH_TRUE@	$(am__append_1) $(am__append_2) \
-@ENABLE_TESTBENCH_TRUE@	$(am__append_3) $(am__append_4)
-@ENABLE_OMUDPSPOOF_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_1 = sndrcv_omudpspoof.sh \
+@ENABLE_TESTBENCH_TRUE@	$(am__append_3) $(am__append_4) \
+@ENABLE_TESTBENCH_TRUE@	$(am__append_5)
+@ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_1 = \
+@ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	imptcp_large.sh \
+@ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	imptcp_addtlframedelim.sh \
+@ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	imptcp_conndrop.sh 
+
+@ENABLE_OMUDPSPOOF_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_2 = sndrcv_omudpspoof.sh \
 @ENABLE_OMUDPSPOOF_TRUE@@ENABLE_TESTBENCH_TRUE@	 sndrcv_omudpspoof_nonstdpt.sh
 
-@ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_2 = omod-if-array.sh \
+@ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_3 = omod-if-array.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 proprepltest.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 parsertest.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 timestamp.sh \
@@ -85,10 +89,10 @@ host_triplet = @host@
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 tabescape_off.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 fieldtest.sh
 
-@ENABLE_OMRULESET_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_3 = omruleset.sh \
+@ENABLE_OMRULESET_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_4 = omruleset.sh \
 @ENABLE_OMRULESET_TRUE@@ENABLE_TESTBENCH_TRUE@	 omruleset-queue.sh
 
-@ENABLE_EXTENDED_TESTS_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_4 = random.sh 
+@ENABLE_EXTENDED_TESTS_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_5 = random.sh 
 subdir = tests
 DIST_COMMON = README $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	INSTALL
@@ -153,7 +157,7 @@ tcpflood_OBJECTS = $(am_tcpflood_OBJECTS)
 tcpflood_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_uxsockrcvr_OBJECTS = uxsockrcvr.$(OBJEXT)
 uxsockrcvr_OBJECTS = $(am_uxsockrcvr_OBJECTS)
-uxsockrcvr_LDADD = $(LDADD)
+uxsockrcvr_DEPENDENCIES = $(am__DEPENDENCIES_1)
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -572,10 +576,11 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/dircreate_off.conf \
 	   cfg.sh
 
-uxsockrcvr_SOURCES = uxsockrcvr.c
 ourtail_SOURCES = ourtail.c
 msleep_SOURCES = msleep.c
 chkseq_SOURCES = chkseq.c
+uxsockrcvr_SOURCES = uxsockrcvr.c
+uxsockrcvr_LDADD = $(SOL_LIBS)
 tcpflood_SOURCES = tcpflood.c
 tcpflood_LDADD = $(SOL_LIBS)
 syslog_caller_SOURCES = syslog_caller.c
