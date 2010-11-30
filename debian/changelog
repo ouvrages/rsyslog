@@ -6,6 +6,8 @@ rsyslog (5.7.2-1) UNRELEASED; urgency=low
     - debian/patches/02-tls_loop_fix.patch
   * debian/patches/02-typo_fix_equation_sign.patch
     - Fix small typo ("equation sign"). Closes: #575589
+  * debian/rsyslog.postinst
+    - Remove pre-lenny migration code to rotate old log files from sysklogd.
 
  -- Michael Biebl <biebl@debian.org>  Tue, 30 Nov 2010 15:11:44 +0100
 
