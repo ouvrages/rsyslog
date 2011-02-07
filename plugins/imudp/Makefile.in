@@ -71,7 +71,8 @@ am__base_list = \
   sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
 am__installdirs = "$(DESTDIR)$(pkglibdir)"
 LTLIBRARIES = $(pkglib_LTLIBRARIES)
-imudp_la_DEPENDENCIES =
+am__DEPENDENCIES_1 =
+imudp_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_imudp_la_OBJECTS = imudp_la-imudp.lo
 imudp_la_OBJECTS = $(am_imudp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
@@ -144,6 +145,7 @@ HAVE_JAVAC = @HAVE_JAVAC@
 HAVE_MYSQL_CONFIG = @HAVE_MYSQL_CONFIG@
 HAVE_ORACLE_CONFIG = @HAVE_ORACLE_CONFIG@
 HAVE_PGSQL_CONFIG = @HAVE_PGSQL_CONFIG@
+IMUDP_LIBS = @IMUDP_LIBS@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -261,7 +263,7 @@ pkglib_LTLIBRARIES = imudp.la
 imudp_la_SOURCES = imudp.c
 imudp_la_CPPFLAGS = -I$(top_srcdir) $(PTHREADS_CFLAGS) $(RSRT_CFLAGS)
 imudp_la_LDFLAGS = -module -avoid-version
-imudp_la_LIBADD = 
+imudp_la_LIBADD = $(IMUDP_LIBS)
 all: all-am
 
 .SUFFIXES:

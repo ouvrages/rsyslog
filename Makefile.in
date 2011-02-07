@@ -56,22 +56,24 @@ sbin_PROGRAMS =
 @ENABLE_CUST1_TRUE@am__append_13 = plugins/cust1
 @ENABLE_IMTEMPLATE_TRUE@am__append_14 = plugins/imtemplate
 @ENABLE_OMSTDOUT_TRUE@am__append_15 = plugins/omstdout
-@ENABLE_PMLASTMSG_TRUE@am__append_16 = plugins/pmlastmsg
-@ENABLE_PMRFC3164SD_TRUE@am__append_17 = plugins/pmrfc3164sd
-@ENABLE_OMRULESET_TRUE@am__append_18 = plugins/omruleset
-@ENABLE_OMDBALERTING_TRUE@am__append_19 = plugins/omdbalerting
-@ENABLE_OMUDPSPOOF_TRUE@am__append_20 = plugins/omudpspoof
-@ENABLE_OMUXSOCK_TRUE@am__append_21 = plugins/omuxsock
-@ENABLE_OMHDFS_TRUE@am__append_22 = plugins/omhdfs
-@ENABLE_OMTEMPLATE_TRUE@am__append_23 = plugins/omtemplate
-@ENABLE_IMFILE_TRUE@am__append_24 = plugins/imfile
-@ENABLE_IMPTCP_TRUE@am__append_25 = plugins/imptcp
-@ENABLE_IMDIAG_TRUE@am__append_26 = plugins/imdiag
-@ENABLE_MAIL_TRUE@am__append_27 = plugins/ommail
-@ENABLE_OMPROG_TRUE@am__append_28 = plugins/omprog
-@ENABLE_RFC3195_TRUE@am__append_29 = plugins/im3195
-@ENABLE_ORACLE_TRUE@am__append_30 = plugins/omoracle
-@ENABLE_GUI_TRUE@am__append_31 = java
+@ENABLE_PMCISCONAMES_TRUE@am__append_16 = plugins/pmcisconames
+@ENABLE_PMAIXFORWARDEDFROM_TRUE@am__append_17 = plugins/pmaixforwardedfrom
+@ENABLE_PMLASTMSG_TRUE@am__append_18 = plugins/pmlastmsg
+@ENABLE_PMRFC3164SD_TRUE@am__append_19 = plugins/pmrfc3164sd
+@ENABLE_OMRULESET_TRUE@am__append_20 = plugins/omruleset
+@ENABLE_OMDBALERTING_TRUE@am__append_21 = plugins/omdbalerting
+@ENABLE_OMUDPSPOOF_TRUE@am__append_22 = plugins/omudpspoof
+@ENABLE_OMUXSOCK_TRUE@am__append_23 = plugins/omuxsock
+@ENABLE_OMHDFS_TRUE@am__append_24 = plugins/omhdfs
+@ENABLE_OMTEMPLATE_TRUE@am__append_25 = plugins/omtemplate
+@ENABLE_IMFILE_TRUE@am__append_26 = plugins/imfile
+@ENABLE_IMPTCP_TRUE@am__append_27 = plugins/imptcp
+@ENABLE_IMDIAG_TRUE@am__append_28 = plugins/imdiag
+@ENABLE_MAIL_TRUE@am__append_29 = plugins/ommail
+@ENABLE_OMPROG_TRUE@am__append_30 = plugins/omprog
+@ENABLE_RFC3195_TRUE@am__append_31 = plugins/im3195
+@ENABLE_ORACLE_TRUE@am__append_32 = plugins/omoracle
+@ENABLE_GUI_TRUE@am__append_33 = java
 subdir = .
 DIST_COMMON = README $(am__configure_deps) \
 	$(am__dist_systemdsystemunit_DATA_DIST) $(srcdir)/Makefile.am \
@@ -203,7 +205,8 @@ DIST_SUBDIRS = doc runtime . plugins/immark plugins/imuxsock \
 	plugins/omgssapi plugins/imgssapi plugins/omrelp \
 	plugins/imrelp plugins/ommysql plugins/omlibdbi \
 	plugins/ompgsql plugins/omsnmp plugins/cust1 \
-	plugins/imtemplate plugins/omstdout plugins/pmlastmsg \
+	plugins/imtemplate plugins/omstdout plugins/pmcisconames \
+	plugins/pmaixforwardedfrom plugins/pmlastmsg \
 	plugins/pmrfc3164sd plugins/omruleset plugins/omdbalerting \
 	plugins/omudpspoof plugins/omuxsock plugins/omhdfs \
 	plugins/omtemplate plugins/imfile plugins/imptcp \
@@ -278,6 +281,7 @@ HAVE_JAVAC = @HAVE_JAVAC@
 HAVE_MYSQL_CONFIG = @HAVE_MYSQL_CONFIG@
 HAVE_ORACLE_CONFIG = @HAVE_ORACLE_CONFIG@
 HAVE_PGSQL_CONFIG = @HAVE_PGSQL_CONFIG@
+IMUDP_LIBS = @IMUDP_LIBS@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -458,7 +462,7 @@ SUBDIRS = doc runtime . plugins/immark plugins/imuxsock plugins/imtcp \
 	$(am__append_22) $(am__append_23) $(am__append_24) \
 	$(am__append_25) $(am__append_26) $(am__append_27) \
 	$(am__append_28) $(am__append_29) $(am__append_30) \
-	$(am__append_31) tests
+	$(am__append_31) $(am__append_32) $(am__append_33) tests
 
 # make sure "make distcheck" tries to build all modules. This means that
 # a developer must always have an environment where every supporting library
