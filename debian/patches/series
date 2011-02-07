@@ -1,4 +1,2 @@
 # Debian patches for rsyslog
 01-dont_create_db.patch
-02-typo_fix_equation_sign.patch
-03-atomic_operations.patch

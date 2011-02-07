@@ -2,6 +2,10 @@ rsyslog (5.7.3-1) UNRELEASED; urgency=low
 
   * New upstream release.
   * Upload to unstable.
+  * debian/patches/02-typo_fix_equation_sign.patch
+    - Removed, merged upstream.
+  * debian/patches/03-atomic_operations.patch
+    - Removed, merged upstream.
 
  -- Michael Biebl <biebl@debian.org>  Mon, 07 Feb 2011 18:00:41 +0100
 
