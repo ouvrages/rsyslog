@@ -1,6 +1,7 @@
 rsyslog (5.7.4-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * Enable and install parser modules.
 
  -- Michael Biebl <biebl@debian.org>  Thu, 17 Feb 2011 21:19:44 +0100
 
