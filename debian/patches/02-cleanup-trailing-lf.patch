@@ -1,0 +1,26 @@
+commit 026f59388a105597c3c6890bb0c83652cb712903
+Author: Rainer Gerhards <rgerhards@adiscon.com>
+Date:   Mon Feb 21 09:10:45 2011 +0100
+
+    bugfix: imuxsock did no longer remove trailing LF
+    
+    This was a regression from the imuxsock partial rewrite. Happened
+    because the message is no longer run through the standard parsers.
+    Now imuxsock does this sanitization itself.
+    bug tracker: http://bugzilla.adiscon.com/show_bug.cgi?id=224
+
+diff --git a/plugins/imuxsock/imuxsock.c b/plugins/imuxsock/imuxsock.c
+index 75f97db..136e419 100644
+--- a/plugins/imuxsock/imuxsock.c
++++ b/plugins/imuxsock/imuxsock.c
+@@ -517,6 +517,10 @@ SubmitMsg(uchar *pRcv, int lenRcv, lstn_t *pLstn, struct ucred *cred)
+ 	 * rate-limiting as well.
+ 	 */
+ 	parse = pRcv;
++	if(pRcv[lenRcv-1] == '\n') {
++		DBGPRINTF("imuxsock: found trailing LF, removing\n");
++		lenRcv--;
++	}
+ 	lenMsg = lenRcv;
+ 	
+ 	parse++; lenMsg--; /* '<' */
