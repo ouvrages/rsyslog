@@ -5,6 +5,7 @@ rsyslog (5.7.5-1) UNRELEASED; urgency=low
       messages. This makes 02-cleanup-trailing-lf.patch obsolete and also
       fixes the SQL syntax errors in the mysql output if the input contained
       NUL bytes. Closes: #614061
+  * Enable and install omprog output plugin. Closes: #552095
 
  -- Michael Biebl <biebl@debian.org>  Wed, 23 Feb 2011 11:27:14 +0100
 
