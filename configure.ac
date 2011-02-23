@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[5.7.4],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[5.7.5],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -809,11 +809,6 @@ AC_ARG_ENABLE(testbench,
          esac],
         [enable_testbench=yes]
 )
-if test "$enable_testbench" = "yes"; then
-	if test x$HAVE_JAVAC = x; then
-	   enable_testbench='no'
-	fi
-fi
 AM_CONDITIONAL(ENABLE_TESTBENCH, test x$enable_testbench = xyes)
 
 

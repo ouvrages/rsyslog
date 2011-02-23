@@ -38,7 +38,8 @@ host_triplet = @host@
 @ENABLE_TESTBENCH_TRUE@	tcpflood$(EXEEXT) chkseq$(EXEEXT) \
 @ENABLE_TESTBENCH_TRUE@	msleep$(EXEEXT) randomgen$(EXEEXT) \
 @ENABLE_TESTBENCH_TRUE@	diagtalker$(EXEEXT) uxsockrcvr$(EXEEXT) \
-@ENABLE_TESTBENCH_TRUE@	syslog_caller$(EXEEXT)
+@ENABLE_TESTBENCH_TRUE@	syslog_caller$(EXEEXT) \
+@ENABLE_TESTBENCH_TRUE@	syslog_inject$(EXEEXT)
 @ENABLE_TESTBENCH_TRUE@TESTS = $(am__EXEEXT_1) cfg.sh arrayqueue.sh \
 @ENABLE_TESTBENCH_TRUE@	linkedlistqueue.sh da-mainmsg-q.sh \
 @ENABLE_TESTBENCH_TRUE@	validation-run.sh imtcp-multiport.sh \
@@ -64,10 +65,13 @@ host_triplet = @host@
 @ENABLE_TESTBENCH_TRUE@	execonlywhenprevsuspended3.sh \
 @ENABLE_TESTBENCH_TRUE@	execonlywhenprevsuspended4.sh \
 @ENABLE_TESTBENCH_TRUE@	pipe_noreader.sh dircreate_dflt.sh \
-@ENABLE_TESTBENCH_TRUE@	dircreate_off.sh queue-persist.sh \
-@ENABLE_TESTBENCH_TRUE@	$(am__append_1) $(am__append_2) \
-@ENABLE_TESTBENCH_TRUE@	$(am__append_3) $(am__append_4) \
-@ENABLE_TESTBENCH_TRUE@	$(am__append_5)
+@ENABLE_TESTBENCH_TRUE@	dircreate_off.sh \
+@ENABLE_TESTBENCH_TRUE@	imuxsock_logger_root.sh \
+@ENABLE_TESTBENCH_TRUE@	imuxsock_traillf_root.sh \
+@ENABLE_TESTBENCH_TRUE@	imuxsock_ccmiddle_root.sh \
+@ENABLE_TESTBENCH_TRUE@	queue-persist.sh $(am__append_1) \
+@ENABLE_TESTBENCH_TRUE@	$(am__append_2) $(am__append_3) \
+@ENABLE_TESTBENCH_TRUE@	$(am__append_4) $(am__append_5)
 @ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_1 = \
 @ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	imptcp_large.sh \
 @ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	imptcp_addtlframedelim.sh \
@@ -152,6 +156,9 @@ rt_init_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 am_syslog_caller_OBJECTS = syslog_caller.$(OBJEXT)
 syslog_caller_OBJECTS = $(am_syslog_caller_OBJECTS)
 syslog_caller_DEPENDENCIES = $(am__DEPENDENCIES_1)
+am_syslog_inject_OBJECTS = syslog_inject.$(OBJEXT)
+syslog_inject_OBJECTS = $(am_syslog_inject_OBJECTS)
+syslog_inject_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_tcpflood_OBJECTS = tcpflood.$(OBJEXT)
 tcpflood_OBJECTS = $(am_tcpflood_OBJECTS)
 tcpflood_DEPENDENCIES = $(am__DEPENDENCIES_1)
@@ -187,12 +194,13 @@ am__v_GEN_0 = @echo "  GEN   " $@;
 SOURCES = $(chkseq_SOURCES) $(diagtalker_SOURCES) $(msleep_SOURCES) \
 	$(nettester_SOURCES) $(ourtail_SOURCES) $(randomgen_SOURCES) \
 	$(rscript_SOURCES) $(rt_init_SOURCES) $(syslog_caller_SOURCES) \
-	$(tcpflood_SOURCES) $(uxsockrcvr_SOURCES)
+	$(syslog_inject_SOURCES) $(tcpflood_SOURCES) \
+	$(uxsockrcvr_SOURCES)
 DIST_SOURCES = $(chkseq_SOURCES) $(diagtalker_SOURCES) \
 	$(msleep_SOURCES) $(nettester_SOURCES) $(ourtail_SOURCES) \
 	$(randomgen_SOURCES) $(rscript_SOURCES) $(rt_init_SOURCES) \
-	$(syslog_caller_SOURCES) $(tcpflood_SOURCES) \
-	$(uxsockrcvr_SOURCES)
+	$(syslog_caller_SOURCES) $(syslog_inject_SOURCES) \
+	$(tcpflood_SOURCES) $(uxsockrcvr_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 am__tty_colors = \
@@ -575,6 +583,15 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/dircreate_dflt.conf \
 	   dircreate_off.sh \
 	   testsuites/dircreate_off.conf \
+	   imuxsock_logger_root.sh \
+	   testsuites/imuxsock_logger_root.conf \
+	   resultdata/imuxsock_logger.log \
+	   imuxsock_traillf_root.sh \
+	   testsuites/imuxsock_traillf_root.conf \
+	   resultdata/imuxsock_traillf.log \
+	   imuxsock_ccmiddle_root.sh \
+	   testsuites/imuxsock_ccmiddle_root.conf \
+	   resultdata/imuxsock_ccmiddle.log \
 	   cfg.sh
 
 ourtail_SOURCES = ourtail.c
@@ -586,6 +603,8 @@ tcpflood_SOURCES = tcpflood.c
 tcpflood_LDADD = $(SOL_LIBS)
 syslog_caller_SOURCES = syslog_caller.c
 syslog_caller_LDADD = $(SOL_LIBS)
+syslog_inject_SOURCES = syslog_inject.c
+syslog_inject_LDADD = $(SOL_LIBS)
 diagtalker_SOURCES = diagtalker.c
 diagtalker_LDADD = $(SOL_LIBS)
 randomgen_SOURCES = randomgen.c
@@ -670,6 +689,9 @@ rt_init$(EXEEXT): $(rt_init_OBJECTS) $(rt_init_DEPENDENCIES)
 syslog_caller$(EXEEXT): $(syslog_caller_OBJECTS) $(syslog_caller_DEPENDENCIES) 
 	@rm -f syslog_caller$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(syslog_caller_OBJECTS) $(syslog_caller_LDADD) $(LIBS)
+syslog_inject$(EXEEXT): $(syslog_inject_OBJECTS) $(syslog_inject_DEPENDENCIES) 
+	@rm -f syslog_inject$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(syslog_inject_OBJECTS) $(syslog_inject_LDADD) $(LIBS)
 tcpflood$(EXEEXT): $(tcpflood_OBJECTS) $(tcpflood_DEPENDENCIES) 
 	@rm -f tcpflood$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(tcpflood_OBJECTS) $(tcpflood_LDADD) $(LIBS)
@@ -696,6 +718,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rt_init-rt-init.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rt_init-runtime-dummy.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/syslog_caller.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/syslog_inject.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tcpflood.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/uxsockrcvr.Po@am__quote@
 
