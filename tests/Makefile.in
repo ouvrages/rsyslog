@@ -45,7 +45,7 @@ host_triplet = @host@
 @ENABLE_TESTBENCH_TRUE@	validation-run.sh imtcp-multiport.sh \
 @ENABLE_TESTBENCH_TRUE@	daqueue-persist.sh diskqueue.sh \
 @ENABLE_TESTBENCH_TRUE@	diskqueue-fsync.sh rulesetmultiqueue.sh \
-@ENABLE_TESTBENCH_TRUE@	manytcp.sh rsf_getenv.sh manyptcp.sh \
+@ENABLE_TESTBENCH_TRUE@	manytcp.sh rsf_getenv.sh \
 @ENABLE_TESTBENCH_TRUE@	imtcp_conndrop.sh \
 @ENABLE_TESTBENCH_TRUE@	imtcp_addtlframedelim.sh sndrcv.sh \
 @ENABLE_TESTBENCH_TRUE@	sndrcv_gzip.sh sndrcv_udp.sh \
@@ -59,7 +59,7 @@ host_triplet = @host@
 @ENABLE_TESTBENCH_TRUE@	dynfile_invld_sync.sh \
 @ENABLE_TESTBENCH_TRUE@	dynfile_invalid2.sh complex1.sh \
 @ENABLE_TESTBENCH_TRUE@	queue-persist.sh pipeaction.sh \
-@ENABLE_TESTBENCH_TRUE@	uxsock_simple.sh execonlyonce.sh \
+@ENABLE_TESTBENCH_TRUE@	execonlyonce.sh \
 @ENABLE_TESTBENCH_TRUE@	execonlywhenprevsuspended.sh \
 @ENABLE_TESTBENCH_TRUE@	execonlywhenprevsuspended2.sh \
 @ENABLE_TESTBENCH_TRUE@	execonlywhenprevsuspended3.sh \
@@ -71,16 +71,19 @@ host_triplet = @host@
 @ENABLE_TESTBENCH_TRUE@	imuxsock_ccmiddle_root.sh \
 @ENABLE_TESTBENCH_TRUE@	queue-persist.sh $(am__append_1) \
 @ENABLE_TESTBENCH_TRUE@	$(am__append_2) $(am__append_3) \
-@ENABLE_TESTBENCH_TRUE@	$(am__append_4) $(am__append_5)
+@ENABLE_TESTBENCH_TRUE@	$(am__append_4) $(am__append_5) \
+@ENABLE_TESTBENCH_TRUE@	$(am__append_6)
 @ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_1 = \
+@ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	manyptcp.sh \
 @ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	imptcp_large.sh \
 @ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	imptcp_addtlframedelim.sh \
 @ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	imptcp_conndrop.sh 
 
-@ENABLE_OMUDPSPOOF_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_2 = sndrcv_omudpspoof.sh \
+@ENABLE_OMUXSOCK_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_2 = uxsock_simple.sh
+@ENABLE_OMUDPSPOOF_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_3 = sndrcv_omudpspoof.sh \
 @ENABLE_OMUDPSPOOF_TRUE@@ENABLE_TESTBENCH_TRUE@	 sndrcv_omudpspoof_nonstdpt.sh
 
-@ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_3 = omod-if-array.sh \
+@ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_4 = omod-if-array.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 proprepltest.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 parsertest.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 timestamp.sh \
@@ -93,10 +96,10 @@ host_triplet = @host@
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 tabescape_off.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 fieldtest.sh
 
-@ENABLE_OMRULESET_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_4 = omruleset.sh \
+@ENABLE_OMRULESET_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_5 = omruleset.sh \
 @ENABLE_OMRULESET_TRUE@@ENABLE_TESTBENCH_TRUE@	 omruleset-queue.sh
 
-@ENABLE_EXTENDED_TESTS_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_5 = random.sh 
+@ENABLE_EXTENDED_TESTS_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_6 = random.sh 
 subdir = tests
 DIST_COMMON = README $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	INSTALL
