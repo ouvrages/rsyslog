@@ -353,6 +353,7 @@ datarootdir = @datarootdir@
 docdir = @docdir@
 dvidir = @dvidir@
 exec_prefix = @exec_prefix@
+have_valgrind = @have_valgrind@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@

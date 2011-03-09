@@ -40,66 +40,93 @@ host_triplet = @host@
 @ENABLE_TESTBENCH_TRUE@	diagtalker$(EXEEXT) uxsockrcvr$(EXEEXT) \
 @ENABLE_TESTBENCH_TRUE@	syslog_caller$(EXEEXT) \
 @ENABLE_TESTBENCH_TRUE@	syslog_inject$(EXEEXT)
-@ENABLE_TESTBENCH_TRUE@TESTS = $(am__EXEEXT_1) cfg.sh arrayqueue.sh \
-@ENABLE_TESTBENCH_TRUE@	linkedlistqueue.sh da-mainmsg-q.sh \
-@ENABLE_TESTBENCH_TRUE@	validation-run.sh imtcp-multiport.sh \
-@ENABLE_TESTBENCH_TRUE@	daqueue-persist.sh diskqueue.sh \
-@ENABLE_TESTBENCH_TRUE@	diskqueue-fsync.sh rulesetmultiqueue.sh \
-@ENABLE_TESTBENCH_TRUE@	manytcp.sh rsf_getenv.sh \
-@ENABLE_TESTBENCH_TRUE@	imtcp_conndrop.sh \
-@ENABLE_TESTBENCH_TRUE@	imtcp_addtlframedelim.sh sndrcv.sh \
-@ENABLE_TESTBENCH_TRUE@	sndrcv_gzip.sh sndrcv_udp.sh \
-@ENABLE_TESTBENCH_TRUE@	sndrcv_udp_nonstdpt.sh asynwr_simple.sh \
-@ENABLE_TESTBENCH_TRUE@	asynwr_timeout.sh asynwr_small.sh \
-@ENABLE_TESTBENCH_TRUE@	asynwr_tinybuf.sh wr_large_async.sh \
-@ENABLE_TESTBENCH_TRUE@	wr_large_sync.sh asynwr_deadlock.sh \
-@ENABLE_TESTBENCH_TRUE@	asynwr_deadlock2.sh asynwr_deadlock4.sh \
-@ENABLE_TESTBENCH_TRUE@	gzipwr_large.sh gzipwr_large_dynfile.sh \
-@ENABLE_TESTBENCH_TRUE@	dynfile_invld_async.sh \
-@ENABLE_TESTBENCH_TRUE@	dynfile_invld_sync.sh \
-@ENABLE_TESTBENCH_TRUE@	dynfile_invalid2.sh complex1.sh \
-@ENABLE_TESTBENCH_TRUE@	queue-persist.sh pipeaction.sh \
-@ENABLE_TESTBENCH_TRUE@	execonlyonce.sh \
-@ENABLE_TESTBENCH_TRUE@	execonlywhenprevsuspended.sh \
-@ENABLE_TESTBENCH_TRUE@	execonlywhenprevsuspended2.sh \
-@ENABLE_TESTBENCH_TRUE@	execonlywhenprevsuspended3.sh \
-@ENABLE_TESTBENCH_TRUE@	execonlywhenprevsuspended4.sh \
-@ENABLE_TESTBENCH_TRUE@	pipe_noreader.sh dircreate_dflt.sh \
-@ENABLE_TESTBENCH_TRUE@	dircreate_off.sh \
-@ENABLE_TESTBENCH_TRUE@	imuxsock_logger_root.sh \
-@ENABLE_TESTBENCH_TRUE@	imuxsock_traillf_root.sh \
-@ENABLE_TESTBENCH_TRUE@	imuxsock_ccmiddle_root.sh \
-@ENABLE_TESTBENCH_TRUE@	queue-persist.sh $(am__append_1) \
+@ENABLE_TESTBENCH_TRUE@TESTS = $(am__EXEEXT_1) cfg.sh $(am__append_1) \
 @ENABLE_TESTBENCH_TRUE@	$(am__append_2) $(am__append_3) \
 @ENABLE_TESTBENCH_TRUE@	$(am__append_4) $(am__append_5) \
-@ENABLE_TESTBENCH_TRUE@	$(am__append_6)
-@ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_1 = \
+@ENABLE_TESTBENCH_TRUE@	$(am__append_6) $(am__append_7) \
+@ENABLE_TESTBENCH_TRUE@	$(am__append_8)
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_1 = \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	arrayqueue.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	linkedlistqueue.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	da-mainmsg-q.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	validation-run.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	imtcp-multiport.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	daqueue-persist.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	diskqueue.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	diskqueue-fsync.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rulesetmultiqueue.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	manytcp.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rsf_getenv.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	imtcp_conndrop.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	imtcp_addtlframedelim.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	sndrcv.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	sndrcv_gzip.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	sndrcv_udp.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	sndrcv_udp_nonstdpt.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	asynwr_simple.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	asynwr_timeout.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	asynwr_small.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	asynwr_tinybuf.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	wr_large_async.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	wr_large_sync.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	asynwr_deadlock.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	asynwr_deadlock2.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	asynwr_deadlock4.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	gzipwr_large.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	gzipwr_large_dynfile.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	dynfile_invld_async.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	dynfile_invld_sync.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	dynfile_invalid2.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	complex1.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	queue-persist.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	pipeaction.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	execonlyonce.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	execonlywhenprevsuspended.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	execonlywhenprevsuspended2.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	execonlywhenprevsuspended3.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	execonlywhenprevsuspended4.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	pipe_noreader.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	dircreate_dflt.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	dircreate_off.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	imuxsock_logger_root.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	imuxsock_traillf_root.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	imuxsock_ccmiddle_root.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	discard-rptdmsg.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	discard.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	queue-persist.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	arrayqueue.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	linkedlistqueue.sh
+
+@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@am__append_2 = \
+@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@	discard-rptdmsg-vg.sh \
+@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@	tcp-msgreduc-vg.sh
+
+@ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_3 = \
 @ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	manyptcp.sh \
 @ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	imptcp_large.sh \
 @ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	imptcp_addtlframedelim.sh \
 @ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	imptcp_conndrop.sh 
 
-@ENABLE_OMUXSOCK_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_2 = uxsock_simple.sh
-@ENABLE_OMUDPSPOOF_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_3 = sndrcv_omudpspoof.sh \
+@ENABLE_OMUXSOCK_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_4 = uxsock_simple.sh
+@ENABLE_OMUDPSPOOF_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_5 = sndrcv_omudpspoof.sh \
 @ENABLE_OMUDPSPOOF_TRUE@@ENABLE_TESTBENCH_TRUE@	 sndrcv_omudpspoof_nonstdpt.sh
 
-@ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_4 = omod-if-array.sh \
+@ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_6 = omod-if-array.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 proprepltest.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 parsertest.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 timestamp.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 inputname.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 threadingmq.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 threadingmqaq.sh \
-@ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 discard.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 badqi.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 tabescape_dflt.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 tabescape_off.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 fieldtest.sh
 
-@ENABLE_OMRULESET_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_5 = omruleset.sh \
-@ENABLE_OMRULESET_TRUE@@ENABLE_TESTBENCH_TRUE@	 omruleset-queue.sh
+@ENABLE_IMDIAG_TRUE@@ENABLE_OMRULESET_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_7 = omruleset.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_OMRULESET_TRUE@@ENABLE_TESTBENCH_TRUE@	 omruleset-queue.sh
 
-@ENABLE_EXTENDED_TESTS_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_6 = random.sh 
+@ENABLE_EXTENDED_TESTS_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_8 = random.sh 
 subdir = tests
 DIST_COMMON = README $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	INSTALL
@@ -325,6 +352,7 @@ datarootdir = @datarootdir@
 docdir = @docdir@
 dvidir = @dvidir@
 exec_prefix = @exec_prefix@
+have_valgrind = @have_valgrind@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@
@@ -450,9 +478,7 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/rsf_getenv.conf \
 	   diskqueue.sh \
 	   testsuites/diskqueue.conf \
-	   arrayqueue.sh \
 	   testsuites/arrayqueue.conf \
-	   linkedlistqueue.sh \
 	   testsuites/linkedlistqueue.conf \
 	   da-mainmsg-q.sh \
 	   testsuites/da-mainmsg-q.conf \
@@ -474,6 +500,8 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/imtcp_conndrop.conf \
 	   imtcp_addtlframedelim.sh \
 	   testsuites/imtcp_addtlframedelim.conf \
+	   tcp-msgreduc-vg.sh \
+	   testsuites/./tcp-msgreduc-vg.conf \
 	   inputname.sh \
 	   testsuites/inputname_imtcp.conf \
 	   testsuites/1.inputname_imtcp_12514 \
@@ -482,6 +510,9 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   omod-if-array.sh \
 	   discard.sh \
 	   testsuites/discard.conf \
+	   discard-rptdmsg.sh \
+	   discard-rptdmsg-vg.sh \
+	   testsuites/discard-rptdmsg.conf \
 	   diag.sh \
 	   testsuites/diag-common.conf \
 	   testsuites/diag-common2.conf \

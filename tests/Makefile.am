@@ -1,7 +1,10 @@
 if ENABLE_TESTBENCH
 TESTRUNS = rt_init rscript
 check_PROGRAMS = $(TESTRUNS) ourtail nettester tcpflood chkseq msleep randomgen diagtalker uxsockrcvr syslog_caller syslog_inject
-TESTS = $(TESTRUNS) cfg.sh \
+TESTS = $(TESTRUNS) cfg.sh
+
+if ENABLE_IMDIAG
+TESTS +=  \
 	arrayqueue.sh \
 	linkedlistqueue.sh \
 	da-mainmsg-q.sh \
@@ -47,7 +50,18 @@ TESTS = $(TESTRUNS) cfg.sh \
 	imuxsock_logger_root.sh \
 	imuxsock_traillf_root.sh \
 	imuxsock_ccmiddle_root.sh \
-	queue-persist.sh 
+	discard-rptdmsg.sh \
+	discard.sh \
+	queue-persist.sh \
+	arrayqueue.sh \
+	linkedlistqueue.sh
+endif
+
+if HAVE_VALGRIND
+TESTS +=  \
+	discard-rptdmsg-vg.sh \
+	tcp-msgreduc-vg.sh
+endif
 
 if ENABLE_IMPTCP
 TESTS +=  \
@@ -74,7 +88,6 @@ TESTS += omod-if-array.sh \
 	 inputname.sh \
 	 threadingmq.sh \
 	 threadingmqaq.sh \
-	 discard.sh \
 	 badqi.sh \
 	 tabescape_dflt.sh \
 	 tabescape_off.sh \
@@ -82,8 +95,10 @@ TESTS += omod-if-array.sh \
 endif
 
 if ENABLE_OMRULESET
+if ENABLE_IMDIAG
 TESTS += omruleset.sh \
 	 omruleset-queue.sh
+endif
 endif
 
 if ENABLE_EXTENDED_TESTS
@@ -186,9 +201,7 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/rsf_getenv.conf \
 	   diskqueue.sh \
 	   testsuites/diskqueue.conf \
-	   arrayqueue.sh \
 	   testsuites/arrayqueue.conf \
-	   linkedlistqueue.sh \
 	   testsuites/linkedlistqueue.conf \
 	   da-mainmsg-q.sh \
 	   testsuites/da-mainmsg-q.conf \
@@ -210,6 +223,8 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/imtcp_conndrop.conf \
 	   imtcp_addtlframedelim.sh \
 	   testsuites/imtcp_addtlframedelim.conf \
+	   tcp-msgreduc-vg.sh \
+	   testsuites/./tcp-msgreduc-vg.conf \
 	   inputname.sh \
 	   testsuites/inputname_imtcp.conf \
 	   testsuites/1.inputname_imtcp_12514 \
@@ -218,6 +233,9 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   omod-if-array.sh \
 	   discard.sh \
 	   testsuites/discard.conf \
+	   discard-rptdmsg.sh \
+	   discard-rptdmsg-vg.sh \
+	   testsuites/discard-rptdmsg.conf \
 	   diag.sh \
 	   testsuites/diag-common.conf \
 	   testsuites/diag-common2.conf \
