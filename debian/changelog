@@ -1,6 +1,9 @@
 rsyslog (5.7.8-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * debian/rsyslog.links
+    - Create symlink for rsyslog.service in multi-user.target.wants so rsyslog
+      is enabled by default when using systemd.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 09 Mar 2011 22:21:10 +0100
 
