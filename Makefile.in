@@ -76,8 +76,7 @@ sbin_PROGRAMS =
 @ENABLE_ORACLE_TRUE@am__append_33 = plugins/omoracle
 @ENABLE_GUI_TRUE@am__append_34 = java
 subdir = .
-DIST_COMMON = README $(am__configure_deps) \
-	$(am__dist_systemdsystemunit_DATA_DIST) $(srcdir)/Makefile.am \
+DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
 	$(top_srcdir)/configure AUTHORS COPYING COPYING.LESSER \
 	ChangeLog INSTALL NEWS compile config.guess config.sub depcomp \
@@ -118,7 +117,6 @@ am__base_list = \
   sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
   sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
 am__installdirs = "$(DESTDIR)$(pkglibdir)" "$(DESTDIR)$(sbindir)" \
-	"$(DESTDIR)$(systemdsystemunitdir)" \
 	"$(DESTDIR)$(systemdsystemunitdir)"
 LTLIBRARIES = $(pkglib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
@@ -191,8 +189,7 @@ RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	install-pdf-recursive install-ps-recursive install-recursive \
 	installcheck-recursive installdirs-recursive pdf-recursive \
 	ps-recursive uninstall-recursive
-am__dist_systemdsystemunit_DATA_DIST = rsyslog.socket
-DATA = $(dist_systemdsystemunit_DATA) $(nodist_systemdsystemunit_DATA)
+DATA = $(nodist_systemdsystemunit_DATA)
 RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
 AM_RECURSIVE_TARGETS = $(RECURSIVE_TARGETS:-recursive=) \
@@ -365,6 +362,7 @@ datarootdir = @datarootdir@
 docdir = @docdir@
 dvidir = @dvidir@
 exec_prefix = @exec_prefix@
+have_valgrind = @have_valgrind@
 host = @host@
 host_alias = @host_alias@
 host_cpu = @host_cpu@
@@ -429,9 +427,6 @@ pkglib_LTLIBRARIES = $(am__append_1) $(am__append_2)
 #
 # systemd support
 #
-@HAVE_SYSTEMD_TRUE@dist_systemdsystemunit_DATA = \
-@HAVE_SYSTEMD_TRUE@	rsyslog.socket
-
 @HAVE_SYSTEMD_TRUE@nodist_systemdsystemunit_DATA = \
 @HAVE_SYSTEMD_TRUE@	rsyslog.service
 
@@ -710,26 +705,6 @@ clean-libtool:
 
 distclean-libtool:
 	-rm -f libtool config.lt
-install-dist_systemdsystemunitDATA: $(dist_systemdsystemunit_DATA)
-	@$(NORMAL_INSTALL)
-	test -z "$(systemdsystemunitdir)" || $(MKDIR_P) "$(DESTDIR)$(systemdsystemunitdir)"
-	@list='$(dist_systemdsystemunit_DATA)'; test -n "$(systemdsystemunitdir)" || list=; \
-	for p in $$list; do \
-	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  echo "$$d$$p"; \
-	done | $(am__base_list) | \
-	while read files; do \
-	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(systemdsystemunitdir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(systemdsystemunitdir)" || exit $$?; \
-	done
-
-uninstall-dist_systemdsystemunitDATA:
-	@$(NORMAL_UNINSTALL)
-	@list='$(dist_systemdsystemunit_DATA)'; test -n "$(systemdsystemunitdir)" || list=; \
-	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
-	test -n "$$files" || exit 0; \
-	echo " ( cd '$(DESTDIR)$(systemdsystemunitdir)' && rm -f" $$files ")"; \
-	cd "$(DESTDIR)$(systemdsystemunitdir)" && rm -f $$files
 install-nodist_systemdsystemunitDATA: $(nodist_systemdsystemunit_DATA)
 	@$(NORMAL_INSTALL)
 	test -z "$(systemdsystemunitdir)" || $(MKDIR_P) "$(DESTDIR)$(systemdsystemunitdir)"
@@ -1066,7 +1041,7 @@ check: check-recursive
 all-am: Makefile $(LTLIBRARIES) $(PROGRAMS) $(DATA) config.h
 installdirs: installdirs-recursive
 installdirs-am:
-	for dir in "$(DESTDIR)$(pkglibdir)" "$(DESTDIR)$(sbindir)" "$(DESTDIR)$(systemdsystemunitdir)" "$(DESTDIR)$(systemdsystemunitdir)"; do \
+	for dir in "$(DESTDIR)$(pkglibdir)" "$(DESTDIR)$(sbindir)" "$(DESTDIR)$(systemdsystemunitdir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-recursive
@@ -1119,8 +1094,7 @@ info: info-recursive
 
 info-am:
 
-install-data-am: install-dist_systemdsystemunitDATA \
-	install-nodist_systemdsystemunitDATA
+install-data-am: install-nodist_systemdsystemunitDATA
 
 install-dvi: install-dvi-recursive
 
@@ -1168,8 +1142,7 @@ ps: ps-recursive
 
 ps-am:
 
-uninstall-am: uninstall-dist_systemdsystemunitDATA \
-	uninstall-nodist_systemdsystemunitDATA \
+uninstall-am: uninstall-nodist_systemdsystemunitDATA \
 	uninstall-pkglibLTLIBRARIES uninstall-sbinPROGRAMS
 
 .MAKE: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) all \
@@ -1183,10 +1156,9 @@ uninstall-am: uninstall-dist_systemdsystemunitDATA \
 	distclean-compile distclean-generic distclean-hdr \
 	distclean-libtool distclean-tags distcleancheck distdir \
 	distuninstallcheck dvi dvi-am html html-am info info-am \
-	install install-am install-data install-data-am \
-	install-dist_systemdsystemunitDATA install-dvi install-dvi-am \
-	install-exec install-exec-am install-html install-html-am \
-	install-info install-info-am install-man \
+	install install-am install-data install-data-am install-dvi \
+	install-dvi-am install-exec install-exec-am install-html \
+	install-html-am install-info install-info-am install-man \
 	install-nodist_systemdsystemunitDATA install-pdf \
 	install-pdf-am install-pkglibLTLIBRARIES install-ps \
 	install-ps-am install-sbinPROGRAMS install-strip installcheck \
@@ -1194,7 +1166,6 @@ uninstall-am: uninstall-dist_systemdsystemunitDATA \
 	maintainer-clean-generic mostlyclean mostlyclean-compile \
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
 	tags tags-recursive uninstall uninstall-am \
-	uninstall-dist_systemdsystemunitDATA \
 	uninstall-nodist_systemdsystemunitDATA \
 	uninstall-pkglibLTLIBRARIES uninstall-sbinPROGRAMS
 

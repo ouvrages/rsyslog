@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[5.7.6],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[5.7.8],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -12,6 +12,10 @@ AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS([config.h])
 
 AC_GNU_SOURCE
+
+# check if valgrind is present
+AC_CHECK_PROG(have_valgrind, [valgrind], [yes])
+AM_CONDITIONAL(HAVE_VALGRIND, test x$have_valgrind = xyes)
 
 # check for Java compiler
 AC_CHECK_PROG(HAVE_JAVAC, [javac], [yes])
