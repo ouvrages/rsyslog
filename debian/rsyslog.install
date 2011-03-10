@@ -20,4 +20,3 @@ debian/tmp/usr/lib/rsyslog/omprog.so
 debian/tmp/usr/lib/rsyslog/omruleset.so
 debian/tmp/usr/lib/rsyslog/pm*.so
 debian/tmp/lib/systemd/system/rsyslog.service
-debian/tmp/lib/systemd/system/rsyslog.socket
