@@ -7,6 +7,9 @@ rsyslog (5.7.8-1) UNRELEASED; urgency=low
   * debian/patches/02-pmaixforwardedfrom_type_nokeep.patch
     - Fix build failure in aixforwardedfrom parser module by setting the
       module type to NOKEEP.
+  * debian/rsyslog.preinst
+    - Remove old rsyslog.socket symlink from sockets.target.wants on upgrades
+      as rsyslog uses syslog.socket now which is provided by systemd.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 09 Mar 2011 22:21:10 +0100
 
