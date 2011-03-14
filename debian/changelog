@@ -1,3 +1,12 @@
+rsyslog (5.7.8-2) UNRELEASED; urgency=low
+
+  * debian/patches/03-epoll_create1-fallback.patch
+    - If epoll_create1() is not available during runtime, fall back to
+      epoll_create(). This fixes remote syslog when runnig rsyslog on a
+      lenny kernel. (Closes: #617996)
+
+ -- Michael Biebl <biebl@debian.org>  Mon, 14 Mar 2011 12:09:37 +0100
+
 rsyslog (5.7.8-1) unstable; urgency=low
 
   * New upstream release.
