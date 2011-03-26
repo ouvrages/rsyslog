@@ -1,12 +1,11 @@
 if ENABLE_TESTBENCH
 TESTRUNS = rt_init rscript
-check_PROGRAMS = $(TESTRUNS) ourtail nettester tcpflood chkseq msleep randomgen diagtalker uxsockrcvr syslog_caller syslog_inject
+check_PROGRAMS = $(TESTRUNS) ourtail nettester tcpflood chkseq msleep randomgen diagtalker uxsockrcvr syslog_caller syslog_inject inputfilegen
 TESTS = $(TESTRUNS) cfg.sh
 
 if ENABLE_IMDIAG
 TESTS +=  \
 	arrayqueue.sh \
-	linkedlistqueue.sh \
 	da-mainmsg-q.sh \
 	validation-run.sh \
 	imtcp-multiport.sh \
@@ -51,16 +50,43 @@ TESTS +=  \
 	imuxsock_traillf_root.sh \
 	imuxsock_ccmiddle_root.sh \
 	discard-rptdmsg.sh \
+	discard-allmark.sh \
 	discard.sh \
+	failover-basic.sh \
+	failover-rptd.sh \
+	failover-no-rptd.sh \
+	failover-no-basic.sh \
+	queue-persist.sh 
 	queue-persist.sh \
-	arrayqueue.sh \
 	linkedlistqueue.sh
 endif
 
 if HAVE_VALGRIND
 TESTS +=  \
 	discard-rptdmsg-vg.sh \
+	discard-allmark-vg.sh \
+	failover-basic-vg.sh \
+	failover-rptd-vg.sh \
+	failover-no-basic-vg.sh \
+	failover-no-rptd-vg.sh \
 	tcp-msgreduc-vg.sh
+endif
+
+
+if ENABLE_MYSQL_TESTS
+TESTS +=  \
+	mysql-basic.sh \
+	mysql-asyn.sh 
+if ENABLE_OMLIBDBI
+TESTS +=  \
+	libdbi-basic.sh \
+	libdbi-asyn.sh
+endif
+if HAVE_VALGRIND
+TESTS +=  \
+	mysql-basic-vg.sh \
+	mysql-asyn-vg.sh 
+endif
 endif
 
 if ENABLE_IMPTCP
@@ -103,6 +129,13 @@ endif
 
 if ENABLE_EXTENDED_TESTS
 TESTS += random.sh 
+endif
+
+if ENABLE_IMFILE
+TESTS += imfile-basic.sh
+if HAVE_VALGRIND
+TESTS += imfile-basic-vg.sh
+endif
 endif
 
 endif # if ENABLE_TESTBENCH
@@ -201,7 +234,9 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/rsf_getenv.conf \
 	   diskqueue.sh \
 	   testsuites/diskqueue.conf \
+	   arrayqueue.sh \
 	   testsuites/arrayqueue.conf \
+	   linkedlistqueue.sh \
 	   testsuites/linkedlistqueue.conf \
 	   da-mainmsg-q.sh \
 	   testsuites/da-mainmsg-q.conf \
@@ -233,9 +268,24 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   omod-if-array.sh \
 	   discard.sh \
 	   testsuites/discard.conf \
+	   failover-no-rptd.sh \
+	   failover-no-rptd-vg.sh \
+	   testsuites/failover-no-rptd.conf \
+	   failover-no-basic.sh \
+	   failover-no-basic-vg.sh \
+	   testsuites/failover-no-basic.conf \
+	   failover-rptd.sh \
+	   failover-rptd-vg.sh \
+	   testsuites/failover-rptd.conf \
+	   failover-basic.sh \
+	   failover-basic-vg.sh \
+	   testsuites/failover-basic.conf \
 	   discard-rptdmsg.sh \
 	   discard-rptdmsg-vg.sh \
 	   testsuites/discard-rptdmsg.conf \
+	   discard-allmark.sh \
+	   discard-allmark-vg.sh \
+	   testsuites/discard-allmark.conf \
 	   diag.sh \
 	   testsuites/diag-common.conf \
 	   testsuites/diag-common2.conf \
@@ -299,6 +349,9 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/complex1.conf \
 	   random.sh \
 	   testsuites/random.conf \
+	   imfile-basic.sh \
+	   imfile-basic-vg.sh \
+	   testsuites/imfile-basic.conf \
 	   dynfile_invld_async.sh \
 	   dynfile_invld_sync.sh \
 	   dynfile_cachemiss.sh \
@@ -349,6 +402,18 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   imuxsock_ccmiddle_root.sh \
 	   testsuites/imuxsock_ccmiddle_root.conf \
 	   resultdata/imuxsock_ccmiddle.log \
+	   testsuites/mysql-truncate.sql \
+	   testsuites/mysql-select-msg.sql \
+	   libdbi-basic.sh \
+	   testsuites/libdbi-basic.conf \
+	   libdbi-asyn.sh \
+	   testsuites/libdbi-asyn.conf \
+	   mysql-basic.sh \
+	   mysql-basic-vg.sh \
+	   testsuites/mysql-basic.conf \
+	   mysql-asyn.sh \
+	   mysql-asyn-vg.sh \
+	   testsuites/mysql-asyn.conf \
 	   cfg.sh
 
 ourtail_SOURCES = ourtail.c
@@ -372,6 +437,9 @@ diagtalker_LDADD = $(SOL_LIBS)
 
 randomgen_SOURCES = randomgen.c
 randomgen_LDADD = $(SOL_LIBS)
+
+inputfilegen_SOURCES = inputfilegen.c
+inputfilegen_LDADD = $(SOL_LIBS)
 
 nettester_SOURCES = nettester.c getline.c
 nettester_LDADD = $(SOL_LIBS)
