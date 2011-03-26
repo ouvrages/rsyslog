@@ -1,4 +1,4 @@
-rsyslog (5.7.9-1) UNRELEASED; urgency=low
+rsyslog (5.7.9-1) unstable; urgency=low
 
   * New upstream release.
   * debian/patches/02-pmaixforwardedfrom_type_nokeep.patch
@@ -6,7 +6,7 @@ rsyslog (5.7.9-1) UNRELEASED; urgency=low
   * debian/patches/03-epoll_create1-fallback.patch
     - Remove, merged upstream.
 
- -- Michael Biebl <biebl@debian.org>  Sat, 26 Mar 2011 19:17:05 +0100
+ -- Michael Biebl <biebl@debian.org>  Sat, 26 Mar 2011 19:31:28 +0100
 
 rsyslog (5.7.8-2) unstable; urgency=low
 
