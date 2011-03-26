@@ -39,15 +39,17 @@ host_triplet = @host@
 @ENABLE_TESTBENCH_TRUE@	msleep$(EXEEXT) randomgen$(EXEEXT) \
 @ENABLE_TESTBENCH_TRUE@	diagtalker$(EXEEXT) uxsockrcvr$(EXEEXT) \
 @ENABLE_TESTBENCH_TRUE@	syslog_caller$(EXEEXT) \
-@ENABLE_TESTBENCH_TRUE@	syslog_inject$(EXEEXT)
+@ENABLE_TESTBENCH_TRUE@	syslog_inject$(EXEEXT) \
+@ENABLE_TESTBENCH_TRUE@	inputfilegen$(EXEEXT)
 @ENABLE_TESTBENCH_TRUE@TESTS = $(am__EXEEXT_1) cfg.sh $(am__append_1) \
 @ENABLE_TESTBENCH_TRUE@	$(am__append_2) $(am__append_3) \
 @ENABLE_TESTBENCH_TRUE@	$(am__append_4) $(am__append_5) \
 @ENABLE_TESTBENCH_TRUE@	$(am__append_6) $(am__append_7) \
-@ENABLE_TESTBENCH_TRUE@	$(am__append_8)
+@ENABLE_TESTBENCH_TRUE@	$(am__append_8) $(am__append_9) \
+@ENABLE_TESTBENCH_TRUE@	$(am__append_10) $(am__append_11) \
+@ENABLE_TESTBENCH_TRUE@	$(am__append_12) $(am__append_13)
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_1 = \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	arrayqueue.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	linkedlistqueue.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	da-mainmsg-q.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	validation-run.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	imtcp-multiport.sh \
@@ -92,26 +94,46 @@ host_triplet = @host@
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	imuxsock_traillf_root.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	imuxsock_ccmiddle_root.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	discard-rptdmsg.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	discard-allmark.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	discard.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	queue-persist.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	arrayqueue.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	linkedlistqueue.sh
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-basic.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-rptd.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-no-rptd.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-no-basic.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	queue-persist.sh 
 
 @ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@am__append_2 = \
 @ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@	discard-rptdmsg-vg.sh \
+@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@	discard-allmark-vg.sh \
+@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@	failover-basic-vg.sh \
+@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@	failover-rptd-vg.sh \
+@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@	failover-no-basic-vg.sh \
+@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@	failover-no-rptd-vg.sh \
 @ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@	tcp-msgreduc-vg.sh
 
-@ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_3 = \
+@ENABLE_MYSQL_TESTS_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_3 = \
+@ENABLE_MYSQL_TESTS_TRUE@@ENABLE_TESTBENCH_TRUE@	mysql-basic.sh \
+@ENABLE_MYSQL_TESTS_TRUE@@ENABLE_TESTBENCH_TRUE@	mysql-asyn.sh 
+
+@ENABLE_MYSQL_TESTS_TRUE@@ENABLE_OMLIBDBI_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_4 = \
+@ENABLE_MYSQL_TESTS_TRUE@@ENABLE_OMLIBDBI_TRUE@@ENABLE_TESTBENCH_TRUE@	libdbi-basic.sh \
+@ENABLE_MYSQL_TESTS_TRUE@@ENABLE_OMLIBDBI_TRUE@@ENABLE_TESTBENCH_TRUE@	libdbi-asyn.sh
+
+@ENABLE_MYSQL_TESTS_TRUE@@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@am__append_5 = \
+@ENABLE_MYSQL_TESTS_TRUE@@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@	mysql-basic-vg.sh \
+@ENABLE_MYSQL_TESTS_TRUE@@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@	mysql-asyn-vg.sh 
+
+@ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_6 = \
 @ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	manyptcp.sh \
 @ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	imptcp_large.sh \
 @ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	imptcp_addtlframedelim.sh \
 @ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	imptcp_conndrop.sh 
 
-@ENABLE_OMUXSOCK_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_4 = uxsock_simple.sh
-@ENABLE_OMUDPSPOOF_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_5 = sndrcv_omudpspoof.sh \
+@ENABLE_OMUXSOCK_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_7 = uxsock_simple.sh
+@ENABLE_OMUDPSPOOF_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_8 = sndrcv_omudpspoof.sh \
 @ENABLE_OMUDPSPOOF_TRUE@@ENABLE_TESTBENCH_TRUE@	 sndrcv_omudpspoof_nonstdpt.sh
 
-@ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_6 = omod-if-array.sh \
+@ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_9 = omod-if-array.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 proprepltest.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 parsertest.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 timestamp.sh \
@@ -123,10 +145,12 @@ host_triplet = @host@
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 tabescape_off.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 fieldtest.sh
 
-@ENABLE_IMDIAG_TRUE@@ENABLE_OMRULESET_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_7 = omruleset.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_OMRULESET_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_10 = omruleset.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_OMRULESET_TRUE@@ENABLE_TESTBENCH_TRUE@	 omruleset-queue.sh
 
-@ENABLE_EXTENDED_TESTS_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_8 = random.sh 
+@ENABLE_EXTENDED_TESTS_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_11 = random.sh 
+@ENABLE_IMFILE_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_12 = imfile-basic.sh
+@ENABLE_IMFILE_TRUE@@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@am__append_13 = imfile-basic-vg.sh
 subdir = tests
 DIST_COMMON = README $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	INSTALL
@@ -154,6 +178,9 @@ am_diagtalker_OBJECTS = diagtalker.$(OBJEXT)
 diagtalker_OBJECTS = $(am_diagtalker_OBJECTS)
 am__DEPENDENCIES_1 =
 diagtalker_DEPENDENCIES = $(am__DEPENDENCIES_1)
+am_inputfilegen_OBJECTS = inputfilegen.$(OBJEXT)
+inputfilegen_OBJECTS = $(am_inputfilegen_OBJECTS)
+inputfilegen_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_msleep_OBJECTS = msleep.$(OBJEXT)
 msleep_OBJECTS = $(am_msleep_OBJECTS)
 msleep_LDADD = $(LDADD)
@@ -221,16 +248,18 @@ am__v_CCLD_0 = @echo "  CCLD  " $@;
 AM_V_GEN = $(am__v_GEN_$(V))
 am__v_GEN_ = $(am__v_GEN_$(AM_DEFAULT_VERBOSITY))
 am__v_GEN_0 = @echo "  GEN   " $@;
-SOURCES = $(chkseq_SOURCES) $(diagtalker_SOURCES) $(msleep_SOURCES) \
-	$(nettester_SOURCES) $(ourtail_SOURCES) $(randomgen_SOURCES) \
-	$(rscript_SOURCES) $(rt_init_SOURCES) $(syslog_caller_SOURCES) \
+SOURCES = $(chkseq_SOURCES) $(diagtalker_SOURCES) \
+	$(inputfilegen_SOURCES) $(msleep_SOURCES) $(nettester_SOURCES) \
+	$(ourtail_SOURCES) $(randomgen_SOURCES) $(rscript_SOURCES) \
+	$(rt_init_SOURCES) $(syslog_caller_SOURCES) \
 	$(syslog_inject_SOURCES) $(tcpflood_SOURCES) \
 	$(uxsockrcvr_SOURCES)
 DIST_SOURCES = $(chkseq_SOURCES) $(diagtalker_SOURCES) \
-	$(msleep_SOURCES) $(nettester_SOURCES) $(ourtail_SOURCES) \
-	$(randomgen_SOURCES) $(rscript_SOURCES) $(rt_init_SOURCES) \
-	$(syslog_caller_SOURCES) $(syslog_inject_SOURCES) \
-	$(tcpflood_SOURCES) $(uxsockrcvr_SOURCES)
+	$(inputfilegen_SOURCES) $(msleep_SOURCES) $(nettester_SOURCES) \
+	$(ourtail_SOURCES) $(randomgen_SOURCES) $(rscript_SOURCES) \
+	$(rt_init_SOURCES) $(syslog_caller_SOURCES) \
+	$(syslog_inject_SOURCES) $(tcpflood_SOURCES) \
+	$(uxsockrcvr_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 am__tty_colors = \
@@ -478,7 +507,9 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/rsf_getenv.conf \
 	   diskqueue.sh \
 	   testsuites/diskqueue.conf \
+	   arrayqueue.sh \
 	   testsuites/arrayqueue.conf \
+	   linkedlistqueue.sh \
 	   testsuites/linkedlistqueue.conf \
 	   da-mainmsg-q.sh \
 	   testsuites/da-mainmsg-q.conf \
@@ -510,9 +541,24 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   omod-if-array.sh \
 	   discard.sh \
 	   testsuites/discard.conf \
+	   failover-no-rptd.sh \
+	   failover-no-rptd-vg.sh \
+	   testsuites/failover-no-rptd.conf \
+	   failover-no-basic.sh \
+	   failover-no-basic-vg.sh \
+	   testsuites/failover-no-basic.conf \
+	   failover-rptd.sh \
+	   failover-rptd-vg.sh \
+	   testsuites/failover-rptd.conf \
+	   failover-basic.sh \
+	   failover-basic-vg.sh \
+	   testsuites/failover-basic.conf \
 	   discard-rptdmsg.sh \
 	   discard-rptdmsg-vg.sh \
 	   testsuites/discard-rptdmsg.conf \
+	   discard-allmark.sh \
+	   discard-allmark-vg.sh \
+	   testsuites/discard-allmark.conf \
 	   diag.sh \
 	   testsuites/diag-common.conf \
 	   testsuites/diag-common2.conf \
@@ -576,6 +622,9 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/complex1.conf \
 	   random.sh \
 	   testsuites/random.conf \
+	   imfile-basic.sh \
+	   imfile-basic-vg.sh \
+	   testsuites/imfile-basic.conf \
 	   dynfile_invld_async.sh \
 	   dynfile_invld_sync.sh \
 	   dynfile_cachemiss.sh \
@@ -626,6 +675,18 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   imuxsock_ccmiddle_root.sh \
 	   testsuites/imuxsock_ccmiddle_root.conf \
 	   resultdata/imuxsock_ccmiddle.log \
+	   testsuites/mysql-truncate.sql \
+	   testsuites/mysql-select-msg.sql \
+	   libdbi-basic.sh \
+	   testsuites/libdbi-basic.conf \
+	   libdbi-asyn.sh \
+	   testsuites/libdbi-asyn.conf \
+	   mysql-basic.sh \
+	   mysql-basic-vg.sh \
+	   testsuites/mysql-basic.conf \
+	   mysql-asyn.sh \
+	   mysql-asyn-vg.sh \
+	   testsuites/mysql-asyn.conf \
 	   cfg.sh
 
 ourtail_SOURCES = ourtail.c
@@ -643,6 +704,8 @@ diagtalker_SOURCES = diagtalker.c
 diagtalker_LDADD = $(SOL_LIBS)
 randomgen_SOURCES = randomgen.c
 randomgen_LDADD = $(SOL_LIBS)
+inputfilegen_SOURCES = inputfilegen.c
+inputfilegen_LDADD = $(SOL_LIBS)
 nettester_SOURCES = nettester.c getline.c
 nettester_LDADD = $(SOL_LIBS)
 rt_init_SOURCES = rt-init.c $(test_files)
@@ -702,6 +765,9 @@ chkseq$(EXEEXT): $(chkseq_OBJECTS) $(chkseq_DEPENDENCIES)
 diagtalker$(EXEEXT): $(diagtalker_OBJECTS) $(diagtalker_DEPENDENCIES) 
 	@rm -f diagtalker$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(diagtalker_OBJECTS) $(diagtalker_LDADD) $(LIBS)
+inputfilegen$(EXEEXT): $(inputfilegen_OBJECTS) $(inputfilegen_DEPENDENCIES) 
+	@rm -f inputfilegen$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(inputfilegen_OBJECTS) $(inputfilegen_LDADD) $(LIBS)
 msleep$(EXEEXT): $(msleep_OBJECTS) $(msleep_DEPENDENCIES) 
 	@rm -f msleep$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(msleep_OBJECTS) $(msleep_LDADD) $(LIBS)
@@ -742,6 +808,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/chkseq.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/diagtalker.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/getline.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/inputfilegen.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/msleep.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nettester.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ourtail.Po@am__quote@
@@ -1159,6 +1226,8 @@ uninstall-am:
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
 	tags uninstall uninstall-am
 
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	queue-persist.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	linkedlistqueue.sh
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
