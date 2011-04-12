@@ -100,7 +100,8 @@ host_triplet = @host@
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-rptd.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-no-rptd.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-no-basic.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	queue-persist.sh 
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rcvr_fail_restore.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	linkedlistqueue.sh
 
 @ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@am__append_2 = \
 @ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@	discard-rptdmsg-vg.sh \
@@ -562,6 +563,9 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   diag.sh \
 	   testsuites/diag-common.conf \
 	   testsuites/diag-common2.conf \
+           rcvr_fail_restore.sh \
+	   testsuites/rcvr_fail_restore_rcvr.conf \
+	   testsuites/rcvr_fail_restore_sender.conf \
            daqueue-persist.sh \
 	   daqueue-persist-drvr.sh \
 	   queue-persist.sh \
@@ -1226,8 +1230,6 @@ uninstall-am:
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
 	tags uninstall uninstall-am
 
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	queue-persist.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	linkedlistqueue.sh
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
