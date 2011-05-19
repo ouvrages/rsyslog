@@ -130,6 +130,8 @@ PATH_SEPARATOR = @PATH_SEPARATOR@
 PGSQL_CFLAGS = @PGSQL_CFLAGS@
 PGSQL_LIBS = @PGSQL_LIBS@
 PKG_CONFIG = @PKG_CONFIG@
+PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
+PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 PTHREADS_CFLAGS = @PTHREADS_CFLAGS@
 PTHREADS_LIBS = @PTHREADS_LIBS@
 RANLIB = @RANLIB@
@@ -186,7 +188,6 @@ libdir = @libdir@
 libexecdir = @libexecdir@
 localedir = @localedir@
 localstatedir = @localstatedir@
-lt_ECHO = @lt_ECHO@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
 moddirs = @moddirs@
@@ -254,6 +255,7 @@ html_files = \
 	imuxsock.html \
 	imklog.html \
 	pmlastmsg.html \
+	mmsnmptrapd.html \
 	queues.html \
 	src/queueWorkerLogic.dia \
 	queueWorkerLogic.jpg \
