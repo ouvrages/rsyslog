@@ -68,14 +68,15 @@ sbin_PROGRAMS =
 @ENABLE_OMUXSOCK_TRUE@am__append_25 = plugins/omuxsock
 @ENABLE_OMHDFS_TRUE@am__append_26 = plugins/omhdfs
 @ENABLE_OMTEMPLATE_TRUE@am__append_27 = plugins/omtemplate
-@ENABLE_IMFILE_TRUE@am__append_28 = plugins/imfile
-@ENABLE_IMPTCP_TRUE@am__append_29 = plugins/imptcp
-@ENABLE_IMDIAG_TRUE@am__append_30 = plugins/imdiag
-@ENABLE_MAIL_TRUE@am__append_31 = plugins/ommail
-@ENABLE_OMPROG_TRUE@am__append_32 = plugins/omprog
-@ENABLE_RFC3195_TRUE@am__append_33 = plugins/im3195
-@ENABLE_ORACLE_TRUE@am__append_34 = plugins/omoracle
-@ENABLE_GUI_TRUE@am__append_35 = java
+@ENABLE_MMSNMPTRAPD_TRUE@am__append_28 = plugins/mmsnmptrapd
+@ENABLE_IMFILE_TRUE@am__append_29 = plugins/imfile
+@ENABLE_IMPTCP_TRUE@am__append_30 = plugins/imptcp
+@ENABLE_IMDIAG_TRUE@am__append_31 = plugins/imdiag
+@ENABLE_MAIL_TRUE@am__append_32 = plugins/ommail
+@ENABLE_OMPROG_TRUE@am__append_33 = plugins/omprog
+@ENABLE_RFC3195_TRUE@am__append_34 = plugins/im3195
+@ENABLE_ORACLE_TRUE@am__append_35 = plugins/omoracle
+@ENABLE_GUI_TRUE@am__append_36 = java
 subdir = .
 DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
@@ -209,8 +210,9 @@ DIST_SUBDIRS = doc runtime . plugins/immark plugins/imuxsock \
 	plugins/pmsnare plugins/pmlastmsg plugins/pmrfc3164sd \
 	plugins/omruleset plugins/omdbalerting plugins/omudpspoof \
 	plugins/omuxsock plugins/omhdfs plugins/omtemplate \
-	plugins/imfile plugins/imptcp plugins/imdiag plugins/ommail \
-	plugins/omprog plugins/im3195 plugins/omoracle java tests
+	plugins/mmsnmptrapd plugins/imfile plugins/imptcp \
+	plugins/imdiag plugins/ommail plugins/omprog plugins/im3195 \
+	plugins/omoracle java tests
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)
@@ -321,6 +323,8 @@ PATH_SEPARATOR = @PATH_SEPARATOR@
 PGSQL_CFLAGS = @PGSQL_CFLAGS@
 PGSQL_LIBS = @PGSQL_LIBS@
 PKG_CONFIG = @PKG_CONFIG@
+PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
+PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 PTHREADS_CFLAGS = @PTHREADS_CFLAGS@
 PTHREADS_LIBS = @PTHREADS_LIBS@
 RANLIB = @RANLIB@
@@ -377,7 +381,6 @@ libdir = @libdir@
 libexecdir = @libexecdir@
 localedir = @localedir@
 localstatedir = @localstatedir@
-lt_ECHO = @lt_ECHO@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
 moddirs = @moddirs@
@@ -460,7 +463,7 @@ SUBDIRS = doc runtime . plugins/immark plugins/imuxsock plugins/imtcp \
 	$(am__append_25) $(am__append_26) $(am__append_27) \
 	$(am__append_28) $(am__append_29) $(am__append_30) \
 	$(am__append_31) $(am__append_32) $(am__append_33) \
-	$(am__append_34) $(am__append_35) tests
+	$(am__append_34) $(am__append_35) $(am__append_36) tests
 
 # make sure "make distcheck" tries to build all modules. This means that
 # a developer must always have an environment where every supporting library
@@ -496,6 +499,7 @@ DISTCHECK_CONFIGURE_FLAGS = --enable-gssapi_krb5 \
 				--enable-pmsnare \
 				--enable-imtemplate \
 				--enable-omtemplate \
+				--enable-mmsnmptrapd \
 				--with-systemdsystemunitdir=$$dc_install_base/$(systemdsystemunitdir)
 
 ACLOCAL_AMFLAGS = -I m4

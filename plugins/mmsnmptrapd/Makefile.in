@@ -34,7 +34,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-subdir = plugins/ompgsql
+subdir = plugins/mmsnmptrapd
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/atomic_operations.m4 \
@@ -71,16 +71,16 @@ am__base_list = \
   sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
 am__installdirs = "$(DESTDIR)$(pkglibdir)"
 LTLIBRARIES = $(pkglib_LTLIBRARIES)
-am__DEPENDENCIES_1 =
-ompgsql_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
-am_ompgsql_la_OBJECTS = ompgsql_la-ompgsql.lo
-ompgsql_la_OBJECTS = $(am_ompgsql_la_OBJECTS)
+mmsnmptrapd_la_DEPENDENCIES =
+am_mmsnmptrapd_la_OBJECTS = mmsnmptrapd_la-mmsnmptrapd.lo
+mmsnmptrapd_la_OBJECTS = $(am_mmsnmptrapd_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
 am__v_lt_0 = --silent
-ompgsql_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
-	$(ompgsql_la_LDFLAGS) $(LDFLAGS) -o $@
+mmsnmptrapd_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(AM_CFLAGS) $(CFLAGS) $(mmsnmptrapd_la_LDFLAGS) $(LDFLAGS) -o \
+	$@
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -107,8 +107,8 @@ am__v_CCLD_0 = @echo "  CCLD  " $@;
 AM_V_GEN = $(am__v_GEN_$(V))
 am__v_GEN_ = $(am__v_GEN_$(AM_DEFAULT_VERBOSITY))
 am__v_GEN_0 = @echo "  GEN   " $@;
-SOURCES = $(ompgsql_la_SOURCES)
-DIST_SOURCES = $(ompgsql_la_SOURCES)
+SOURCES = $(mmsnmptrapd_la_SOURCES)
+DIST_SOURCES = $(mmsnmptrapd_la_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -261,12 +261,12 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-pkglib_LTLIBRARIES = ompgsql.la
-ompgsql_la_SOURCES = ompgsql.c ompgsql.h
-ompgsql_la_CPPFLAGS = -I$(top_srcdir) $(PGSQL_CFLAGS) $(RSRT_CFLAGS)
-ompgsql_la_LDFLAGS = -module -avoid-version
-ompgsql_la_LIBADD = $(PGSQL_LIBS)
-EXTRA_DIST = createDB.sql
+pkglib_LTLIBRARIES = mmsnmptrapd.la
+mmsnmptrapd_la_SOURCES = mmsnmptrapd.c
+mmsnmptrapd_la_CPPFLAGS = $(RSRT_CFLAGS) $(PTHREADS_CFLAGS) 
+mmsnmptrapd_la_LDFLAGS = -module -avoid-version
+mmsnmptrapd_la_LIBADD = 
+EXTRA_DIST = 
 all: all-am
 
 .SUFFIXES:
@@ -280,9 +280,9 @@ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu plugins/ompgsql/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu plugins/mmsnmptrapd/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu plugins/ompgsql/Makefile
+	  $(AUTOMAKE) --gnu plugins/mmsnmptrapd/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -332,8 +332,8 @@ clean-pkglibLTLIBRARIES:
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
-ompgsql.la: $(ompgsql_la_OBJECTS) $(ompgsql_la_DEPENDENCIES) 
-	$(AM_V_CCLD)$(ompgsql_la_LINK) -rpath $(pkglibdir) $(ompgsql_la_OBJECTS) $(ompgsql_la_LIBADD) $(LIBS)
+mmsnmptrapd.la: $(mmsnmptrapd_la_OBJECTS) $(mmsnmptrapd_la_DEPENDENCIES) 
+	$(AM_V_CCLD)$(mmsnmptrapd_la_LINK) -rpath $(pkglibdir) $(mmsnmptrapd_la_OBJECTS) $(mmsnmptrapd_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -341,7 +341,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ompgsql_la-ompgsql.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mmsnmptrapd_la-mmsnmptrapd.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -367,13 +367,13 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LTCOMPILE) -c -o $@ $<
 
-ompgsql_la-ompgsql.lo: ompgsql.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(ompgsql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ompgsql_la-ompgsql.lo -MD -MP -MF $(DEPDIR)/ompgsql_la-ompgsql.Tpo -c -o ompgsql_la-ompgsql.lo `test -f 'ompgsql.c' || echo '$(srcdir)/'`ompgsql.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/ompgsql_la-ompgsql.Tpo $(DEPDIR)/ompgsql_la-ompgsql.Plo
+mmsnmptrapd_la-mmsnmptrapd.lo: mmsnmptrapd.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mmsnmptrapd_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mmsnmptrapd_la-mmsnmptrapd.lo -MD -MP -MF $(DEPDIR)/mmsnmptrapd_la-mmsnmptrapd.Tpo -c -o mmsnmptrapd_la-mmsnmptrapd.lo `test -f 'mmsnmptrapd.c' || echo '$(srcdir)/'`mmsnmptrapd.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mmsnmptrapd_la-mmsnmptrapd.Tpo $(DEPDIR)/mmsnmptrapd_la-mmsnmptrapd.Plo
 @am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='ompgsql.c' object='ompgsql_la-ompgsql.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mmsnmptrapd.c' object='mmsnmptrapd_la-mmsnmptrapd.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(ompgsql_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ompgsql_la-ompgsql.lo `test -f 'ompgsql.c' || echo '$(srcdir)/'`ompgsql.c
+@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mmsnmptrapd_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mmsnmptrapd_la-mmsnmptrapd.lo `test -f 'mmsnmptrapd.c' || echo '$(srcdir)/'`mmsnmptrapd.c
 
 mostlyclean-libtool:
 	-rm -f *.lo
