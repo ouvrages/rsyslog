@@ -63,9 +63,9 @@ do_stop()
 }
 
 #
-# Tell rsyslogd to reload its configuration
+# Tell rsyslogd to close all open files
 #
-do_reload() {
+do_rotate() {
 	NAME="$RSYSLOGD"
 	PIDFILE="$RSYSLOGD_PIDFILE"
 
@@ -117,12 +117,12 @@ case "$1" in
 	esac
 
 	;;
-  reload|force-reload)
-	log_daemon_msg "Reloading $DESC" "$RSYSLOGD"
-	do_reload
+  rotate)
+	log_daemon_msg "Closing open files" "$RSYSLOGD"
+	do_rotate
 	log_end_msg $?
 	;;
-  restart)
+  restart|force-reload)
 	$0 stop
 	$0 start
 	;;
@@ -130,7 +130,7 @@ case "$1" in
 	status_of_proc -p $RSYSLOGD_PIDFILE $RSYSLOGD_BIN $RSYSLOGD && exit 0 || exit $?
 	;;
   *)
-	echo "Usage: $SCRIPTNAME {start|stop|restart|reload|force-reload|status}" >&2
+	echo "Usage: $SCRIPTNAME {start|stop|rotate|restart|force-reload|status}" >&2
 	exit 3
 	;;
 esac

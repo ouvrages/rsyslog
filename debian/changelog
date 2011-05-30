@@ -5,6 +5,16 @@ rsyslog (5.8.1-1) UNRELEASED; urgency=low
   * Enable and install impstats module. (Closes: #620114)
   * Update logcheck rule. (Closes: #616659)
   * debian/rsyslog.init: Set correct compat level (5).
+  * The way rsyslog processes SIGHUP has changed. It no longer does a reload
+    of its configuration, but simply closes all open files. To apply a changed
+    configuration, rsyslogd needs to be restarted now.
+    - Drop "reload" action from debian/rsyslog.init, map "force-reload" to
+      "restart". (Closes: #580897)
+    - Add "rotate" action to debian/rsyslog.init which sends SIGHUP to
+      rsyslogd. Use that in debian/rsyslog.logrotate. (Closes: #626365)
+    - Update debian/rsyslog-mysql.postinst and rsyslog-pgsql.postinst to use
+      restart instead of reload.
+    - Add a NEWS file explaining the changed SIGHUP handling.
 
  -- Michael Biebl <biebl@debian.org>  Thu, 19 May 2011 22:53:30 +0200
 
