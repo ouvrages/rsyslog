@@ -1,4 +1,4 @@
-rsyslog (5.8.1-1) UNRELEASED; urgency=low
+rsyslog (5.8.1-1) unstable; urgency=low
 
   * New upstream release.
   * Bump Standards-Version to 3.9.2. No further changes.
@@ -16,7 +16,7 @@ rsyslog (5.8.1-1) UNRELEASED; urgency=low
       restart instead of reload.
     - Add a NEWS file explaining the changed SIGHUP handling.
 
- -- Michael Biebl <biebl@debian.org>  Thu, 19 May 2011 22:53:30 +0200
+ -- Michael Biebl <biebl@debian.org>  Mon, 30 May 2011 18:40:12 +0200
 
 rsyslog (5.8.0-1) unstable; urgency=low
 
