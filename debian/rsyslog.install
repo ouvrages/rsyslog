@@ -4,6 +4,7 @@ debian/tmp/usr/share/man/
 debian/tmp/usr/lib/rsyslog/imfile.so
 debian/tmp/usr/lib/rsyslog/imklog.so
 debian/tmp/usr/lib/rsyslog/immark.so
+debian/tmp/usr/lib/rsyslog/impstats.so
 debian/tmp/usr/lib/rsyslog/imtcp.so
 debian/tmp/usr/lib/rsyslog/imudp.so
 debian/tmp/usr/lib/rsyslog/imuxsock.so

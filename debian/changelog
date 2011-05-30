@@ -2,6 +2,7 @@ rsyslog (5.8.1-1) UNRELEASED; urgency=low
 
   * New upstream release.
   * Bump Standards-Version to 3.9.2. No further changes.
+  * Enable and install impstats module. (Closes: #620114)
 
  -- Michael Biebl <biebl@debian.org>  Thu, 19 May 2011 22:53:30 +0200
 
