@@ -23,7 +23,7 @@ NAME=rsyslog
 
 RSYSLOGD=rsyslogd
 RSYSLOGD_BIN=/usr/sbin/rsyslogd
-RSYSLOGD_OPTIONS="-c4"
+RSYSLOGD_OPTIONS="-c5"
 RSYSLOGD_PIDFILE=/var/run/rsyslogd.pid
 
 SCRIPTNAME=/etc/init.d/$NAME
