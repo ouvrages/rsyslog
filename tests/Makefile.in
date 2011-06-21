@@ -62,6 +62,7 @@ host_triplet = @host@
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	imtcp_conndrop.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	imtcp_addtlframedelim.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	sndrcv.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	sndrcv_failover.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	sndrcv_gzip.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	sndrcv_udp.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	sndrcv_udp_nonstdpt.sh \
@@ -96,6 +97,8 @@ host_triplet = @host@
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	discard-rptdmsg.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	discard-allmark.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	discard.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-async.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-double.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-basic.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-rptd.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-no-rptd.sh \
@@ -130,6 +133,9 @@ host_triplet = @host@
 @ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	imptcp_addtlframedelim.sh \
 @ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	imptcp_conndrop.sh 
 
+
+# This test does not work on v5 as we keep DH params
+#TESTS += manytcp-too-few-tls.sh
 @ENABLE_OMUXSOCK_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_7 = uxsock_simple.sh
 @ENABLE_OMUDPSPOOF_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_8 = sndrcv_omudpspoof.sh \
 @ENABLE_OMUDPSPOOF_TRUE@@ENABLE_TESTBENCH_TRUE@	 sndrcv_omudpspoof_nonstdpt.sh
@@ -217,9 +223,9 @@ syslog_caller_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_syslog_inject_OBJECTS = syslog_inject.$(OBJEXT)
 syslog_inject_OBJECTS = $(am_syslog_inject_OBJECTS)
 syslog_inject_DEPENDENCIES = $(am__DEPENDENCIES_1)
-am_tcpflood_OBJECTS = tcpflood.$(OBJEXT)
+am_tcpflood_OBJECTS = tcpflood-tcpflood.$(OBJEXT)
 tcpflood_OBJECTS = $(am_tcpflood_OBJECTS)
-tcpflood_DEPENDENCIES = $(am__DEPENDENCIES_1)
+tcpflood_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am_uxsockrcvr_OBJECTS = uxsockrcvr.$(OBJEXT)
 uxsockrcvr_OBJECTS = $(am_uxsockrcvr_OBJECTS)
 uxsockrcvr_DEPENDENCIES = $(am__DEPENDENCIES_1)
@@ -555,6 +561,10 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   failover-basic.sh \
 	   failover-basic-vg.sh \
 	   testsuites/failover-basic.conf \
+	   failover-async.sh \
+	   testsuites/failover-async.conf \
+	   failover-double.sh \
+	   testsuites/failover-double.conf \
 	   discard-rptdmsg.sh \
 	   discard-rptdmsg-vg.sh \
 	   testsuites/discard-rptdmsg.conf \
@@ -577,6 +587,10 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   threadingmqaq.sh \
 	   testsuites/threadingmqaq.conf \
 	   sndrcv_drvr.sh \
+	   sndrcv_drvr_noexit.sh \
+	   sndrcv_failover.sh \
+	   testsuites/sndrcv_failover_sender.conf \
+	   testsuites/sndrcv_failover_rcvr.conf \
 	   sndrcv.sh \
 	   testsuites/sndrcv_sender.conf \
 	   testsuites/sndrcv_rcvr.conf \
@@ -700,7 +714,8 @@ chkseq_SOURCES = chkseq.c
 uxsockrcvr_SOURCES = uxsockrcvr.c
 uxsockrcvr_LDADD = $(SOL_LIBS)
 tcpflood_SOURCES = tcpflood.c
-tcpflood_LDADD = $(SOL_LIBS)
+tcpflood_CPPFLAGS = $(PTHREADS_CFLAGS)
+tcpflood_LDADD = $(SOL_LIBS) $(PTHREADS_LIBS)
 syslog_caller_SOURCES = syslog_caller.c
 syslog_caller_LDADD = $(SOL_LIBS)
 syslog_inject_SOURCES = syslog_inject.c
@@ -825,7 +840,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rt_init-runtime-dummy.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/syslog_caller.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/syslog_inject.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tcpflood.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tcpflood-tcpflood.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/uxsockrcvr.Po@am__quote@
 
 .c.o:
@@ -931,6 +946,22 @@ rt_init-runtime-dummy.obj: runtime-dummy.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='runtime-dummy.c' object='rt_init-runtime-dummy.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rt_init_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rt_init-runtime-dummy.obj `if test -f 'runtime-dummy.c'; then $(CYGPATH_W) 'runtime-dummy.c'; else $(CYGPATH_W) '$(srcdir)/runtime-dummy.c'; fi`
+
+tcpflood-tcpflood.o: tcpflood.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tcpflood_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT tcpflood-tcpflood.o -MD -MP -MF $(DEPDIR)/tcpflood-tcpflood.Tpo -c -o tcpflood-tcpflood.o `test -f 'tcpflood.c' || echo '$(srcdir)/'`tcpflood.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/tcpflood-tcpflood.Tpo $(DEPDIR)/tcpflood-tcpflood.Po
+@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='tcpflood.c' object='tcpflood-tcpflood.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tcpflood_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o tcpflood-tcpflood.o `test -f 'tcpflood.c' || echo '$(srcdir)/'`tcpflood.c
+
+tcpflood-tcpflood.obj: tcpflood.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tcpflood_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT tcpflood-tcpflood.obj -MD -MP -MF $(DEPDIR)/tcpflood-tcpflood.Tpo -c -o tcpflood-tcpflood.obj `if test -f 'tcpflood.c'; then $(CYGPATH_W) 'tcpflood.c'; else $(CYGPATH_W) '$(srcdir)/tcpflood.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/tcpflood-tcpflood.Tpo $(DEPDIR)/tcpflood-tcpflood.Po
+@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='tcpflood.c' object='tcpflood-tcpflood.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tcpflood_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o tcpflood-tcpflood.obj `if test -f 'tcpflood.c'; then $(CYGPATH_W) 'tcpflood.c'; else $(CYGPATH_W) '$(srcdir)/tcpflood.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
