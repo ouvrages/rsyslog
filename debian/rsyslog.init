@@ -86,10 +86,9 @@ create_xconsole() {
 }
 
 sendsigs_omit() {
-	OMITDIR=/lib/init/rw/sendsigs.omit.d
+	OMITDIR=/run/sendsigs.omit.d
 	mkdir -p $OMITDIR
-	rm -f $OMITDIR/rsyslog
-	ln -s $RSYSLOGD_PIDFILE $OMITDIR/rsyslog
+	ln -sf $RSYSLOGD_PIDFILE $OMITDIR/rsyslog
 }
 
 case "$1" in
