@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[5.8.2],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[5.8.3],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -772,7 +772,7 @@ AM_CONDITIONAL(ENABLE_MAIL, test x$enable_mail = xyes)
 # would complicate things if we first needed to tell them how to enable imdiag.
 # rgerhards, 2008-07-25
 AC_ARG_ENABLE(imdiag,
-        [AS_HELP_STRING([--enable-imdiag],[Enable imdiag @<:@default=yes@:>@])],
+        [AS_HELP_STRING([--enable-imdiag],[Enable imdiag @<:@default=no@:>@])],
         [case "${enableval}" in
          yes) enable_imdiag="yes" ;;
           no) enable_imdiag="no" ;;
