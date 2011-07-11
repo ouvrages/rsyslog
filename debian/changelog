@@ -1,3 +1,9 @@
+rsyslog (5.8.3-1) UNRELEASED; urgency=low
+
+  * New upstream release.
+
+ -- Michael Biebl <biebl@debian.org>  Mon, 11 Jul 2011 11:44:29 +0200
+
 rsyslog (5.8.2-2) unstable; urgency=low
 
   * Transition to /run/sendsigs.omit.d. (Closes: #633036)
