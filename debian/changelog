@@ -1,8 +1,10 @@
 rsyslog (5.8.3-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * debian/rsyslog.conf: Use new ":omusrmsg:*" syntax (write to all) for
+    *.emerg messages in preparation for future config format changes.
 
- -- Michael Biebl <biebl@debian.org>  Mon, 11 Jul 2011 11:44:29 +0200
+ -- Michael Biebl <biebl@debian.org>  Mon, 11 Jul 2011 12:30:58 +0200
 
 rsyslog (5.8.2-2) unstable; urgency=low
 
