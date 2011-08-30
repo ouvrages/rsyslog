@@ -1,8 +1,8 @@
-rsyslog (5.8.4-1) UNRELEASED; urgency=low
+rsyslog (5.8.4-1) unstable; urgency=low
 
   * New upstream release.
 
- -- Michael Biebl <biebl@debian.org>  Tue, 30 Aug 2011 23:48:23 +0200
+ -- Michael Biebl <biebl@debian.org>  Tue, 30 Aug 2011 23:58:11 +0200
 
 rsyslog (5.8.3-1) unstable; urgency=low
 
