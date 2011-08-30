@@ -159,8 +159,7 @@ host_triplet = @host@
 @ENABLE_IMFILE_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_12 = imfile-basic.sh
 @ENABLE_IMFILE_TRUE@@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@am__append_13 = imfile-basic-vg.sh
 subdir = tests
-DIST_COMMON = README $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
-	INSTALL
+DIST_COMMON = README $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/atomic_operations.m4 \
 	$(top_srcdir)/m4/atomic_operations_64bit.m4 \
@@ -404,6 +403,7 @@ libdir = @libdir@
 libexecdir = @libexecdir@
 localedir = @localedir@
 localstatedir = @localstatedir@
+lt_ECHO = @lt_ECHO@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
 moddirs = @moddirs@
