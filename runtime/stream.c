@@ -1036,7 +1036,7 @@ asyncWriterThread(void *pPtr)
 				continue; /* now we should have data */
 			}
 			bTimedOut = 0;
-			timeoutComp(&t, pThis->iFlushInterval * 2000); /* *1000 millisconds */ // TODO: check the 2000?!?
+			timeoutComp(&t, pThis->iFlushInterval * 1000); /* *1000 millisconds */
 			if(pThis->bDoTimedWait) {
 				if(pthread_cond_timedwait(&pThis->notEmpty, &pThis->mut, &t) != 0) {
 					int err = errno;
@@ -1276,16 +1276,18 @@ static rsRetVal strmSeek(strm_t *pThis, off64_t offs)
 
 	ISOBJ_TYPE_assert(pThis, strm);
 
-	if(pThis->fd == -1)
-		strmOpenFile(pThis);
-	else
-		strmFlushInternal(pThis);
+	if(pThis->fd == -1) {
+		CHKiRet(strmOpenFile(pThis));
+	} else {
+		CHKiRet(strmFlushInternal(pThis));
+	}
 	long long i;
 	DBGOPRINT((obj_t*) pThis, "file %d seek, pos %llu\n", pThis->fd, (long long unsigned) offs);
 	i = lseek64(pThis->fd, offs, SEEK_SET); // TODO: check error!
 	pThis->iCurrOffs = offs; /* we are now at *this* offset */
 	pThis->iBufPtr = 0; /* buffer invalidated */
 
+finalize_it:
 	RETiRet;
 }
 
