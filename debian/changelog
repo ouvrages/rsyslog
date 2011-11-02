@@ -1,10 +1,12 @@
 rsyslog (5.8.6-1) UNRELEASED; urgency=low
 
   * New upstream release.
+    - Fix regression in imuxsock to ignore message-provided timestamp by
+      default which broke high precision timestamps. (Closes: #638147)
   * debian/control:
     - Wrap (build-)dependencies.
 
- -- Michael Biebl <biebl@debian.org>  Fri, 21 Oct 2011 17:03:41 +0200
+ -- Michael Biebl <biebl@debian.org>  Wed, 02 Nov 2011 22:01:42 +0100
 
 rsyslog (5.8.5-1) unstable; urgency=low
 
