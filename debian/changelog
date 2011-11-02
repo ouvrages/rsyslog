@@ -5,6 +5,9 @@ rsyslog (5.8.6-1) UNRELEASED; urgency=low
       default which broke high precision timestamps. (Closes: #638147)
   * debian/control:
     - Wrap (build-)dependencies.
+  * Enable default hardening options from dpkg-buildflags. (Closes: #644303)
+    - Use buildflags.mk snippet in debian/rules.
+    - Add Build-Depends on dpkg-dev (>= 1.6.1).
 
  -- Michael Biebl <biebl@debian.org>  Wed, 02 Nov 2011 22:01:42 +0100
 
