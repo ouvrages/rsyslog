@@ -1,6 +1,8 @@
 rsyslog (5.8.6-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * debian/control:
+    - Wrap (build-)dependencies.
 
  -- Michael Biebl <biebl@debian.org>  Fri, 21 Oct 2011 17:03:41 +0200
 
