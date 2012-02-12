@@ -1,4 +1,18 @@
 ---------------------------------------------------------------------------
+Version 5.8.7  [V5-stable] 2012-01-17
+- bugfix: instabilities when using RFC5424 header fields
+  Thanks to Kaiwang Chen for the patch
+- bugfix: imuxsock did truncate part of received message if it did not
+  contain a proper date. The truncation occured because we removed that
+  part of the messages that was expected to be the date.
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=295
+- bugfix: potential abort after reading invalid X.509 certificate
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=290
+  Thanks to Tomas Heinrich for the patch
+- bugfix: stats counter were not properly initialized on creation
+- FQDN hostname for multihomed host was not always set to the correct name
+  if multiple aliases existed. Thanks to Tomas Heinreich for the patch.
+---------------------------------------------------------------------------
 Version 5.8.6  [V5-stable] 2011-10-21
 - bugfix: missing whitespace after property-based filter was not detected
 - bugfix: $OMFileFlushInterval period was doubled - now using correct value
@@ -839,12 +853,20 @@ increase.
 - increased ompgsql performance by adapting to new transactional
   output module interface
 ---------------------------------------------------------------------------
-Version 4.8.1  [v4-beta], 2011-09-??
+Version 4.8.1  [v4-stable], 2011-09-??
 - bugfix: $ActionExecOnlyOnce interval did not work properly
   Thanks to Tomas Heinrich for the patch
 - bugfix: potential abort if ultra-large file io buffers are used and
   dynafile cache exhausts address space (primarily a problem on 32 bit
   platforms)
+- bugfix: potential abort after reading invalid X.509 certificate
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=290
+  Thanks to Tomas Heinrich for the patch.
+- bugfix: potential fatal abort in omgssapi
+  Thanks to Tomas Heinrich for the patch.
+- added doc for omprog
+- FQDN hostname for multihomed host was not always set to the correct name
+  if multiple aliases existed. Thanks to Tomas Heinreich for the patch.
 ---------------------------------------------------------------------------
 Version 4.8.0  [v4-stable] (rgerhards), 2011-09-07
 ***************************************************************************
@@ -1634,6 +1656,9 @@ version before switching to this one.
   Thanks to Ken for providing the patch
 ---------------------------------------------------------------------------
 Version 3.22.4 [v3-stable] (rgerhards), 2010-??-??
+- bugfix: action resume interval incorrectly handled, thus took longer to
+  resume
+- bugfix: cosmetic: proper constant used instead of number in open call
 - bugfix: timestamp was incorrectly calculated for timezones with minute
   offset
   closes: http://bugzilla.adiscon.com/show_bug.cgi?id=271
