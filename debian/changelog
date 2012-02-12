@@ -10,6 +10,9 @@ rsyslog (5.8.7-1) UNRELEASED; urgency=low
   * Strip debian/tmp/ from .install files.
   * Install tmpfiles.d snippet to create /dev/xconsole when running systemd.
     (Closes: #634978)
+  * debian/patches/02-path_max.patch
+    - Don't rely on PATH_MAX being defined. Patch cherry-picked from upstream
+      Git. (Closes: #651529)
 
  -- Michael Biebl <biebl@debian.org>  Sun, 12 Feb 2012 11:22:26 +0100
 
