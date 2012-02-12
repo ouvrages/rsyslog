@@ -6,6 +6,7 @@ rsyslog (5.8.7-1) UNRELEASED; urgency=low
   * Fix versioned Build-Depends on dpkg-dev. The buildflags.mk snippet was
     added in version 1.16.1, not 1.6.1. (Closes: #654894)
   * Update watch file. Check download page for stable releases.
+  * Strip debian/tmp/ from .install files.
 
  -- Michael Biebl <biebl@debian.org>  Sun, 12 Feb 2012 11:22:26 +0100
 
