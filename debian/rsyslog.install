@@ -1,4 +1,5 @@
-debian/rsyslog.conf /etc/
+debian/rsyslog.conf  etc/
+debian/xconsole.conf usr/lib/tmpfiles.d/
 usr/sbin/
 usr/share/man/
 usr/lib/rsyslog/imfile.so

@@ -7,6 +7,8 @@ rsyslog (5.8.7-1) UNRELEASED; urgency=low
     added in version 1.16.1, not 1.6.1. (Closes: #654894)
   * Update watch file. Check download page for stable releases.
   * Strip debian/tmp/ from .install files.
+  * Install tmpfiles.d snippet to create /dev/xconsole when running systemd.
+    (Closes: #634978)
 
  -- Michael Biebl <biebl@debian.org>  Sun, 12 Feb 2012 11:22:26 +0100
 
