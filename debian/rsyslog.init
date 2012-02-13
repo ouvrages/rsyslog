@@ -52,30 +52,30 @@ do_start()
 
 do_stop()
 {
-	NAME="$RSYSLOGD"
+	DAEMON="$RSYSLOGD_BIN"
 	PIDFILE="$RSYSLOGD_PIDFILE"
 
 	# Return
 	#   0 if daemon has been stopped
 	#   1 if daemon was already stopped
 	#   other if daemon could not be stopped or a failure occurred
-	start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile $PIDFILE --name $NAME
+	start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile $PIDFILE --exec $DAEMON
 }
 
 #
 # Tell rsyslogd to close all open files
 #
 do_rotate() {
-	NAME="$RSYSLOGD"
+	DAEMON="$RSYSLOGD_BIN"
 	PIDFILE="$RSYSLOGD_PIDFILE"
 
-	start-stop-daemon --stop --signal HUP --quiet --pidfile $PIDFILE --name $NAME
+	start-stop-daemon --stop --signal HUP --quiet --pidfile $PIDFILE --exec $DAEMON
 }
 
 create_xconsole() {
 	XCONSOLE=/dev/xconsole
-	if [ "$(uname -s)" = "GNU/kFreeBSD" ]; then
-		XCONSOLE=/var/run/xconsole
+	if [ "$(uname -s)" != "Linux" ]; then
+		XCONSOLE=/run/xconsole
 		ln -sf $XCONSOLE /dev/xconsole
 	fi
 	if [ ! -e $XCONSOLE ]; then
