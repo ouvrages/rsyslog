@@ -17,6 +17,9 @@ rsyslog (5.8.7-1) UNRELEASED; urgency=low
     - Use --exec instead of --name for start-stop-daemon. This is more
       reliable and works better on GNU/Hurd. (Closes: #652575)
     - Use /run/xconsole and a symlink /dev/xconsole on non-Linux systems.
+  * debian/rsyslog.default
+    - Update comments regarding available command line switches. Remove
+      deprecated options.
 
  -- Michael Biebl <biebl@debian.org>  Sun, 12 Feb 2012 11:22:26 +0100
 
