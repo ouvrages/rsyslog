@@ -26,6 +26,7 @@ rsyslog (5.8.8-1) UNRELEASED; urgency=low
   * debian/copyright
     - Use maschine-readable copyright format 1.0.
     - Most parts of rsyslog have been relicensed under Apache license 2.0.
+  * Bump Standards-Version to 3.9.3.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 07 Mar 2012 00:31:03 +0100
 
