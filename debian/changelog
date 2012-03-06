@@ -23,8 +23,11 @@ rsyslog (5.8.8-1) UNRELEASED; urgency=low
   * debian/rsyslog.links
     - Install syslog.service alias so rsyslog is properly socket activated
       with newer versions of systemd.
+  * debian/copyright
+    - Use maschine-readable copyright format 1.0.
+    - Most parts of rsyslog have been relicensed under Apache license 2.0.
 
- -- Michael Biebl <biebl@debian.org>  Tue, 06 Mar 2012 23:23:28 +0100
+ -- Michael Biebl <biebl@debian.org>  Wed, 07 Mar 2012 00:31:03 +0100
 
 rsyslog (5.8.6-1) unstable; urgency=low
 
