@@ -8,8 +8,8 @@ rsyslog (5.8.8-1) UNRELEASED; urgency=low
     added in version 1.16.1, not 1.6.1. (Closes: #654894)
   * Update watch file. Check download page for stable releases.
   * Strip debian/tmp/ from .install files.
-  * Install tmpfiles.d snippet to create /dev/xconsole when running systemd.
-    (Closes: #634978)
+  * Install tmpfiles.d snippet to create /dev/xconsole when running under
+    systemd. (Closes: #634978)
   * debian/patches/02-path_max.patch
     - Don't rely on PATH_MAX being defined. Patch cherry-picked from upstream
       Git. (Closes: #651529)
