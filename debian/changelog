@@ -20,8 +20,11 @@ rsyslog (5.8.8-1) UNRELEASED; urgency=low
   * debian/rsyslog.default
     - Update comments regarding available command line switches. Remove
       deprecated options.
+  * debian/rsyslog.links
+    - Install syslog.service alias so rsyslog is properly socket activated
+      with newer versions of systemd.
 
- -- Michael Biebl <biebl@debian.org>  Tue, 06 Mar 2012 01:12:56 +0100
+ -- Michael Biebl <biebl@debian.org>  Tue, 06 Mar 2012 23:23:28 +0100
 
 rsyslog (5.8.6-1) unstable; urgency=low
 
