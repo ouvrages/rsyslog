@@ -1,4 +1,4 @@
-rsyslog (5.8.8-1) UNRELEASED; urgency=low
+rsyslog (5.8.8-1) unstable; urgency=low
 
   * New upstream release.
     - Fix imuxsock to not truncate parts of the received message if it
@@ -34,7 +34,7 @@ rsyslog (5.8.8-1) UNRELEASED; urgency=low
   * debian/rsyslog.dirs
     - Add /var/spool/rsyslog/.
 
- -- Michael Biebl <biebl@debian.org>  Wed, 07 Mar 2012 00:31:03 +0100
+ -- Michael Biebl <biebl@debian.org>  Wed, 07 Mar 2012 00:42:56 +0100
 
 rsyslog (5.8.6-1) unstable; urgency=low
 
