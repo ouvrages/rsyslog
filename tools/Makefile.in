@@ -336,7 +336,9 @@ rsyslogd_LDFLAGS = -export-dynamic
 @ENABLE_DIAGTOOLS_TRUE@zpipe_SOURCES = zpipe.c
 @ENABLE_DIAGTOOLS_TRUE@zpipe_LDADD = -lz
 @ENABLE_DIAGTOOLS_TRUE@msggen_SOURCES = msggen.c
-EXTRA_DIST = $(man_MANS)
+EXTRA_DIST = $(man_MANS) \
+	recover_qi.pl
+
 all: all-am
 
 .SUFFIXES:
