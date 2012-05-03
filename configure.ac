@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[5.8.10],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[5.8.11],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -514,8 +514,24 @@ if test "x$enable_mysql" = "xyes"; then
     [AC_MSG_FAILURE([MySQL library is missing])],
     [`mysql_config --libs`]
   )
+  AC_MSG_CHECKING(if we have mysql_library_init)
+  save_CFLAGS="$CFLAGS"
+  CFLAGS="$CFLAGS $MYSQL_CFLAGS"
+  save_LIBS="$LIBS"
+  LIBS="$LIBS $MYSQL_LIBS"
+  AC_TRY_LINK(
+    [#include <mysql.h>
+     #include <stdio.h>],
+    [mysql_library_init(0, NULL, NULL)],
+    [have_mysql_library_init=yes],
+    [have_mysql_library_init=no])
+  CFLAGS="$save_CFLAGS"
+  LIBS="$save_LIBS"
 fi
 AM_CONDITIONAL(ENABLE_MYSQL, test x$enable_mysql = xyes)
+if test "$have_mysql_library_init" = "yes"; then
+  AC_DEFINE([HAVE_MYSQL_LIBRARY_INIT], [1], [mysql_library_init available])
+fi
 AC_SUBST(MYSQL_CFLAGS)
 AC_SUBST(MYSQL_LIBS)
 
