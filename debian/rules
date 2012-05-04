@@ -22,6 +22,8 @@ override_dh_auto_configure:
 		--enable-pmrfc3164sd \
 		--enable-pmsnare \
 		--enable-omprog \
+		--enable-omstdout \
+		--enable-omuxsock \
 		--disable-testbench \
 		--with-systemdsystemunitdir=/lib/systemd/system
 
