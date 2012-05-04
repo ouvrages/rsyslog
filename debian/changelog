@@ -3,7 +3,7 @@ rsyslog (5.8.11-1) unstable; urgency=low
   * New upstream release.
   * Enable and install omuxsock and omstdout module.
 
- -- Michael Biebl <biebl@debian.org>  Fri, 04 May 2012 22:32:00 +0200
+ -- Michael Biebl <biebl@debian.org>  Fri, 04 May 2012 22:38:00 +0200
 
 rsyslog (5.8.10-1) unstable; urgency=low
 
