@@ -1,4 +1,4 @@
-rsyslog (5.8.11-2) UNRELEASED; urgency=low
+rsyslog (5.8.11-2) unstable; urgency=low
 
   * Disable omstdout module again. Upstream doesn't consider it viable for
     production use but mainly for the internal testbench.
@@ -7,7 +7,7 @@ rsyslog (5.8.11-2) UNRELEASED; urgency=low
     property contains the client IP. (Closes: #682529)
     Thanks to Apollon Oikonomopoulos for the patch.
 
- -- Michael Biebl <biebl@debian.org>  Wed, 19 Sep 2012 01:24:26 +0200
+ -- Michael Biebl <biebl@debian.org>  Wed, 26 Sep 2012 20:36:09 +0200
 
 rsyslog (5.8.11-1) unstable; urgency=low
 
