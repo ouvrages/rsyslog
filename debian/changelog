@@ -3,6 +3,9 @@ rsyslog (7.1.9-1) UNRELEASED; urgency=low
   * New major upstream release from the v7 beta branch.
   * Update watch file to track beta releases.
   * Drop patches which have been merged upstream.
+  * Update Build-Depends:
+    - Add libestr-dev, libee-dev, libjson0-dev and uuid-dev.
+    - Bump librelp-dev to (>= 1.0.1).
 
  -- Michael Biebl <biebl@debian.org>  Wed, 10 Oct 2012 06:45:17 +0200
 

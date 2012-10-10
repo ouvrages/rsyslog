@@ -10,7 +10,11 @@ Build-Depends: debhelper (>= 8),
                libpq-dev,
                libkrb5-dev,
                libgnutls-dev,
-               librelp-dev,
+               librelp-dev (>= 1.0.1),
+               libestr-dev (>= 0.1.2),
+               libee-dev (>= 0.4.0),
+               libjson0-dev,
+               uuid-dev,
                pkg-config
 Standards-Version: 3.9.3
 Vcs-Git: git://git.debian.org/git/collab-maint/rsyslog.git
