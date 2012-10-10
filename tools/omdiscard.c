@@ -44,7 +44,7 @@ MODULE_TYPE_NOKEEP
 DEF_OMOD_STATIC_DATA
 
 typedef struct _instanceData {
-    	char dummy;
+	EMPTY_STRUCT
 } instanceData;
 
 /* we do not need a createInstance()!

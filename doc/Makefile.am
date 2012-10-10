@@ -31,6 +31,10 @@ html_files = \
 	version_naming.html \
 	contributors.html \
 	dev_queue.html \
+	ompipe.html \
+	omfwd.html \
+	omfile.html \
+	omusrmsg.html \
 	omstdout.html \
 	omudpspoof.html \
 	omruleset.html \
@@ -110,6 +114,7 @@ html_files = \
 	src/tls_cert.dia \
 	gssapi.html \
 	licensing.html \
+	mmnormalize.html \
 	ommail.html \
 	omuxsock.html \
 	omrelp.html \
@@ -125,6 +130,24 @@ html_files = \
 	rsyslog_conf_nomatch.html \
 	queues_analogy.html \
 	multi_ruleset.html \
+	dev_oplugins.html \
+	free_support.html \
+	imudp.html \
+	messageparser.html \
+	omhdfs.html \
+	omprog.html \
+	queue_msg_state.jpeg \
+	rsconf1_abortonuncleanconfig.html \
+	rsconf1_maxopenfiles.html \
+	rsconf1_omfileforcechown.html \
+	rsyslog_conf_file_syntax_differences.html \
+	rsyslog_conf_lines.html \
+	rsyslog_queue_pointers.jpeg \
+	rsyslog_queue_pointers2.jpeg \
+	v6compatibility.html \
+	v7compatibility.html \
+	rsyslog_conf_basic_structure.html \
+	imkmsg.html \
 	src/classes.dia
 
 grfx_files = \

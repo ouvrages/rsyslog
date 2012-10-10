@@ -60,6 +60,7 @@ DEFobjCurrIf(ruleset)
 /* config data */
 static uchar cCCEscapeChar = '#';/* character to be used to start an escape sequence for control chars */
 static int bEscapeCCOnRcv = 1; /* escape control characters on reception: 0 - no, 1 - yes */
+static int bSpaceLFOnRcv = 0; /* replace newlines with spaces on reception: 0 - no, 1 - yes */
 static int bEscape8BitChars = 0; /* escape characters > 127 on reception: 0 - no, 1 - yes */
 static int bEscapeTab = 1;	/* escape tab control character when doing CC escapes: 0 - no, 1 - yes */
 static int bDropTrailingLF = 1; /* drop trailing LF's on reception? */
@@ -142,6 +143,14 @@ finalize_it:
 	RETiRet;
 }
 
+void
+printParserList(parserList_t *pList)
+{
+	while(pList != NULL) {
+		dbgprintf("parser: %s\n", pList->pParser->pName);
+		pList = pList->pNext;
+	}
+}
 
 /* find a parser based on the provided name */
 static rsRetVal
@@ -179,7 +188,7 @@ AddDfltParser(uchar *pName)
 
 	CHKiRet(FindParser(&pParser, pName));
 	CHKiRet(AddParserToList(&pDfltParsLst, pParser));
-	dbgprintf("Parser '%s' added to default parser set.\n", pName);
+	DBGPRINTF("Parser '%s' added to default parser set.\n", pName);
 	
 finalize_it:
 	RETiRet;
@@ -208,7 +217,7 @@ finalize_it:
 
 BEGINobjDestruct(parser) /* be sure to specify the object type also in END and CODESTART macros! */
 CODESTARTobjDestruct(parser)
-	dbgprintf("destructing parser '%s'\n", pThis->pName);
+	DBGPRINTF("destructing parser '%s'\n", pThis->pName);
 	free(pThis->pName);
 ENDobjDestruct(parser)
 
@@ -310,7 +319,7 @@ SanitizeMsg(msg_t *pMsg)
 	size_t iDst;
 	size_t iMaxLine;
 	size_t maxDest;
-	sbool bUpdatedLen = FALSE;
+	sbool bUpdatedLen = RSFALSE;
 	uchar szSanBuf[32*1024]; /* buffer used for sanitizing a string */
 
 	assert(pMsg != NULL);
@@ -325,7 +334,7 @@ SanitizeMsg(msg_t *pMsg)
 	 */
 	if(pszMsg[lenMsg-1] == '\0') {
 		DBGPRINTF("dropped NUL at very end of message\n");
-		bUpdatedLen = TRUE;
+		bUpdatedLen = RSTRUE;
 		lenMsg--;
 	}
 
@@ -338,7 +347,7 @@ SanitizeMsg(msg_t *pMsg)
 		DBGPRINTF("dropped LF at very end of message (DropTrailingLF is set)\n");
 		lenMsg--;
 		pszMsg[lenMsg] = '\0';
-		bUpdatedLen = TRUE;
+		bUpdatedLen = RSTRUE;
 	}
 
 	/* it is much quicker to sweep over the message and see if it actually
@@ -354,9 +363,13 @@ SanitizeMsg(msg_t *pMsg)
 	int bNeedSanitize = 0;
 	for(iSrc = 0 ; iSrc < lenMsg ; iSrc++) {
 		if(iscntrl(pszMsg[iSrc])) {
+			if(bSpaceLFOnRcv && pszMsg[iSrc] == '\n')
+				pszMsg[iSrc] = ' ';
+			else
 			if(pszMsg[iSrc] == '\0' || bEscapeCCOnRcv) {
 				bNeedSanitize = 1;
-				break;
+				if (!bSpaceLFOnRcv)
+					break;
 			}
 		} else if(pszMsg[iSrc] > 127 && bEscape8BitChars) {
 			bNeedSanitize = 1;
@@ -365,7 +378,7 @@ SanitizeMsg(msg_t *pMsg)
 	}
 
 	if(!bNeedSanitize) {
-		if(bUpdatedLen == TRUE)
+		if(bUpdatedLen == RSTRUE)
 			MsgSetRawMsgSize(pMsg, lenMsg);
 		FINALIZE;
 	}
@@ -496,27 +509,27 @@ ParseMsg(msg_t *pMsg)
 	 * will cause it to happen. After that, access to the unsanitized message is no
 	 * loger possible.
 	 */
-	pParserList = ruleset.GetParserList(pMsg);
+	pParserList = ruleset.GetParserList(ourConf, pMsg);
 	if(pParserList == NULL) {
 		pParserList = pDfltParsLst;
 	}
 	DBGPRINTF("parse using parser list %p%s.\n", pParserList,
 		  (pParserList == pDfltParsLst) ? " (the default list)" : "");
 
-	bIsSanitized = FALSE;
-	bPRIisParsed = FALSE;
+	bIsSanitized = RSFALSE;
+	bPRIisParsed = RSFALSE;
 	while(pParserList != NULL) {
 		pParser = pParserList->pParser;
-		if(pParser->bDoSanitazion && bIsSanitized == FALSE) {
+		if(pParser->bDoSanitazion && bIsSanitized == RSFALSE) {
 			CHKiRet(SanitizeMsg(pMsg));
-			if(pParser->bDoPRIParsing && bPRIisParsed == FALSE) {
+			if(pParser->bDoPRIParsing && bPRIisParsed == RSFALSE) {
 				CHKiRet(ParsePRI(pMsg));
-				bPRIisParsed = TRUE;
+				bPRIisParsed = RSTRUE;
 			}
-			bIsSanitized = TRUE;
+			bIsSanitized = RSTRUE;
 		}
 		localRet = pParser->pModule->mod.pm.parse(pMsg);
-		dbgprintf("Parser '%s' returned %d\n", pParser->pName, localRet);
+		DBGPRINTF("Parser '%s' returned %d\n", pParser->pName, localRet);
 		if(localRet != RS_RET_COULD_NOT_PARSE)
 			break;
 		pParserList = pParserList->pNext;
@@ -645,6 +658,7 @@ resetConfigVariables(uchar __attribute__((unused)) *pp, void __attribute__((unus
 {
 	cCCEscapeChar = '#';
 	bEscapeCCOnRcv = 1; /* default is to escape control characters */
+	bSpaceLFOnRcv = 0;
 	bEscape8BitChars = 0; /* default is to escape control characters */
 	bEscapeTab = 1; /* default is to escape control characters */
 	bDropTrailingLF = 1; /* default is to drop trailing LF's on reception */
@@ -698,6 +712,7 @@ BEGINObjClassInit(parser, 1, OBJ_IS_CORE_MODULE) /* class, version */
 	CHKiRet(regCfSysLineHdlr((uchar *)"controlcharacterescapeprefix", 0, eCmdHdlrGetChar, NULL, &cCCEscapeChar, NULL));
 	CHKiRet(regCfSysLineHdlr((uchar *)"droptrailinglfonreception", 0, eCmdHdlrBinary, NULL, &bDropTrailingLF, NULL));
 	CHKiRet(regCfSysLineHdlr((uchar *)"escapecontrolcharactersonreceive", 0, eCmdHdlrBinary, NULL, &bEscapeCCOnRcv, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"spacelfonreceive", 0, eCmdHdlrBinary, NULL, &bSpaceLFOnRcv, NULL));
 	CHKiRet(regCfSysLineHdlr((uchar *)"escape8bitcharactersonreceive", 0, eCmdHdlrBinary, NULL, &bEscape8BitChars, NULL));
 	CHKiRet(regCfSysLineHdlr((uchar *)"escapecontrolcharactertab", 0, eCmdHdlrBinary, NULL, &bEscapeTab, NULL));
 	CHKiRet(regCfSysLineHdlr((uchar *)"resetconfigvariables", 1, eCmdHdlrCustomHandler, resetConfigVariables, NULL, NULL));

@@ -62,11 +62,7 @@ sbin_PROGRAMS =
 subdir = runtime
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/atomic_operations.m4 \
-	$(top_srcdir)/m4/atomic_operations_64bit.m4 \
-	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
-	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
-	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
@@ -98,24 +94,19 @@ am__installdirs = "$(DESTDIR)$(pkglibdir)" "$(DESTDIR)$(sbindir)"
 LTLIBRARIES = $(noinst_LTLIBRARIES) $(pkglib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
 librsyslog_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am_librsyslog_la_OBJECTS = librsyslog_la-rsyslog.lo \
-	librsyslog_la-glbl.lo librsyslog_la-conf.lo \
+	librsyslog_la-dnscache.lo librsyslog_la-glbl.lo \
+	librsyslog_la-conf.lo librsyslog_la-rsconf.lo \
 	librsyslog_la-parser.lo librsyslog_la-strgen.lo \
 	librsyslog_la-msg.lo librsyslog_la-linkedlist.lo \
 	librsyslog_la-objomsr.lo librsyslog_la-stringbuf.lo \
 	librsyslog_la-datetime.lo librsyslog_la-srutils.lo \
 	librsyslog_la-errmsg.lo librsyslog_la-debug.lo \
 	librsyslog_la-obj.lo librsyslog_la-modules.lo \
-	librsyslog_la-apc.lo librsyslog_la-statsobj.lo \
-	librsyslog_la-sync.lo librsyslog_la-expr.lo \
-	librsyslog_la-ctok.lo librsyslog_la-ctok_token.lo \
-	librsyslog_la-stream.lo librsyslog_la-var.lo \
-	librsyslog_la-wtp.lo librsyslog_la-wti.lo \
-	librsyslog_la-sysvar.lo librsyslog_la-vm.lo \
-	librsyslog_la-vmstk.lo librsyslog_la-vmprg.lo \
-	librsyslog_la-vmop.lo librsyslog_la-queue.lo \
-	librsyslog_la-ruleset.lo librsyslog_la-rule.lo \
+	librsyslog_la-statsobj.lo librsyslog_la-stream.lo \
+	librsyslog_la-var.lo librsyslog_la-wtp.lo librsyslog_la-wti.lo \
+	librsyslog_la-queue.lo librsyslog_la-ruleset.lo \
 	librsyslog_la-prop.lo librsyslog_la-cfsysline.lo \
 	librsyslog_la-sd-daemon.lo librsyslog_la-action.lo \
 	librsyslog_la-threads.lo librsyslog_la-parse.lo \
@@ -250,7 +241,11 @@ CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
+CURL_CFLAGS = @CURL_CFLAGS@
+CURL_LIBS = @CURL_LIBS@
 CYGPATH_W = @CYGPATH_W@
+CZMQ_CFLAGS = @CZMQ_CFLAGS@
+CZMQ_LIBS = @CZMQ_LIBS@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
 DL_LIBS = @DL_LIBS@
@@ -266,27 +261,48 @@ GNUTLS_CFLAGS = @GNUTLS_CFLAGS@
 GNUTLS_LIBS = @GNUTLS_LIBS@
 GREP = @GREP@
 GSS_LIBS = @GSS_LIBS@
-HAVE_JAVAC = @HAVE_JAVAC@
+HAVE_CURL_CONFIG = @HAVE_CURL_CONFIG@
 HAVE_MYSQL_CONFIG = @HAVE_MYSQL_CONFIG@
 HAVE_ORACLE_CONFIG = @HAVE_ORACLE_CONFIG@
 HAVE_PGSQL_CONFIG = @HAVE_PGSQL_CONFIG@
+HIREDIS_CFLAGS = @HIREDIS_CFLAGS@
+HIREDIS_LIBS = @HIREDIS_LIBS@
 IMUDP_LIBS = @IMUDP_LIBS@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
+JSON_CFLAGS = @JSON_CFLAGS@
+JSON_C_CFLAGS = @JSON_C_CFLAGS@
+JSON_C_LIBS = @JSON_C_LIBS@
+JSON_LIBS = @JSON_LIBS@
 LD = @LD@
 LDFLAGS = @LDFLAGS@
+LEX = @LEX@
+LEXLIB = @LEXLIB@
+LEX_OUTPUT_ROOT = @LEX_OUTPUT_ROOT@
 LIBDBI_CFLAGS = @LIBDBI_CFLAGS@
 LIBDBI_LIBS = @LIBDBI_LIBS@
+LIBEE_CFLAGS = @LIBEE_CFLAGS@
+LIBEE_LIBS = @LIBEE_LIBS@
+LIBESTR_CFLAGS = @LIBESTR_CFLAGS@
+LIBESTR_LIBS = @LIBESTR_LIBS@
 LIBLOGGING_CFLAGS = @LIBLOGGING_CFLAGS@
 LIBLOGGING_LIBS = @LIBLOGGING_LIBS@
+LIBLOGNORM_CFLAGS = @LIBLOGNORM_CFLAGS@
+LIBLOGNORM_LIBS = @LIBLOGNORM_LIBS@
+LIBMONGO_CLIENT_CFLAGS = @LIBMONGO_CLIENT_CFLAGS@
+LIBMONGO_CLIENT_LIBS = @LIBMONGO_CLIENT_LIBS@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
+LIBUUID_CFLAGS = @LIBUUID_CFLAGS@
+LIBUUID_LIBS = @LIBUUID_LIBS@
 LIPO = @LIPO@
 LN_S = @LN_S@
+LOGNORM_CFLAGS = @LOGNORM_CFLAGS@
+LOGNORM_LIBS = @LOGNORM_LIBS@
 LTLIBOBJS = @LTLIBOBJS@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
@@ -319,7 +335,9 @@ RANLIB = @RANLIB@
 RELP_CFLAGS = @RELP_CFLAGS@
 RELP_LIBS = @RELP_LIBS@
 RSRT_CFLAGS = @RSRT_CFLAGS@
+RSRT_CFLAGS1 = @RSRT_CFLAGS1@
 RSRT_LIBS = @RSRT_LIBS@
+RSRT_LIBS1 = @RSRT_LIBS1@
 RT_LIBS = @RT_LIBS@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
@@ -331,6 +349,8 @@ STRIP = @STRIP@
 UDPSPOOF_CFLAGS = @UDPSPOOF_CFLAGS@
 UDPSPOOF_LIBS = @UDPSPOOF_LIBS@
 VERSION = @VERSION@
+YACC = @YACC@
+YFLAGS = @YFLAGS@
 ZLIB_LIBS = @ZLIB_LIBS@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
@@ -369,6 +389,7 @@ libdir = @libdir@
 libexecdir = @libexecdir@
 localedir = @localedir@
 localstatedir = @localstatedir@
+lt_ECHO = @lt_ECHO@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
 moddirs = @moddirs@
@@ -395,11 +416,14 @@ librsyslog_la_SOURCES = \
 	rsyslog.c \
 	rsyslog.h \
 	typedefs.h \
+	dnscache.c \
+	dnscache.h \
 	unicode-helper.h \
 	atomic.h \
 	batch.h \
 	syslogd-types.h \
 	module-template.h \
+	im-helper.h \
 	obj-types.h \
 	nsd.h \
 	glbl.h \
@@ -407,6 +431,8 @@ librsyslog_la_SOURCES = \
 	unlimited_select.h \
 	conf.c \
 	conf.h \
+	rsconf.c \
+	rsconf.h \
 	parser.h \
 	parser.c \
 	strgen.h \
@@ -431,18 +457,8 @@ librsyslog_la_SOURCES = \
 	obj.h \
 	modules.c \
 	modules.h \
-	apc.c \
-	apc.h \
 	statsobj.c \
 	statsobj.h \
-	sync.c \
-	sync.h \
-	expr.c \
-	expr.h \
-	ctok.c \
-	ctok.h \
-	ctok_token.c \
-	ctok_token.h \
 	stream.c \
 	stream.h \
 	var.c \
@@ -451,22 +467,10 @@ librsyslog_la_SOURCES = \
 	wtp.h \
 	wti.c \
 	wti.h \
-	sysvar.c \
-	sysvar.h \
-	vm.c \
-	vm.h \
-	vmstk.c \
-	vmstk.h \
-	vmprg.c \
-	vmprg.h \
-	vmop.c \
-	vmop.h \
 	queue.c \
 	queue.h \
 	ruleset.c \
 	ruleset.h \
-	rule.c \
-	rule.h \
 	prop.c \
 	prop.h \
 	cfsysline.c \
@@ -494,12 +498,12 @@ librsyslog_la_SOURCES = \
 	../template.c \
 	../template.h
 
-@WITH_MODDIRS_FALSE@librsyslog_la_CPPFLAGS = -DSD_EXPORT_SYMBOLS -D_PATH_MODDIR=\"$(pkglibdir)/\" -I$(top_srcdir) $(PTHREADS_CFLAGS)
+@WITH_MODDIRS_FALSE@librsyslog_la_CPPFLAGS = -DSD_EXPORT_SYMBOLS -D_PATH_MODDIR=\"$(pkglibdir)/\" -I$(top_srcdir) $(PTHREADS_CFLAGS) $(LIBEE_CFLAGS) -I\$(top_srcdir)/tools -I\$(top_srcdir)/grammar
 # the files with ../ we need to work on - so that they either become part of the
 # runtime or will no longer be needed. -- rgerhards, 2008-06-13
-@WITH_MODDIRS_TRUE@librsyslog_la_CPPFLAGS = -DSD_EXPORT_SYMBOLS -D_PATH_MODDIR=\"$(pkglibdir)/:$(moddirs)\" $(PTHREADS_CFLAGS)
+@WITH_MODDIRS_TRUE@librsyslog_la_CPPFLAGS = -DSD_EXPORT_SYMBOLS -D_PATH_MODDIR=\"$(pkglibdir)/:$(moddirs)\" $(PTHREADS_CFLAGS) $(LIBEE_CFLAGS) -I\$(top_srcdir)/tools
 #librsyslog_la_LDFLAGS = -module -avoid-version
-librsyslog_la_LIBADD = $(DL_LIBS) $(RT_LIBS)
+librsyslog_la_LIBADD = $(DL_LIBS) $(RT_LIBS) $(LIBEE_LIBS)
 @ENABLE_REGEXP_TRUE@lmregexp_la_SOURCES = regexp.c regexp.h
 @ENABLE_REGEXP_TRUE@lmregexp_la_CPPFLAGS = $(PTHREADS_CFLAGS) $(RSRT_CFLAGS)
 @ENABLE_REGEXP_TRUE@lmregexp_la_LDFLAGS = -module -avoid-version
@@ -681,15 +685,12 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-action.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-apc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-cfsysline.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-conf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-ctok.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-ctok_token.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-datetime.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-debug.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-dnscache.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-errmsg.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-expr.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-glbl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-hashtable.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-hashtable_itr.Plo@am__quote@
@@ -703,8 +704,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-parser.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-prop.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-queue.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-rsconf.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-rsyslog.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-rule.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-ruleset.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-sd-daemon.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-srutils.Plo@am__quote@
@@ -712,15 +713,9 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-stream.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-strgen.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-stringbuf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-sync.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-sysvar.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-template.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-threads.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-var.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-vm.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-vmop.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-vmprg.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-vmstk.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-wti.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-wtp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lmnet_la-net.Plo@am__quote@
@@ -770,6 +765,14 @@ librsyslog_la-rsyslog.lo: rsyslog.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-rsyslog.lo `test -f 'rsyslog.c' || echo '$(srcdir)/'`rsyslog.c
 
+librsyslog_la-dnscache.lo: dnscache.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-dnscache.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-dnscache.Tpo -c -o librsyslog_la-dnscache.lo `test -f 'dnscache.c' || echo '$(srcdir)/'`dnscache.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librsyslog_la-dnscache.Tpo $(DEPDIR)/librsyslog_la-dnscache.Plo
+@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='dnscache.c' object='librsyslog_la-dnscache.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-dnscache.lo `test -f 'dnscache.c' || echo '$(srcdir)/'`dnscache.c
+
 librsyslog_la-glbl.lo: glbl.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-glbl.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-glbl.Tpo -c -o librsyslog_la-glbl.lo `test -f 'glbl.c' || echo '$(srcdir)/'`glbl.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librsyslog_la-glbl.Tpo $(DEPDIR)/librsyslog_la-glbl.Plo
@@ -785,6 +788,14 @@ librsyslog_la-conf.lo: conf.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='conf.c' object='librsyslog_la-conf.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-conf.lo `test -f 'conf.c' || echo '$(srcdir)/'`conf.c
+
+librsyslog_la-rsconf.lo: rsconf.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-rsconf.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-rsconf.Tpo -c -o librsyslog_la-rsconf.lo `test -f 'rsconf.c' || echo '$(srcdir)/'`rsconf.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librsyslog_la-rsconf.Tpo $(DEPDIR)/librsyslog_la-rsconf.Plo
+@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='rsconf.c' object='librsyslog_la-rsconf.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-rsconf.lo `test -f 'rsconf.c' || echo '$(srcdir)/'`rsconf.c
 
 librsyslog_la-parser.lo: parser.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-parser.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-parser.Tpo -c -o librsyslog_la-parser.lo `test -f 'parser.c' || echo '$(srcdir)/'`parser.c
@@ -882,14 +893,6 @@ librsyslog_la-modules.lo: modules.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-modules.lo `test -f 'modules.c' || echo '$(srcdir)/'`modules.c
 
-librsyslog_la-apc.lo: apc.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-apc.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-apc.Tpo -c -o librsyslog_la-apc.lo `test -f 'apc.c' || echo '$(srcdir)/'`apc.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librsyslog_la-apc.Tpo $(DEPDIR)/librsyslog_la-apc.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='apc.c' object='librsyslog_la-apc.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-apc.lo `test -f 'apc.c' || echo '$(srcdir)/'`apc.c
-
 librsyslog_la-statsobj.lo: statsobj.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-statsobj.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-statsobj.Tpo -c -o librsyslog_la-statsobj.lo `test -f 'statsobj.c' || echo '$(srcdir)/'`statsobj.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librsyslog_la-statsobj.Tpo $(DEPDIR)/librsyslog_la-statsobj.Plo
@@ -897,38 +900,6 @@ librsyslog_la-statsobj.lo: statsobj.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='statsobj.c' object='librsyslog_la-statsobj.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-statsobj.lo `test -f 'statsobj.c' || echo '$(srcdir)/'`statsobj.c
-
-librsyslog_la-sync.lo: sync.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-sync.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-sync.Tpo -c -o librsyslog_la-sync.lo `test -f 'sync.c' || echo '$(srcdir)/'`sync.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librsyslog_la-sync.Tpo $(DEPDIR)/librsyslog_la-sync.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='sync.c' object='librsyslog_la-sync.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-sync.lo `test -f 'sync.c' || echo '$(srcdir)/'`sync.c
-
-librsyslog_la-expr.lo: expr.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-expr.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-expr.Tpo -c -o librsyslog_la-expr.lo `test -f 'expr.c' || echo '$(srcdir)/'`expr.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librsyslog_la-expr.Tpo $(DEPDIR)/librsyslog_la-expr.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='expr.c' object='librsyslog_la-expr.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-expr.lo `test -f 'expr.c' || echo '$(srcdir)/'`expr.c
-
-librsyslog_la-ctok.lo: ctok.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-ctok.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-ctok.Tpo -c -o librsyslog_la-ctok.lo `test -f 'ctok.c' || echo '$(srcdir)/'`ctok.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librsyslog_la-ctok.Tpo $(DEPDIR)/librsyslog_la-ctok.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='ctok.c' object='librsyslog_la-ctok.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-ctok.lo `test -f 'ctok.c' || echo '$(srcdir)/'`ctok.c
-
-librsyslog_la-ctok_token.lo: ctok_token.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-ctok_token.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-ctok_token.Tpo -c -o librsyslog_la-ctok_token.lo `test -f 'ctok_token.c' || echo '$(srcdir)/'`ctok_token.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librsyslog_la-ctok_token.Tpo $(DEPDIR)/librsyslog_la-ctok_token.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='ctok_token.c' object='librsyslog_la-ctok_token.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-ctok_token.lo `test -f 'ctok_token.c' || echo '$(srcdir)/'`ctok_token.c
 
 librsyslog_la-stream.lo: stream.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-stream.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-stream.Tpo -c -o librsyslog_la-stream.lo `test -f 'stream.c' || echo '$(srcdir)/'`stream.c
@@ -962,46 +933,6 @@ librsyslog_la-wti.lo: wti.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-wti.lo `test -f 'wti.c' || echo '$(srcdir)/'`wti.c
 
-librsyslog_la-sysvar.lo: sysvar.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-sysvar.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-sysvar.Tpo -c -o librsyslog_la-sysvar.lo `test -f 'sysvar.c' || echo '$(srcdir)/'`sysvar.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librsyslog_la-sysvar.Tpo $(DEPDIR)/librsyslog_la-sysvar.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='sysvar.c' object='librsyslog_la-sysvar.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-sysvar.lo `test -f 'sysvar.c' || echo '$(srcdir)/'`sysvar.c
-
-librsyslog_la-vm.lo: vm.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-vm.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-vm.Tpo -c -o librsyslog_la-vm.lo `test -f 'vm.c' || echo '$(srcdir)/'`vm.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librsyslog_la-vm.Tpo $(DEPDIR)/librsyslog_la-vm.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='vm.c' object='librsyslog_la-vm.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-vm.lo `test -f 'vm.c' || echo '$(srcdir)/'`vm.c
-
-librsyslog_la-vmstk.lo: vmstk.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-vmstk.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-vmstk.Tpo -c -o librsyslog_la-vmstk.lo `test -f 'vmstk.c' || echo '$(srcdir)/'`vmstk.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librsyslog_la-vmstk.Tpo $(DEPDIR)/librsyslog_la-vmstk.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='vmstk.c' object='librsyslog_la-vmstk.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-vmstk.lo `test -f 'vmstk.c' || echo '$(srcdir)/'`vmstk.c
-
-librsyslog_la-vmprg.lo: vmprg.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-vmprg.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-vmprg.Tpo -c -o librsyslog_la-vmprg.lo `test -f 'vmprg.c' || echo '$(srcdir)/'`vmprg.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librsyslog_la-vmprg.Tpo $(DEPDIR)/librsyslog_la-vmprg.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='vmprg.c' object='librsyslog_la-vmprg.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-vmprg.lo `test -f 'vmprg.c' || echo '$(srcdir)/'`vmprg.c
-
-librsyslog_la-vmop.lo: vmop.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-vmop.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-vmop.Tpo -c -o librsyslog_la-vmop.lo `test -f 'vmop.c' || echo '$(srcdir)/'`vmop.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librsyslog_la-vmop.Tpo $(DEPDIR)/librsyslog_la-vmop.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='vmop.c' object='librsyslog_la-vmop.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-vmop.lo `test -f 'vmop.c' || echo '$(srcdir)/'`vmop.c
-
 librsyslog_la-queue.lo: queue.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-queue.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-queue.Tpo -c -o librsyslog_la-queue.lo `test -f 'queue.c' || echo '$(srcdir)/'`queue.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librsyslog_la-queue.Tpo $(DEPDIR)/librsyslog_la-queue.Plo
@@ -1017,14 +948,6 @@ librsyslog_la-ruleset.lo: ruleset.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='ruleset.c' object='librsyslog_la-ruleset.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-ruleset.lo `test -f 'ruleset.c' || echo '$(srcdir)/'`ruleset.c
-
-librsyslog_la-rule.lo: rule.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-rule.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-rule.Tpo -c -o librsyslog_la-rule.lo `test -f 'rule.c' || echo '$(srcdir)/'`rule.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librsyslog_la-rule.Tpo $(DEPDIR)/librsyslog_la-rule.Plo
-@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='rule.c' object='librsyslog_la-rule.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-rule.lo `test -f 'rule.c' || echo '$(srcdir)/'`rule.c
 
 librsyslog_la-prop.lo: prop.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-prop.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-prop.Tpo -c -o librsyslog_la-prop.lo `test -f 'prop.c' || echo '$(srcdir)/'`prop.c

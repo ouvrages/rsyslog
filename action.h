@@ -26,7 +26,6 @@
 #define	ACTION_H_INCLUDED 1
 
 #include "syslogd-types.h"
-#include "sync.h"
 #include "queue.h"
 
 /* external data - this is to be removed when we change the action
@@ -37,7 +36,7 @@ extern int glbliActionResumeRetryCount;
 
 
 typedef enum {
-	ACT_STATE_DIED = 0,	/* action permanently failed and now disabled  - MUST BE ZEO! */
+	ACT_STATE_DIED = 0,	/* action permanently failed and now disabled  - MUST BE ZERO! */
 	ACT_STATE_RDY  = 1,	/* action ready, waiting for new transaction */
 	ACT_STATE_ITX  = 2,	/* transaction active, waiting for new data or commit */
 	ACT_STATE_COMM = 3, 	/* transaction finished (a transient state) */
@@ -75,7 +74,8 @@ struct action_s {
 	int	f_repeatcount;	/* number of "repeated" msgs */
 	rsRetVal (*submitToActQ)(action_t *, batch_t *);/* function submit message to action queue */
 	rsRetVal (*qConstruct)(struct queue_s *pThis);
-	enum 	{ ACT_STRING_PASSING = 0, ACT_ARRAY_PASSING = 1, ACT_MSG_PASSING }
+	enum 	{ ACT_STRING_PASSING = 0, ACT_ARRAY_PASSING = 1, ACT_MSG_PASSING = 2,
+		  ACT_JSON_PASSING = 3}
 		eParamPassing;	/* mode of parameter passing to action */
 	int	iNumTpls;	/* number of array entries for template element below */
 	struct template **ppTpl;/* array of template to use - strings must be passed to doAction
@@ -85,17 +85,21 @@ struct action_s {
 				 * processed - it is also used to detect duplicates.
 				 */
 	qqueue_t *pQueue;	/* action queue */
-	SYNC_OBJ_TOOL;		/* required for mutex support */
+	pthread_mutex_t mutAction; /* primary action mutex */
 	pthread_mutex_t mutActExec; /* mutex to guard actual execution of doAction for single-threaded modules */
 	uchar *pszName;		/* action name (for documentation) */
 	DEF_ATOMIC_HELPER_MUT(mutCAS);
+	/* for statistics subsystem */
+	statsobj_t *statsobj;
+	STATSCOUNTER_DEF(ctrProcessed, mutCtrProcessed);
+	STATSCOUNTER_DEF(ctrFail, mutCtrFail);
 };
 
 
 /* function prototypes
  */
 rsRetVal actionConstruct(action_t **ppThis);
-rsRetVal actionConstructFinalize(action_t *pThis);
+rsRetVal actionConstructFinalize(action_t *pThis, struct cnfparamvals *queueParams);
 rsRetVal actionDestruct(action_t *pThis);
 rsRetVal actionDbgPrint(action_t *pThis);
 rsRetVal actionSetGlobalResumeInterval(int iNewVal);
@@ -103,6 +107,9 @@ rsRetVal actionDoAction(action_t *pAction);
 rsRetVal actionWriteToAction(action_t *pAction);
 rsRetVal actionCallHUPHdlr(action_t *pAction);
 rsRetVal actionClassInit(void);
-rsRetVal addAction(action_t **ppAction, modInfo_t *pMod, void *pModData, omodStringRequest_t *pOMSR, int bSuspended);
+rsRetVal addAction(action_t **ppAction, modInfo_t *pMod, void *pModData, omodStringRequest_t *pOMSR, struct cnfparamvals *actParams, struct cnfparamvals *queueParams, int bSuspended);
+rsRetVal activateActions(void);
+rsRetVal actionNewInst(struct nvlst *lst, action_t **ppAction);
+rsRetVal actionProcessCnf(struct cnfobj *o);
 
 #endif /* #ifndef ACTION_H_INCLUDED */

@@ -3,6 +3,12 @@
 /* Defined if debug mode is enabled (its easier to check). */
 #undef DEBUG
 
+/* Defined if debugless mode is enabled. */
+#undef DEBUGLESS
+
+/* Indicator that GnuTLS is present */
+#undef ENABLE_GNUTLS
+
 /* Regular expressions support enabled. */
 #undef FEATURE_REGEXP
 
@@ -17,12 +23,6 @@
 
 /* Define to 1 if you have the <arpa/nameser.h> header file. */
 #undef HAVE_ARPA_NAMESER_H
-
-/* Define if compiler provides atomic builtins */
-#undef HAVE_ATOMIC_BUILTINS
-
-/* Define if compiler provides 64 bit atomic builtins */
-#undef HAVE_ATOMIC_BUILTINS_64BIT
 
 /* Define to 1 if you have the `basename' function. */
 #undef HAVE_BASENAME
@@ -171,6 +171,9 @@
 /* Define to 1 if you have the `socket' function. */
 #undef HAVE_SOCKET
 
+/* set define */
+#undef HAVE_SO_TIMESTAMP
+
 /* Define to 1 if `stat' has the bug that it succeeds when given the
    zero-length file name argument. */
 #undef HAVE_STAT_EMPTY_STRING_BUG
@@ -280,6 +283,9 @@
 /* Define to 1 if you have the <utmp.h> header file. */
 #undef HAVE_UTMP_H
 
+/* Define to 1 if you have the <uuid/uuid.h> header file. */
+#undef HAVE_UUID_UUID_H
+
 /* Define to 1 if you have the `vfork' function. */
 #undef HAVE_VFORK
 
@@ -321,6 +327,9 @@
 
 /* Indicator for a BSD OS */
 #undef OS_BSD
+
+/* Indicator for a Linux OS */
+#undef OS_LINUX
 
 /* Indicator for a Solaris OS */
 #undef OS_SOLARIS
@@ -420,6 +429,10 @@
 
 /* Version number of package */
 #undef VERSION
+
+/* Define to 1 if `lex' declares `yytext' as a `char *' by default, not a
+   `char[]'. */
+#undef YYTEXT_POINTER
 
 /* Number of bits in a file offset, on hosts where this is settable. */
 #undef _FILE_OFFSET_BITS

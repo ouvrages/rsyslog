@@ -79,6 +79,21 @@ typedef struct parserList_s parserList_t;
 typedef struct strgen_s strgen_t;
 typedef struct strgenList_s strgenList_t;
 typedef struct statsobj_s statsobj_t;
+typedef struct nsd_epworkset_s nsd_epworkset_t;
+typedef struct templates_s templates_t;
+typedef struct queuecnf_s queuecnf_t;
+typedef struct rulesets_s rulesets_t;
+typedef struct globals_s globals_t;
+typedef struct defaults_s defaults_t;
+typedef struct actions_s actions_t;
+typedef struct rsconf_s rsconf_t;
+typedef struct cfgmodules_s cfgmodules_t;
+typedef struct cfgmodules_etry_s cfgmodules_etry_t;
+typedef struct outchannels_s outchannels_t;
+typedef struct modConfData_s modConfData_t;
+typedef struct instanceConf_s instanceConf_t;
+typedef int rs_size_t; /* we do never need more than 2Gig strings, signed permits to
+			* use -1 as a special flag. */
 typedef rsRetVal (*prsf_t)(struct vmstk_s*, int);	/* pointer to a RainerScript function */
 typedef uint64 qDeqID;	/* queue Dequeue order ID. 32 bits is considered dangerously few */
 
@@ -127,8 +142,46 @@ typedef enum {
 	FIOP_ISEQUAL  = 2,	/* is (exactly) equal? */
 	FIOP_STARTSWITH = 3,	/* starts with a string? */
 	FIOP_REGEX = 4,		/* matches a (BRE) regular expression? */
-	FIOP_EREREGEX = 5	/* matches a ERE regular expression? */
+	FIOP_EREREGEX = 5,	/* matches a ERE regular expression? */
+	FIOP_ISEMPTY = 6	/* string empty <=> strlen(s) == 0 ?*/
 } fiop_t;
+
+/* types of configuration handlers
+ */
+typedef enum cslCmdHdlrType {
+	eCmdHdlrInvalid = 0,		/* invalid handler type - indicates a coding error */
+	eCmdHdlrCustomHandler,		/* custom handler, just call handler function */
+	eCmdHdlrUID,
+	eCmdHdlrGID,
+	eCmdHdlrBinary,
+	eCmdHdlrFileCreateMode,
+	eCmdHdlrInt,
+	eCmdHdlrNonNegInt,
+	eCmdHdlrPositiveInt,
+	eCmdHdlrSize,
+	eCmdHdlrGetChar,
+	eCmdHdlrFacility,
+	eCmdHdlrSeverity,
+	eCmdHdlrGetWord,
+	eCmdHdlrString,
+	eCmdHdlrArray,
+	eCmdHdlrQueueType,
+	eCmdHdlrGoneAway		/* statment existed, but is no longer supported */
+} ecslCmdHdrlType;
+
+
+/* the next type describes $Begin .. $End block object types
+ */
+typedef enum cslConfObjType {
+	eConfObjGlobal = 0,	/* global directives */
+	eConfObjAction,		/* action-specific directives */
+	/* now come states that indicate that we wait for a block-end. These are
+	 * states that permit us to do some safety checks and they hopefully ease
+	 * migration to a "real" parser/grammar.
+	 */
+	eConfObjActionWaitEnd,
+	eConfObjAlways		/* always valid, very special case (guess $End only!) */
+} ecslConfObjType;
 
 
 /* multi-submit support.

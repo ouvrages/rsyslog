@@ -75,12 +75,11 @@ ENDisCompatibleWithFeature
 BEGINparse
 	uchar *p2parse;
 	int lenMsg;
-	int bTAGCharDetected;
 	int i;	/* general index for parsing */
 	uchar bufParseTAG[CONF_TAG_MAXSIZE];
 	uchar bufParseHOSTNAME[CONF_HOSTNAME_MAXSIZE];
 CODESTARTparse
-	dbgprintf("Message will now be parsed by the legacy syslog parser (one size fits all... ;)).\n");
+	DBGPRINTF("Message will now be parsed by the legacy syslog parser (one size fits all... ;)).\n");
 	assert(pMsg != NULL);
 	assert(pMsg->pszRawMsg != NULL);
 	lenMsg = pMsg->iLenRawMsg - pMsg->offAfterPRI; /* note: offAfterPRI is already the number of PRI chars (do not add one!) */
@@ -137,7 +136,6 @@ CODESTARTparse
 		 * rgerhards, 2009-06-23: and I now have extended this logic to every character
 		 * that is not a valid hostname.
 		 */
-		bTAGCharDetected = 0;
 		if(lenMsg > 0 && pMsg->msgFlags & PARSE_HOSTNAME) {
 			i = 0;
 			while(i < lenMsg && (isalnum(p2parse[i]) || p2parse[i] == '.' || p2parse[i] == '.'
@@ -231,7 +229,7 @@ CODEmodInit_QueryRegCFSLineHdlr
 	CHKiRet(objUse(parser, CORE_COMPONENT));
 	CHKiRet(objUse(datetime, CORE_COMPONENT));
 
-	dbgprintf("rfc3164 parser init called\n");
+	DBGPRINTF("rfc3164 parser init called\n");
  	bParseHOSTNAMEandTAG = glbl.GetParseHOSTNAMEandTAG(); /* cache value, is set only during rsyslogd option processing */
 
 

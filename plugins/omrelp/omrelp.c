@@ -46,6 +46,7 @@
 
 MODULE_TYPE_OUTPUT
 MODULE_TYPE_NOKEEP
+MODULE_CNFNAME("omrelp")
 
 /* internal structures
  */
@@ -63,6 +64,15 @@ typedef struct _instanceData {
 	int bIsConnected; /* currently connected to server? 0 - no, 1 - yes */
 	relpClt_t *pRelpClt;		/* relp client for this instance */
 } instanceData;
+
+typedef struct configSettings_s {
+	EMPTY_STRUCT
+} configSettings_t;
+static configSettings_t __attribute__((unused)) cs;
+
+BEGINinitConfVars		/* (re)set config variables to default values */
+CODESTARTinitConfVars 
+ENDinitConfVars
 
 /* get the syslog forward port from selector_t. The passed in
  * struct must be one that is setup for forwarding.
@@ -336,6 +346,7 @@ ENDqueryEtryPt
 
 BEGINmodInit()
 CODESTARTmodInit
+INITLegCnfVars
 	*ipIFVersProvided = CURR_MOD_IF_VERSION; /* we only support the current interface specification */
 CODEmodInit_QueryRegCFSLineHdlr
 	/* create our relp engine */

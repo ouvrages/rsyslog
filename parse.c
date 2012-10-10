@@ -211,7 +211,7 @@ rsRetVal parsSkipAfterChar(rsParsObj *pThis, char c)
  * If bRequireOne is set to true, at least one whitespace
  * must exist, else an error is returned.
  */
-rsRetVal parsSkipWhitespace(rsParsObj *pThis, sbool bRequireOne)
+rsRetVal parsSkipWhitespace(rsParsObj *pThis)
 {
 	register unsigned char *pC;
 	int numSkipped;
@@ -230,16 +230,14 @@ rsRetVal parsSkipWhitespace(rsParsObj *pThis, sbool bRequireOne)
 		++numSkipped;
 	}
 
-	if(bRequireOne && numSkipped == 0)
-		iRet = RS_RET_MISSING_WHITESPACE;
-
 	RETiRet;
 }
 
 /* Parse string up to a delimiter.
  *
  * Input:
- * cDelim - the delimiter
+ * cDelim - the delimiter. Note that SP within a value always is a delimiter,
+ * so cDelim is actually an *additional* delimiter.
  *   The following two are for whitespace stripping,
  *   0 means "no", 1 "yes"
  *   - bTrimLeading
@@ -260,17 +258,17 @@ rsRetVal parsDelimCStr(rsParsObj *pThis, cstr_t **ppCStr, char cDelim, int bTrim
 	CHKiRet(rsCStrConstruct(&pCStr));
 
 	if(bTrimLeading)
-		parsSkipWhitespace(pThis, 0);
+		parsSkipWhitespace(pThis);
 
 	pC = rsCStrGetBufBeg(pThis->pCStr) + pThis->iCurrPos;
 
-	while(pThis->iCurrPos < rsCStrLen(pThis->pCStr) && *pC != cDelim) {
+	while(pThis->iCurrPos < rsCStrLen(pThis->pCStr) && *pC != cDelim && *pC != ' ') {
 		CHKiRet(cstrAppendChar(pCStr, bConvLower ? tolower(*pC) : *pC));
 		++pThis->iCurrPos;
 		++pC;
 	}
 	
-	if(*pC == cDelim) {
+	if(pThis->iCurrPos < cstrLen(pThis->pCStr)) { //BUGFIX!!
 		++pThis->iCurrPos; /* eat delimiter */
 	}
 
@@ -391,7 +389,7 @@ rsRetVal parsAddrWithBits(rsParsObj *pThis, struct NetAddr **pIP, int *pBits)
 
 	CHKiRet(cstrConstruct(&pCStr));
 
-	parsSkipWhitespace(pThis, 0);
+	parsSkipWhitespace(pThis);
 	pC = rsCStrGetBufBeg(pThis->pCStr) + pThis->iCurrPos;
 
 	/* we parse everything until either '/', ',' or

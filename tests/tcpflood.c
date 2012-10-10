@@ -91,8 +91,10 @@
 #include <errno.h>
 #ifdef ENABLE_GNUTLS
 #	include <gnutls/gnutls.h>
-#	include <gcrypt.h>
+#	if GNUTLS_VERSION_NUMBER <= 0x020b00
+#		include <gcrypt.h>
 	GCRY_THREAD_OPTION_PTHREAD_IMPL;
+#	endif
 #endif
 
 #define EXIT_FAILURE 1
@@ -346,7 +348,7 @@ genMsg(char *buf, size_t maxBuf, int *pLenBuf, struct instdata *inst)
 		do {
 			done = 1;
 			*pLenBuf = fread(buf, 1, 1024, dataFP);
-			if(feof(dataFP)) {
+			if(*pLenBuf == 0) {
 				if(--numFileIterations > 0)  {
 					rewind(dataFP);
 					done = 0; /* need new iteration */
@@ -358,7 +360,7 @@ genMsg(char *buf, size_t maxBuf, int *pLenBuf, struct instdata *inst)
 		} while(!done); /* Attention: do..while()! */
 	} else if(MsgToSend == NULL) {
 		if(dynFileIDs > 0) {
-			snprintf(dynFileIDBuf, maxBuf, "%d:", rand() % dynFileIDs);
+			snprintf(dynFileIDBuf, sizeof(dynFileIDBuf), "%d:", rand() % dynFileIDs);
 		}
 		if(extraDataLen == 0) {
 			*pLenBuf = snprintf(buf, maxBuf, "<%s>Mar  1 01:00:00 172.20.245.8 tag msgnum:%s%8.8d:%c",
@@ -660,7 +662,7 @@ runTests(void)
 	int run;
 
 	stats.totalRuntime = 0;
-	stats.minRuntime = (unsigned long long) 0xffffffffffffffffll;
+	stats.minRuntime = 0xffffffffllu;
 	stats.maxRuntime = 0;
 	stats.numRuns = numRuns;
 	run = 1;
@@ -707,7 +709,9 @@ initTLS(void)
 	int r;
 
 	/* order of gcry_control and gnutls_global_init matters! */
+	#if GNUTLS_VERSION_NUMBER <= 0x020b00
 	gcry_control(GCRYCTL_SET_THREAD_CBS, &gcry_threads_pthread);
+	#endif
 	gnutls_global_init();
 	/* set debug mode, if so required by the options */
 	if(tlsLogLevel > 0) {

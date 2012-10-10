@@ -16,7 +16,7 @@
  * it turns out to be problematic. Then, we need to quasi-refcount the number of accesses
  * to the object.
  *
- * Copyright 2008, 2009 Rainer Gerhards and Adiscon GmbH.
+ * Copyright 2008-2012 Rainer Gerhards and Adiscon GmbH.
  *
  * This file is part of the rsyslog runtime library.
  *
@@ -361,7 +361,7 @@ static rsRetVal strmCloseFile(strm_t *pThis)
 		pThis->fdDir = -1;
 	}
 
-	if(pThis->bDeleteOnClose) {
+	if(pThis->bDeleteOnClose && pThis->pszCurrFName != NULL) {
 		if(unlink((char*) pThis->pszCurrFName) == -1) {
 			char errStr[1024];
 			int err = errno;
@@ -369,13 +369,11 @@ static rsRetVal strmCloseFile(strm_t *pThis)
 			DBGPRINTF("error %d unlinking '%s' - ignored: %s\n",
 				   errno, pThis->pszCurrFName, errStr);
 		}
-	}
-
-	pThis->iCurrOffs = 0;	/* we are back at begin of file */
-	if(pThis->pszCurrFName != NULL) {
 		free(pThis->pszCurrFName);	/* no longer needed in any case (just for open) */
 		pThis->pszCurrFName = NULL;
 	}
+
+	pThis->iCurrOffs = 0;	/* we are back at begin of file */
 
 	RETiRet;
 }
@@ -1012,6 +1010,7 @@ asyncWriterThread(void *pPtr)
 	struct timespec t;
 	sbool bTimedOut = 0;
 	strm_t *pThis = (strm_t*) pPtr;
+	int err;
 	ISOBJ_TYPE_assert(pThis, strm);
 
 	BEGINfunc
@@ -1038,8 +1037,7 @@ asyncWriterThread(void *pPtr)
 			bTimedOut = 0;
 			timeoutComp(&t, pThis->iFlushInterval * 1000); /* *1000 millisconds */
 			if(pThis->bDoTimedWait) {
-				if(pthread_cond_timedwait(&pThis->notEmpty, &pThis->mut, &t) != 0) {
-					int err = errno;
+				if((err = pthread_cond_timedwait(&pThis->notEmpty, &pThis->mut, &t)) != 0) {
 					if(err == ETIMEDOUT) {
 						bTimedOut = 1;
 					} else {
@@ -1172,7 +1170,7 @@ doZipWrite(strm_t *pThis, uchar *pBuf, size_t lenBuf)
 {
 	z_stream zstrm;
 	int zRet;	/* zlib return state */
-	sbool bzInitDone = FALSE;
+	sbool bzInitDone = RSFALSE;
 	DEFiRet;
 	assert(pThis != NULL);
 	assert(pBuf != NULL);
@@ -1188,7 +1186,7 @@ doZipWrite(strm_t *pThis, uchar *pBuf, size_t lenBuf)
 		DBGPRINTF("error %d returned from zlib/deflateInit2()\n", zRet);
 		ABORT_FINALIZE(RS_RET_ZLIB_ERR);
 	}
-	bzInitDone = TRUE;
+	bzInitDone = RSTRUE;
 
 	/* now doing the compression */
 	zstrm.next_in = (Bytef*) pBuf;	/* as of zlib doc, this must be set BEFORE DeflateInit2 */

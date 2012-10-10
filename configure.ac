@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[5.8.11],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[7.1.9],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -17,13 +17,9 @@ AC_GNU_SOURCE
 AC_CHECK_PROG(have_valgrind, [valgrind], [yes])
 AM_CONDITIONAL(HAVE_VALGRIND, test x$have_valgrind = xyes)
 
-# check for Java compiler
-AC_CHECK_PROG(HAVE_JAVAC, [javac], [yes])
-if test x"$HAVE_JAVAC" = x""; then
-        AC_MSG_WARN([no javac found, disabling features depending on it])
-fi
-
 # Checks for programs.
+AC_PROG_LEX
+AC_PROG_YACC
 AC_PROG_CC
 AM_PROG_CC_C_O
 if test "$GCC" = "yes"
@@ -35,11 +31,19 @@ AC_CANONICAL_HOST
 
 PKG_PROG_PKG_CONFIG
 
+# modules we require
+PKG_CHECK_MODULES(LIBESTR, libestr >= 0.1.2)
+PKG_CHECK_MODULES(LIBEE, libee >= 0.4.0)
+PKG_CHECK_MODULES([JSON_C], [json])
+AC_SUBST([JSON_CFLAGS])
+AC_SUBST([JSON_LIBS])
+
 case "${host}" in
   *-*-linux*)
+    AC_DEFINE([OS_LINUX], [1], [Indicator for a Linux OS])
     os_type="linux"
   ;;
-  *-*-*darwin*|*-*-freebsd*|*-*-netbsd*|*-*-openbsd*)
+  *-*-*darwin*|*-*-dragonfly*|*-*-freebsd*|*-*-netbsd*|*-*-openbsd*)
     AC_DEFINE([OS_BSD], [1], [Indicator for a BSD OS])
     os_type="bsd"
   ;;
@@ -117,6 +121,8 @@ AC_CHECK_FUNCS([flock basename alarm clock_gettime gethostbyname gethostname get
 # the check below is probably ugly. If someone knows how to do it in a better way, please
 # let me know! -- rgerhards, 2010-10-06
 AC_CHECK_DECL([SCM_CREDENTIALS], [AC_DEFINE(HAVE_SCM_CREDENTIALS, [1], [set define])], [], [#include <sys/types.h>
+#include <sys/socket.h>])
+AC_CHECK_DECL([SO_TIMESTAMP], [AC_DEFINE(HAVE_SO_TIMESTAMP, [1], [set define])], [], [#include <sys/types.h>
 #include <sys/socket.h>])
 
 # Check for MAXHOSTNAMELEN
@@ -324,6 +330,18 @@ AM_CONDITIONAL(ENABLE_IMKLOG_BSD, test x$os_type = xbsd)
 AM_CONDITIONAL(ENABLE_IMKLOG_LINUX, test x$os_type = xlinux)
 AM_CONDITIONAL(ENABLE_IMKLOG_SOLARIS, test x$os_type = xsolaris)
 
+# kmsg
+AC_ARG_ENABLE(kmsg,
+        [AS_HELP_STRING([--enable-kmsg],[Kmsg structured kernel logs functionality @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_kmsg="yes" ;;
+          no) enable_kmsg="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-kmsg) ;;
+         esac],
+        [enable_kmsg="no"]
+)
+AM_CONDITIONAL(ENABLE_IMKMSG, test x$enable_kmsg = xyes)
+
 
 #
 # SYSLOG_UNIXAF
@@ -442,6 +460,22 @@ if test "$enable_rtinst" = "yes"; then
 fi
 
 
+# total debugless: highest performance, but no way at all to enable debug 
+# logging
+AC_ARG_ENABLE(debugless,
+        [AS_HELP_STRING([--enable-debugless],[Enable runtime instrumentation mode @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_debugless="yes" ;;
+          no) enable_debugless="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-debugless) ;;
+         esac],
+        [enable_debugless="no"]
+)
+if test "$enable_debugless" = "yes"; then
+        AC_DEFINE(DEBUGLESS, 1, [Defined if debugless mode is enabled.])
+fi
+
+
 # valgrind
 AC_ARG_ENABLE(valgrind,
         [AS_HELP_STRING([--enable-valgrind],[Enable valgrind support settings @<:@default=no@:>@])],
@@ -484,6 +518,18 @@ AC_ARG_ENABLE(diagtools,
 )
 AM_CONDITIONAL(ENABLE_DIAGTOOLS, test x$enable_diagtools = xyes)
 
+
+# compile end-user tools
+AC_ARG_ENABLE(usertools,
+        [AS_HELP_STRING([--enable-usertools],[Enable end user tools @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_usertools="yes" ;;
+          no) enable_usertools="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-usertools) ;;
+         esac],
+        [enable_usertools=no]
+)
+AM_CONDITIONAL(ENABLE_USERTOOLS, test x$enable_usertools = xyes)
 
 
 # MySQL support
@@ -655,6 +701,21 @@ AM_CONDITIONAL(ENABLE_OMLIBDBI, test x$enable_libdbi = xyes)
 AC_SUBST(LIBDBI_CFLAGS)
 AC_SUBST(LIBDBI_LIBS)
 
+# libuuid support
+AC_CHECK_HEADERS(
+  [uuid/uuid.h],,
+  [AC_MSG_FAILURE([libuuid is missing])]
+)
+AC_CHECK_LIB(
+  [uuid],
+  [uuid_generate],
+  [LIBUUID_CFLAGS=""
+   LIBUUID_LIBS="-luuid"
+  ],
+  [AC_MSG_FAILURE([libuuid library is missing])]
+)
+AC_SUBST(LIBUUID_CFLAGS)
+AC_SUBST(LIBUUID_LIBS)
 
 # SNMP support
 AC_ARG_ENABLE(snmp,
@@ -685,6 +746,40 @@ AC_SUBST(SNMP_CFLAGS)
 AC_SUBST(SNMP_LIBS)
 
 
+# elasticsearch support
+AC_ARG_ENABLE(elasticsearch,
+        [AS_HELP_STRING([--enable-elasticsearch],[Enable elasticsearch output module @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_elasticsearch="yes" ;;
+          no) enable_elasticsearch="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-elasticsearch) ;;
+         esac],
+        [enable_elasticsearch=no]
+)
+if test "x$enable_elasticsearch" = "xyes"; then
+  AC_CHECK_PROG(
+    [HAVE_CURL_CONFIG],
+    [curl-config],
+    [yes],,,
+  )
+  if test "x${HAVE_CURL_CONFIG}" != "xyes"; then
+    AC_MSG_FAILURE([curl-config not found in PATH])
+  fi
+  AC_CHECK_LIB(
+    [curl],
+    [curl_global_init],
+    [CURL_CFLAGS="`curl-config --cflags`"
+      CURL_LIBS="`curl-config --libs`"
+    ],
+    [AC_MSG_FAILURE([curl library is missing])],
+    [`curl-config --libs --cflags`]
+  )
+fi
+AM_CONDITIONAL(ENABLE_ELASTICSEARCH, test x$enable_elasticsearch = xyes)
+AC_SUBST(CURL_CFLAGS)
+AC_SUBST(CURL_LIBS)
+
+
 # GnuTLS support
 AC_ARG_ENABLE(gnutls,
         [AS_HELP_STRING([--enable-gnutls],[Enable GNU TLS support @<:@default=no@:>@])],
@@ -697,6 +792,7 @@ AC_ARG_ENABLE(gnutls,
 )
 if test "x$enable_gnutls" = "xyes"; then
 	PKG_CHECK_MODULES(GNUTLS, gnutls >= 1.4.0)
+	AC_DEFINE([ENABLE_GNUTLS], [1], [Indicator that GnuTLS is present])
 fi
 AM_CONDITIONAL(ENABLE_GNUTLS, test x$enable_gnutls = xyes)
 AC_SUBST(GNUTLS_CFLAGS)
@@ -714,10 +810,15 @@ AC_ARG_ENABLE(rsyslogrt,
         [enable_rsyslogrt=yes]
 )
 if test "x$enable_rsyslogrt" = "xyes"; then
-  RSRT_CFLAGS="-I\$(top_srcdir)/runtime -I\$(top_srcdir)"
-  RSRT_LIBS="\$(top_builddir)/runtime/librsyslog.la"
+  RSRT_CFLAGS1="-I\$(top_srcdir)/runtime -I\$(top_srcdir) -I\$(top_srcdir)/grammar"
+  RSRT_LIBS1="\$(top_builddir)/runtime/librsyslog.la"
+  #??CNF_LIBS="\$(top_builddir)/grammar/libgrammar.la"
 fi
 AM_CONDITIONAL(ENABLE_RSYSLOGRT, test x$enable_rsyslogrt = xyes)
+RSRT_CFLAGS="\$(RSRT_CFLAGS1) \$(LIBESTR_CFLAGS) \$(JSON_C_FLAGS)"
+RSRT_LIBS="\$(RSRT_LIBS1) \$(LIBESTR_LIBS) \$(JSON_C_LIBS)"
+AC_SUBST(RSRT_CFLAGS1)
+AC_SUBST(RSRT_LIBS1)
 AC_SUBST(RSRT_CFLAGS)
 AC_SUBST(RSRT_LIBS)
 
@@ -799,6 +900,57 @@ AC_ARG_ENABLE(imdiag,
 AM_CONDITIONAL(ENABLE_IMDIAG, test x$enable_imdiag = xyes)
 
 
+# mmnormalize
+AC_ARG_ENABLE(mmnormalize,
+        [AS_HELP_STRING([--enable-mmnormalize],[Enable building mmnormalize support @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_mmnormalize="yes" ;;
+          no) enable_mmnormalize="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-mmnormalize) ;;
+         esac],
+        [enable_mmnormalize=no]
+)
+if test "x$enable_mmnormalize" = "xyes"; then
+	PKG_CHECK_MODULES(LIBLOGNORM, lognorm >= 0.3.1)
+fi
+AM_CONDITIONAL(ENABLE_MMNORMALIZE, test x$enable_mmnormalize = xyes)
+AC_SUBST(LOGNORM_CFLAGS)
+AC_SUBST(LOGNORM_LIBS)
+
+
+# mmnjsonparse
+AC_ARG_ENABLE(mmjsonparse,
+        [AS_HELP_STRING([--enable-mmjsonparse],[Enable building mmjsonparse support @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_mmjsonparse="yes" ;;
+          no) enable_mmjsonparse="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-mmjsonparse) ;;
+         esac],
+        [enable_mmjsonparse=no]
+)
+if test "x$enable_mmjsonparse" = "xyes"; then
+	PKG_CHECK_MODULES(LIBLOGNORM, lognorm >= 0.3.1)
+fi
+AM_CONDITIONAL(ENABLE_MMJSONPARSE, test x$enable_mmjsonparse = xyes)
+
+
+
+# mmaudit
+AC_ARG_ENABLE(mmaudit,
+        [AS_HELP_STRING([--enable-mmaudit],[Enable building mmaudit support @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_mmaudit="yes" ;;
+          no) enable_mmaudit="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-mmaudit) ;;
+         esac],
+        [enable_mmaudit=no]
+)
+if test "x$enable_mmaudit" = "xyes"; then
+	PKG_CHECK_MODULES(LIBLOGNORM, lognorm >= 0.3.1)
+fi
+AM_CONDITIONAL(ENABLE_MMAUDIT, test x$enable_mmaudit = xyes)
+
+
 # RELP support
 AC_ARG_ENABLE(relp,
         [AS_HELP_STRING([--enable-relp],[Enable RELP support @<:@default=no@:>@])],
@@ -810,7 +962,7 @@ AC_ARG_ENABLE(relp,
         [enable_relp=no]
 )
 if test "x$enable_relp" = "xyes"; then
-	PKG_CHECK_MODULES(RELP, relp >= 0.1.1)
+	PKG_CHECK_MODULES(RELP, relp >= 1.0.1)
 fi
 AM_CONDITIONAL(ENABLE_RELP, test x$enable_relp = xyes)
 AC_SUBST(RELP_CFLAGS)
@@ -885,6 +1037,19 @@ AC_ARG_ENABLE(imptcp,
         [enable_imptcp=no]
 )
 AM_CONDITIONAL(ENABLE_IMPTCP, test x$enable_imptcp = xyes)
+
+
+# settings for the ttcp input module
+AC_ARG_ENABLE(imttcp,
+        [AS_HELP_STRING([--enable-imttcp],[threaded plain tcp input module enabled @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_imttcp="yes" ;;
+          no) enable_imttcp="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-imttcp) ;;
+         esac],
+        [enable_imttcp=no]
+)
+AM_CONDITIONAL(ENABLE_IMTTCP, test x$enable_imttcp = xyes)
 
 
 # settings for the pstats input module
@@ -1034,20 +1199,6 @@ AC_ARG_ENABLE(omruleset,
 AM_CONDITIONAL(ENABLE_OMRULESET, test x$enable_omruleset = xyes)
 
 
-# settings for omdbalerting
-AC_ARG_ENABLE(omdbalerting,
-        [AS_HELP_STRING([--enable-omdbalerting],[Compiles omdbalerting module @<:@default=no@:>@])],
-        [case "${enableval}" in
-         yes) enable_omdbalerting="yes" ;;
-          no) enable_omdbalerting="no" ;;
-           *) AC_MSG_ERROR(bad value ${enableval} for --enable-omdbalerting) ;;
-         esac],
-        [enable_omdbalerting=no]
-)
-AM_CONDITIONAL(ENABLE_OMDBALERTING, test x$enable_omdbalerting = xyes)
-
-
-
 # building the GUI (mostly for diagnostic reasons)
 AC_ARG_ENABLE(gui,
         [AS_HELP_STRING([--enable-gui],[Enable GUI programs @<:@default=no@:>@])],
@@ -1082,73 +1233,18 @@ AC_ARG_ENABLE(omuxsock,
 AM_CONDITIONAL(ENABLE_OMUXSOCK, test x$enable_omuxsock = xyes)
 
 
-# This provides a vehicle to integrate custom modules, that are not
-# part of rsyslog, into the build process. It is named cust1, so that
-# additional such modules can easily be added.
-AC_ARG_ENABLE(cust1,
-        [AS_HELP_STRING([--enable-cust1],[Compiles cust1 module @<:@default=no@:>@])],
-        [case "${enableval}" in
-         yes) enable_cust1="yes" ;;
-          no) enable_cust1="no" ;;
-           *) AC_MSG_ERROR(bad value ${enableval} for --enable-cust1) ;;
-         esac],
-        [enable_cust1=no]
-)
-AM_CONDITIONAL(ENABLE_CUST1, test x$enable_cust1 = xyes)
-
-
 # A custom strgen that also serves as a sample of how to do
 # SQL-generating strgen's
-AC_ARG_ENABLE(smcustbindcdr,
-        [AS_HELP_STRING([--enable-smcustbindcdr],[Compiles smcustbindcdr module @<:@default=no@:>@])],
+AC_ARG_ENABLE(sm_cust_bindcdr,
+        [AS_HELP_STRING([--enable-sm_cust_bindcdr],[Compiles sm_cust_bindcdr module @<:@default=no@:>@])],
         [case "${enableval}" in
-         yes) enable_smcustbindcdr="yes" ;;
-          no) enable_smcustbindcdr="no" ;;
-           *) AC_MSG_ERROR(bad value ${enableval} for --enable-smcustbindcdr) ;;
+         yes) enable_sm_cust_bindcdr="yes" ;;
+          no) enable_sm_cust_bindcdr="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-sm_cust_bindcdr) ;;
          esac],
-        [enable_smcustbindcdr=no]
+        [enable_sm_cust_bindcdr=no]
 )
-AM_CONDITIONAL(ENABLE_SMCUSTBINDCDR, test x$enable_smcustbindcdr = xyes)
-
-
-# settings for the template input module; copy and modify this code
-# if you intend to add your own module. Be sure to replace imtemplate
-# by the actual name of your module.
-AC_ARG_ENABLE(imtemplate,
-        [AS_HELP_STRING([--enable-imtemplate],[Compiles imtemplate template module @<:@default=no@:>@])],
-        [case "${enableval}" in
-         yes) enable_imtemplate="yes" ;;
-          no) enable_imtemplate="no" ;;
-           *) AC_MSG_ERROR(bad value ${enableval} for --enable-imtemplate) ;;
-         esac],
-        [enable_imtemplate=no]
-)
-#
-# you may want to do some library checks here - see snmp, mysql, pgsql modules
-# for samples
-#
-AM_CONDITIONAL(ENABLE_IMTEMPLATE, test x$enable_imtemplate = xyes)
-# end of copy template - be sure to search for imtemplate to find everything!
-
-
-# settings for the template output module; copy and modify this code
-# if you intend to add your own module. Be sure to replace omtemplate
-# by the actual name of your module.
-AC_ARG_ENABLE(omtemplate,
-        [AS_HELP_STRING([--enable-omtemplate],[Compiles omtemplate template module @<:@default=no@:>@])],
-        [case "${enableval}" in
-         yes) enable_omtemplate="yes" ;;
-          no) enable_omtemplate="no" ;;
-           *) AC_MSG_ERROR(bad value ${enableval} for --enable-omtemplate) ;;
-         esac],
-        [enable_omtemplate=no]
-)
-#
-# you may want to do some library checks here - see snmp, mysql, pgsql modules
-# for samples
-#
-AM_CONDITIONAL(ENABLE_OMTEMPLATE, test x$enable_omtemplate = xyes)
-# end of copy template - be sure to search for omtemplate to find everything!
+AM_CONDITIONAL(ENABLE_SMCUSTBINDCDR, test x$enable_sm_cust_bindcdr = xyes)
 
 
 # settings for mmsnmptrapd message modification module
@@ -1181,8 +1277,87 @@ AC_ARG_ENABLE(omhdfs,
 AM_CONDITIONAL(ENABLE_OMHDFS, test x$enable_omhdfs = xyes)
 
 
+#MONGODB SUPPORT
+
+AC_ARG_ENABLE(ommongodb,
+        [AS_HELP_STRING([--enable-ommongodb],[Compiles ommongodb template module @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_ommongodb="yes" ;;
+          no) enable_ommongodb="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-ommongodb) ;;
+         esac],
+        [enable_ommongodb=no]
+)
+if test "x$enable_ommongodb" = "xyes"; then
+	PKG_CHECK_MODULES(LIBMONGO_CLIENT, libmongo-client >= 0.1.4)
+	AC_SUBST(LIBMONGO_CLIENT_CFLAGS)
+	AC_SUBST(LIBMONGO_CLIENT_LIBS)
+fi
+AM_CONDITIONAL(ENABLE_OMMONGODB, test x$enable_ommongodb = xyes)
+# end of mongodb code
+
+# BEGIN ZMQ3 INPUT SUPPORT
+AC_ARG_ENABLE(imzmq3,
+        [AS_HELP_STRING([--enable-imzmq3],[Compiles imzmq3 output module @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_imzmq3="yes" ;;
+          no) enable_imzmq3="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-imzmq3) ;;
+         esac],
+        [enable_imzmq3=no]
+)
+if test "x$enable_imzmq3" = "xyes"; then
+	PKG_CHECK_MODULES(CZMQ, libczmq >= 1.1.0)
+	AC_SUBST(CZMQ_CFLAGS)
+	AC_SUBST(CZMQ_LIBS)
+fi
+AM_CONDITIONAL(ENABLE_IMZMQ3, test x$enable_imzmq3 = xyes)
+
+# END ZMQ3 INPUT SUPPORT
+
+# BEGIN ZMQ3 OUTPUT SUPPORT
+AC_ARG_ENABLE(omzmq3,
+        [AS_HELP_STRING([--enable-omzmq3],[Compiles omzmq3 output module @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_omzmq3="yes" ;;
+          no) enable_omzmq3="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-omzmq3) ;;
+         esac],
+        [enable_omzmq3=no]
+)
+if test "x$enable_omzmq3" = "xyes"; then
+	PKG_CHECK_MODULES(CZMQ, libczmq >= 1.1.0)
+	AC_SUBST(CZMQ_CFLAGS)
+	AC_SUBST(CZMQ_LIBS)
+fi
+AM_CONDITIONAL(ENABLE_OMZMQ3, test x$enable_omzmq3 = xyes)
+
+# END ZMQ3 SUPPORT
+
+# HIREDIS SUPPORT
+
+AC_ARG_ENABLE(omhiredis,
+        [AS_HELP_STRING([--enable-omhiredis],[Compiles omhiredis template module @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_omhiredis="yes" ;;
+          no) enable_omhiredis="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-omhiredis) ;;
+         esac],
+        [enable_omhiredis=no]
+)
+#
+if test "x$enable_omhiredis" = "xyes"; then
+	PKG_CHECK_MODULES(HIREDIS, hiredis >= 0.10.1)
+	AC_SUBST(HIREDIS_CFLAGS)
+	AC_SUBST(HIREDIS_LIBS)
+fi
+AM_CONDITIONAL(ENABLE_OMHIREDIS, test x$enable_omhiredis = xyes)
+
+# END HIREDIS SUPPORT
+
 AC_CONFIG_FILES([Makefile \
 		runtime/Makefile \
+		grammar/Makefile \
 		tools/Makefile \
 		doc/Makefile \
 		plugins/imudp/Makefile \
@@ -1192,8 +1367,7 @@ AC_CONFIG_FILES([Makefile \
 		plugins/imuxsock/Makefile \
 		plugins/immark/Makefile \
 		plugins/imklog/Makefile \
-		plugins/imtemplate/Makefile \
-		plugins/omtemplate/Makefile \
+		plugins/imkmsg/Makefile \
 		plugins/omhdfs/Makefile \
 		plugins/omprog/Makefile \
 		plugins/omstdout/Makefile \
@@ -1203,14 +1377,15 @@ AC_CONFIG_FILES([Makefile \
 		plugins/pmsnare/Makefile \
 		plugins/pmaixforwardedfrom/Makefile \
 		plugins/omruleset/Makefile \
-		plugins/omdbalerting/Makefile \
 		plugins/omuxsock/Makefile \
 		plugins/imfile/Makefile \
 		plugins/imsolaris/Makefile \
 		plugins/imptcp/Makefile \
+		plugins/imttcp/Makefile \
 		plugins/impstats/Makefile \
 		plugins/imrelp/Makefile \
 		plugins/imdiag/Makefile \
+        plugins/imzmq3/Makefile \
 		plugins/omtesting/Makefile \
 		plugins/omgssapi/Makefile \
 		plugins/ommysql/Makefile \
@@ -1221,11 +1396,18 @@ AC_CONFIG_FILES([Makefile \
 		plugins/omsnmp/Makefile \
 		plugins/omoracle/Makefile \
 		plugins/omudpspoof/Makefile \
+		plugins/ommongodb/Makefile \
+        plugins/omhiredis/Makefile \
+        plugins/omzmq3/Makefile \
+		plugins/mmnormalize/Makefile \
+		plugins/mmjsonparse/Makefile \
+		plugins/mmaudit/Makefile \
+		plugins/omelasticsearch/Makefile \
 		plugins/sm_cust_bindcdr/Makefile \
 		plugins/mmsnmptrapd/Makefile \
-		plugins/cust1/Makefile \
 		java/Makefile \
 		tests/Makefile])
+#add on demand: plugins/cust1/Makefile
 AC_OUTPUT
 
 echo "****************************************************"
@@ -1238,28 +1420,29 @@ echo "    Zlib compression support enabled:         $enable_zlib"
 echo "    rsyslog runtime will be built:            $enable_rsyslogrt"
 echo "    rsyslogd will be built:                   $enable_rsyslogd"
 echo "    GUI components will be built:             $enable_gui"
-echo "    custom module 1 will be built:            $enable_cust1"
 echo "    Unlimited select() support enabled:       $enable_unlimited_select"
 echo
 echo "---{ input plugins }---"
 echo "    Klog functionality enabled:               $enable_klog ($os_type)"
+echo "    /dev/kmsg functionality enabled:          $enable_kmsg"
 echo "    plain tcp input module enabled:           $enable_imptcp"
+echo "    threaded plain tcp input module enabled:  $enable_imttcp"
 echo "    imdiag enabled:                           $enable_imdiag"
 echo "    file input module enabled:                $enable_imfile"
 echo "    Solaris input module enabled:             $enable_imsolaris"
 echo "    periodic statistics module enabled:       $enable_impstats"
-echo "    input template module will be compiled:   $enable_imtemplate"
+echo "    imzmq3 input module enabled:              $enable_imzmq3"
 echo
 echo "---{ output plugins }---"
 echo "    Mail support enabled:                     $enable_mail"
 echo "    omprog module will be compiled:           $enable_omprog"
 echo "    omstdout module will be compiled:         $enable_omstdout"
 echo "    omhdfs module will be compiled:           $enable_omhdfs"
+echo "    omelasticsearch module will be compiled:  $enable_elasticsearch"
 echo "    omruleset module will be compiled:        $enable_omruleset"
-echo "    omdbalerting module will be compiled:     $enable_omdbalerting"
 echo "    omudpspoof module will be compiled:       $enable_omudpspoof"
 echo "    omuxsock module will be compiled:         $enable_omuxsock"
-echo "    output template module will be compiled:  $enable_omtemplate"
+echo "    omzmq3 module will be compiled:           $enable_omzmq3"
 echo
 echo "---{ parser modules }---"
 echo "    pmrfc3164sd module will be compiled:      $enable_pmrfc3164sd"
@@ -1269,6 +1452,9 @@ echo "    pmaixforwardedfrom module w.be compiled:  $enable_pmaixforwardedfrom"
 echo "    pmsnare module will be compiled:          $enable_pmsnare"
 echo
 echo "---{ message modification modules }---"
+echo "    mmnormalize module will be compiled:      $enable_mmnormalize"
+echo "    mmjsonparse module will be compiled:      $enable_mmjsonparse"
+echo "    mmjaduit module will be compiled:         $enable_mmaudit"
 echo "    mmsnmptrapd module will be compiled:      $enable_mmsnmptrapd"
 echo
 echo "---{ strgen modules }---"
@@ -1278,6 +1464,8 @@ echo "---{ database support }---"
 echo "    MySql support enabled:                    $enable_mysql"
 echo "    libdbi support enabled:                   $enable_libdbi"
 echo "    PostgreSQL support enabled:               $enable_pgsql"
+echo "    mongodb support enabled:                  $enable_ommongodb"
+echo "    hiredis support enabled:                  $enable_omhiredis"
 echo "    Oracle (OCI) support enabled:             $enable_oracle"
 echo
 echo "---{ protocol support }---"
@@ -1292,7 +1480,9 @@ echo "    Extended Testbench enabled:               $enable_extended_tests"
 echo "    MySQL Tests enabled:                      $enable_mysql_tests"
 echo "    Debug mode enabled:                       $enable_debug"
 echo "    Runtime Instrumentation enabled:          $enable_rtinst"
+echo "    (total) debugless mode enabled:           $enable_debugless"
 echo "    Diagnostic tools enabled:                 $enable_diagtools"
+echo "    End-User tools enabled:                   $enable_usertools"
 echo "    Enhanced memory checking enabled:         $enable_memcheck"
 echo "    Valgrind support settings enabled:        $enable_valgrind"
 echo

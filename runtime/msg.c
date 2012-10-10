@@ -36,16 +36,21 @@
 #include <assert.h>
 #include <ctype.h>
 #include <sys/socket.h>
+#include <sys/sysinfo.h>
 #include <netdb.h>
+#include <libestr.h>
+#include <json/json.h>
+/* For struct json_object_iter, should not be necessary in future versions */
+#include <json/json_object_private.h>
 #if HAVE_MALLOC_H
 #  include <malloc.h>
 #endif
+#include <uuid/uuid.h>
 #include "rsyslog.h"
 #include "srUtils.h"
 #include "stringbuf.h"
 #include "template.h"
 #include "msg.h"
-#include "var.h"
 #include "datetime.h"
 #include "glbl.h"
 #include "regexp.h"
@@ -54,10 +59,10 @@
 #include "ruleset.h"
 #include "prop.h"
 #include "net.h"
+#include "rsconf.h"
 
 /* static data */
 DEFobjStaticHelpers
-DEFobjCurrIf(var)
 DEFobjCurrIf(datetime)
 DEFobjCurrIf(glbl)
 DEFobjCurrIf(regexp)
@@ -261,6 +266,9 @@ static struct {
 	{ UCHAR_CONSTANT("190"), 5},
 	{ UCHAR_CONSTANT("191"), 5}
 	};
+static char hexdigit[16] =
+	{'0', '1', '2', '3', '4', '5', '6', '7', '8',
+	 '9', 'A', 'B', 'C', 'D', 'E', 'F' };
 
 /*syslog facility names (as of RFC5424) */
 static char *syslog_fac_names[24] = { "kern", "user", "mail", "daemon", "auth", "syslog", "lpr",
@@ -285,6 +293,9 @@ static pthread_mutex_t mutTrimCtr;	 /* mutex to handle malloc trim */
 
 /* some forward declarations */
 static int getAPPNAMELen(msg_t *pM, sbool bLockMutex);
+static rsRetVal jsonPathFindParent(msg_t *pM, uchar *name, uchar *leaf, struct json_object **parent, int bCreate);
+static uchar * jsonPathGetLeaf(uchar *name, int lenName);
+static struct json_object *jsonDeepCopy(struct json_object *src);
 
 
 /* The following functions will support advanced output module
@@ -431,12 +442,12 @@ resolveDNS(msg_t *pMsg) {
 		}
 	}
 finalize_it:
-	MsgUnlock(pMsg);
 	if(iRet != RS_RET_OK) {
 		/* best we can do: remove property */
 		MsgSetRcvFromStr(pMsg, UCHAR_CONSTANT(""), 0, &propFromHost);
 		prop.Destruct(&propFromHost);
 	}
+	MsgUnlock(pMsg);
 	if(propFromHost != NULL)
 		prop.Destruct(&propFromHost);
 	if(propFromHostIP != NULL)
@@ -479,16 +490,13 @@ getRcvFromIP(msg_t *pM)
 }
 
 
-
-/* map a property name (string) to a property ID */
-rsRetVal propNameToID(cstr_t *pCSPropName, propid_t *pPropID)
+/* map a property name (C string) to a property ID */
+rsRetVal
+propNameStrToID(uchar *pName, propid_t *pPropID)
 {
-	uchar *pName;
 	DEFiRet;
 
-	assert(pCSPropName != NULL);
-	assert(pPropID != NULL);
-	pName = rsCStrGetSzStrNoNULL(pCSPropName);
+	assert(pName != NULL);
 
 	/* sometimes there are aliases to the original MonitoWare
 	 * property names. These come after || in the ifs below. */
@@ -503,11 +511,6 @@ rsRetVal propNameToID(cstr_t *pCSPropName, propid_t *pPropID)
 		*pPropID = PROP_SYSLOGTAG;
 	} else if(!strcmp((char*) pName, "rawmsg")) {
 		*pPropID = PROP_RAWMSG;
-	/* enable this, if someone actually uses UxTradMsg, delete after some  time has
-	 * passed and nobody complained -- rgerhards, 2009-06-16
-	} else if(!strcmp((char*) pName, "uxtradmsg")) {
-		pRes = getUxTradMsg(pMsg);
-	*/
 	} else if(!strcmp((char*) pName, "inputname")) {
 		*pPropID = PROP_INPUTNAME;
 	} else if(!strcmp((char*) pName, "fromhost")) {
@@ -542,6 +545,10 @@ rsRetVal propNameToID(cstr_t *pCSPropName, propid_t *pPropID)
 		*pPropID = PROP_PROCID;
 	} else if(!strcmp((char*) pName, "msgid")) {
 		*pPropID = PROP_MSGID;
+	} else if(!strcmp((char*) pName, "parsesuccess")) {
+		*pPropID = PROP_PARSESUCCESS;
+	} else if(!strcmp((char*) pName, "uuid")) {
+		*pPropID = PROP_UUID;
 	/* here start system properties (those, that do not relate to the message itself */
 	} else if(!strcmp((char*) pName, "$now")) {
 		*pPropID = PROP_SYS_NOW;
@@ -561,13 +568,34 @@ rsRetVal propNameToID(cstr_t *pCSPropName, propid_t *pPropID)
 		*pPropID = PROP_SYS_MINUTE;
 	} else if(!strcmp((char*) pName, "$myhostname")) {
 		*pPropID = PROP_SYS_MYHOSTNAME;
+	} else if(!strcmp((char*) pName, "$!all-json")) {
+		*pPropID = PROP_CEE_ALL_JSON;
+	} else if(!strncmp((char*) pName, "$!", 2)) {
+		*pPropID = PROP_CEE;
 	} else if(!strcmp((char*) pName, "$bom")) {
 		*pPropID = PROP_SYS_BOM;
+	} else if(!strcmp((char*) pName, "$uptime")) {
+		*pPropID = PROP_SYS_UPTIME;
 	} else {
 		*pPropID = PROP_INVALID;
 		iRet = RS_RET_VAR_NOT_FOUND;
 	}
 
+	RETiRet;
+}
+
+
+/* map a property name (string) to a property ID */
+rsRetVal
+propNameToID(cstr_t *pCSPropName, propid_t *pPropID)
+{
+	uchar *pName;
+	DEFiRet;
+
+	assert(pCSPropName != NULL);
+	assert(pPropID != NULL);
+	pName = rsCStrGetSzStrNoNULL(pCSPropName);
+	iRet =  propNameStrToID(pName, pPropID);
 	RETiRet;
 }
 
@@ -586,12 +614,6 @@ uchar *propIDToName(propid_t propID)
 			return UCHAR_CONSTANT("syslogtag");
 		case PROP_RAWMSG:
 			return UCHAR_CONSTANT("rawmsg");
-		/* enable this, if someone actually uses UxTradMsg, delete after some  time has
-		 * passed and nobody complained -- rgerhards, 2009-06-16
-		case PROP_UXTRADMSG:
-			pRes = getUxTradMsg(pMsg);
-			break;
-		*/
 		case PROP_INPUTNAME:
 			return UCHAR_CONSTANT("inputname");
 		case PROP_FROMHOST:
@@ -626,6 +648,8 @@ uchar *propIDToName(propid_t propID)
 			return UCHAR_CONSTANT("procid");
 		case PROP_MSGID:
 			return UCHAR_CONSTANT("msgid");
+		case PROP_PARSESUCCESS:
+			return UCHAR_CONSTANT("parsesuccess");
 		case PROP_SYS_NOW:
 			return UCHAR_CONSTANT("$NOW");
 		case PROP_SYS_YEAR:
@@ -644,8 +668,14 @@ uchar *propIDToName(propid_t propID)
 			return UCHAR_CONSTANT("$MINUTE");
 		case PROP_SYS_MYHOSTNAME:
 			return UCHAR_CONSTANT("$MYHOSTNAME");
+		case PROP_CEE:
+			return UCHAR_CONSTANT("*CEE-based property*");
+		case PROP_CEE_ALL_JSON:
+			return UCHAR_CONSTANT("$!all-json");
 		case PROP_SYS_BOM:
 			return UCHAR_CONSTANT("$BOM");
+		case PROP_UUID:
+			return UCHAR_CONSTANT("uuid");
 		default:
 			return UCHAR_CONSTANT("*invalid property id*");
 	}
@@ -684,6 +714,7 @@ static inline rsRetVal msgBaseConstruct(msg_t **ppThis)
 	pM->flowCtlType = 0;
 	pM->bDoLock = 0;
 	pM->bAlreadyFreed = 0;
+	pM->bParseSuccess = 0;
 	pM->iRefCount = 1;
 	pM->iSeverity = -1;
 	pM->iFacility = -1;
@@ -714,6 +745,7 @@ static inline rsRetVal msgBaseConstruct(msg_t **ppThis)
 	pM->pRcvFromIP = NULL;
 	pM->rcvFrom.pRcvFrom = NULL;
 	pM->pRuleset = NULL;
+	pM->json = NULL;
 	memset(&pM->tRcvdAt, 0, sizeof(pM->tRcvdAt));
 	memset(&pM->tTIMESTAMP, 0, sizeof(pM->tTIMESTAMP));
 	pM->TAG.pszTAG = NULL;
@@ -721,6 +753,9 @@ static inline rsRetVal msgBaseConstruct(msg_t **ppThis)
 	pM->pszTimestamp3339[0] = '\0';
 	pM->pszTIMESTAMP_SecFrac[0] = '\0';
 	pM->pszRcvdAt_SecFrac[0] = '\0';
+	pM->pszTIMESTAMP_Unix[0] = '\0';
+	pM->pszRcvdAt_Unix[0] = '\0';
+	pM->pszUUID = NULL;
 
 	/* DEV debugging only! dbgprintf("msgConstruct\t0x%x, ref 1\n", (int)pM);*/
 
@@ -849,6 +884,10 @@ CODESTARTobjDestruct(msg)
 			rsCStrDestruct(&pThis->pCSPROCID);
 		if(pThis->pCSMSGID != NULL)
 			rsCStrDestruct(&pThis->pCSMSGID);
+		if(pThis->json != NULL)
+			json_object_put(pThis->json);
+		if(pThis->pszUUID != NULL)
+			free(pThis->pszUUID);
 #	ifndef HAVE_ATOMIC_BUILTINS
 		MsgUnlock(pThis);
 # 	endif
@@ -961,10 +1000,6 @@ msg_t* MsgDup(msg_t* pOld)
 		pNew->pInputName = pOld->pInputName;
 		prop.AddRef(pNew->pInputName);
 	}
-	/* enable this, if someone actually uses UxTradMsg, delete after some time has
-	 * passed and nobody complained -- rgerhards, 2009-06-16
-	pNew->offAfterPRI = pOld->offAfterPRI;
-	*/
 	if(pOld->iLenTAG > 0) {
 		if(pOld->iLenTAG < CONF_TAG_BUFSIZE) {
 			memcpy(pNew->TAG.szBuf, pOld->TAG.szBuf, pOld->iLenTAG + 1);
@@ -982,11 +1017,15 @@ msg_t* MsgDup(msg_t* pOld)
 	} else {
 		tmpCOPYSZ(RawMsg);
 	}
-	if(pOld->iLenHOSTNAME < CONF_HOSTNAME_BUFSIZE) {
-		memcpy(pNew->szHOSTNAME, pOld->szHOSTNAME, pOld->iLenHOSTNAME + 1);
-		pNew->pszHOSTNAME = pNew->szHOSTNAME;
+	if(pOld->pszHOSTNAME == NULL) {
+		pNew->pszHOSTNAME = NULL;
 	} else {
-		tmpCOPYSZ(HOSTNAME);
+		if(pOld->iLenHOSTNAME < CONF_HOSTNAME_BUFSIZE) {
+			memcpy(pNew->szHOSTNAME, pOld->szHOSTNAME, pOld->iLenHOSTNAME + 1);
+			pNew->pszHOSTNAME = pNew->szHOSTNAME;
+		} else {
+			tmpCOPYSZ(HOSTNAME);
+		}
 	}
 
 	tmpCOPYCSTR(ProgName);
@@ -994,6 +1033,9 @@ msg_t* MsgDup(msg_t* pOld)
 	tmpCOPYCSTR(APPNAME);
 	tmpCOPYCSTR(PROCID);
 	tmpCOPYCSTR(MSGID);
+
+	if(pOld->json != NULL)
+		pNew->json = jsonDeepCopy(pOld->json);
 
 	/* we do not copy all other cache properties, as we do not even know
 	 * if they are needed once again. So we let them re-create if needed.
@@ -1036,10 +1078,6 @@ static rsRetVal MsgSerialize(msg_t *pThis, strm_t *pStrm)
 	objSerializeSCALAR(pStrm, ttGenTime, INT);
 	objSerializeSCALAR(pStrm, tRcvdAt, SYSLOGTIME);
 	objSerializeSCALAR(pStrm, tTIMESTAMP, SYSLOGTIME);
-	/* enable this, if someone actually uses UxTradMsg, delete after some  time has
-	 * passed and nobody complained -- rgerhards, 2009-06-16
-	objSerializeSCALAR(pStrm, offsAfterPRI, SHORT);
-	*/
 
 	CHKiRet(obj.SerializeProp(pStrm, UCHAR_CONSTANT("pszTAG"), PROPTYPE_PSZ, (void*)
 		((pThis->iLenTAG < CONF_TAG_BUFSIZE) ? pThis->TAG.szBuf : pThis->TAG.pszTAG)));
@@ -1052,12 +1090,18 @@ static rsRetVal MsgSerialize(msg_t *pThis, strm_t *pStrm)
 	CHKiRet(obj.SerializeProp(pStrm, UCHAR_CONSTANT("pszRcvFrom"), PROPTYPE_PSZ, (void*) psz));
 	psz = getRcvFromIP(pThis); 
 	CHKiRet(obj.SerializeProp(pStrm, UCHAR_CONSTANT("pszRcvFromIP"), PROPTYPE_PSZ, (void*) psz));
+	if(pThis->json != NULL) {
+		psz = (uchar*) json_object_get_string(pThis->json);
+		CHKiRet(obj.SerializeProp(pStrm, UCHAR_CONSTANT("json"), PROPTYPE_PSZ, (void*) psz));
+	}
 
 	objSerializePTR(pStrm, pCSStrucData, CSTR);
 	objSerializePTR(pStrm, pCSAPPNAME, CSTR);
 	objSerializePTR(pStrm, pCSPROCID, CSTR);
 	objSerializePTR(pStrm, pCSMSGID, CSTR);
 	
+	objSerializePTR(pStrm, pszUUID, PSZ);
+
 	if(pThis->pRuleset != NULL) {
 		rulesetGetName(pThis->pRuleset);
 		CHKiRet(obj.SerializeProp(pStrm, UCHAR_CONSTANT("pszRuleset"), PROPTYPE_PSZ,
@@ -1220,8 +1264,62 @@ char *getProtocolVersionString(msg_t *pM)
 	return(pM->iProtocolVersion ? "1" : "0");
 }
 
+/* note: libuuid seems not to be thread-safe, so we need
+ * to get some safeguards in place.
+ */
+static void msgSetUUID(msg_t *pM)
+{
+	size_t lenRes = sizeof(uuid_t) * 2 + 1;
+	char hex_char [] = "0123456789ABCDEF";
+	unsigned int byte_nbr;
+	uuid_t uuid;
+	static pthread_mutex_t mutUUID = PTHREAD_MUTEX_INITIALIZER;
 
-static inline void
+	dbgprintf("[MsgSetUUID] START\n");
+	assert(pM != NULL);
+
+	if((pM->pszUUID = (uchar*) MALLOC(lenRes)) == NULL) {
+		pM->pszUUID = (uchar *)"";
+	} else {
+		pthread_mutex_lock(&mutUUID);
+		uuid_generate(uuid);
+		pthread_mutex_unlock(&mutUUID);
+		for (byte_nbr = 0; byte_nbr < sizeof (uuid_t); byte_nbr++) {
+			pM->pszUUID[byte_nbr * 2 + 0] = hex_char[uuid [byte_nbr] >> 4];
+			pM->pszUUID[byte_nbr * 2 + 1] = hex_char[uuid [byte_nbr] & 15];
+		}
+
+		dbgprintf("[MsgSetUUID] UUID : %s LEN: %d \n", pM->pszUUID, (int)lenRes);
+		pM->pszUUID[lenRes] = '\0';
+	}
+	dbgprintf("[MsgSetUUID] END\n");
+}
+
+void getUUID(msg_t *pM, uchar **pBuf, int *piLen)
+{
+	dbgprintf("[getUUID] START\n");
+	if(pM == NULL) {
+		dbgprintf("[getUUID] pM is NULL\n");
+		*pBuf=	UCHAR_CONSTANT("");
+		*piLen = 0;
+	} else {
+		if(pM->pszUUID == NULL) {
+			dbgprintf("[getUUID] pM->pszUUID is NULL\n");
+			MsgLock(pM);
+			/* re-query, things may have changed in the mean time... */
+			if(pM->pszUUID == NULL)
+				msgSetUUID(pM);
+			MsgUnlock(pM);
+		} else { /* UUID already there we reuse it */
+			dbgprintf("[getUUID] pM->pszUUID already exists\n");
+		}
+		*pBuf = pM->pszUUID;
+		*piLen = sizeof(uuid_t) * 2;
+	}
+	dbgprintf("[getUUID] END\n");
+}
+
+void
 getRawMsg(msg_t *pM, uchar **pBuf, int *piLen)
 {
 	if(pM == NULL) {
@@ -1237,18 +1335,6 @@ getRawMsg(msg_t *pM, uchar **pBuf, int *piLen)
 		}
 	}
 }
-
-
-/* enable this, if someone actually uses UxTradMsg, delete after some  time has
- * passed and nobody complained -- rgerhards, 2009-06-16
-char *getUxTradMsg(msg_t *pM)
-{
-	if(pM == NULL)
-		return "";
-	else
-		return (char*)pM->pszRawMsg + pM->offAfterPRI;
-}
-*/
 
 
 int getMSGLen(msg_t *pM)
@@ -1345,6 +1431,13 @@ getTimeReported(msg_t *pM, enum tplFormatTypes eFmt)
 		}
 		MsgUnlock(pM);
 		return(pM->pszTIMESTAMP3339);
+	case tplFmtUnixDate:
+		MsgLock(pM);
+		if(pM->pszTIMESTAMP_Unix[0] == '\0') {
+			datetime.formatTimestampUnix(&pM->tTIMESTAMP, pM->pszTIMESTAMP_Unix);
+		}
+		MsgUnlock(pM);
+		return(pM->pszTIMESTAMP_Unix);
 	case tplFmtSecFrac:
 		if(pM->pszTIMESTAMP_SecFrac[0] == '\0') {
 			MsgLock(pM);
@@ -1424,6 +1517,13 @@ static inline char *getTimeGenerated(msg_t *pM, enum tplFormatTypes eFmt)
 		}
 		MsgUnlock(pM);
 		return(pM->pszRcvdAt3339);
+	case tplFmtUnixDate:
+		MsgLock(pM);
+		if(pM->pszRcvdAt_Unix[0] == '\0') {
+			datetime.formatTimestampUnix(&pM->tRcvdAt, pM->pszRcvdAt_Unix);
+		}
+		MsgUnlock(pM);
+		return(pM->pszRcvdAt_Unix);
 	case tplFmtSecFrac:
 		if(pM->pszRcvdAt_SecFrac[0] == '\0') {
 			MsgLock(pM);
@@ -1618,7 +1718,7 @@ char *getPROCID(msg_t *pM, sbool bLockMutex)
 		MsgLock(pM);
 	preparePROCID(pM, MUTEX_ALREADY_LOCKED);
 	if(pM->pCSPROCID == NULL)
-		pszRet = UCHAR_CONSTANT("");
+		pszRet = UCHAR_CONSTANT("-");
 	else 
 		pszRet = rsCStrGetSzStrNoNULL(pM->pCSPROCID);
 	if(bLockMutex == LOCK_MUTEX)
@@ -1645,6 +1745,15 @@ finalize_it:
 }
 
 
+/* Return state of last parser. If it had success, "OK" is returned, else
+ * "FAIL". All from the constant pool.
+ */
+static inline char *getParseSuccess(msg_t *pM)
+{
+	return (pM->bParseSuccess) ? "OK" : "FAIL";
+}
+
+
 /* al, 2011-07-26: LockMsg to avoid race conditions
  */
 static inline char *getMSGID(msg_t *pM)
@@ -1658,6 +1767,14 @@ static inline char *getMSGID(msg_t *pM)
 		MsgUnlock(pM);
 		return pszreturn; 
 	}
+}
+
+/* rgerhards 2012-03-15: set parser success (an integer, acutally bool)
+ */
+void MsgSetParseSuccess(msg_t *pMsg, int bSuccess)
+{
+	assert(pMsg != NULL);
+	pMsg->bParseSuccess = bSuccess;
 }
 
 /* rgerhards 2009-06-12: set associated ruleset
@@ -1675,7 +1792,7 @@ void MsgSetRuleset(msg_t *pMsg, ruleset_t *pRuleset)
 static void
 MsgSetRulesetByName(msg_t *pMsg, cstr_t *rulesetName)
 {
-	rulesetGetRuleset(&(pMsg->pRuleset), rsCStrGetSzStrNoNULL(rulesetName));
+	rulesetGetRuleset(runConf, &(pMsg->pRuleset), rsCStrGetSzStrNoNULL(rulesetName));
 }
 
 
@@ -1705,7 +1822,6 @@ void MsgSetTAG(msg_t *pMsg, uchar* pszBuf, size_t lenBuf)
 
 	memcpy(pBuf, pszBuf, pMsg->iLenTAG);
 	pBuf[pMsg->iLenTAG] = '\0'; /* this also works with truncation! */
-
 }
 
 
@@ -1867,7 +1983,6 @@ static inline char *getStructuredData(msg_t *pM)
 	MsgUnlock(pM);
 	return (char*) pszRet;
 }
-
 
 /* check if we have a ProgramName, and, if not, try to aquire/emulate it.
  * rgerhards, 2009-06-26
@@ -2192,7 +2307,6 @@ finalize_it:
 	RETiRet;
 }
 
-
 /* set raw message in message object. Size of message is provided.
  * The function makes sure that the stored rawmsg is properly
  * terminated by '\0'.
@@ -2243,8 +2357,8 @@ char *textpri(char *pRes, size_t pResLen, int pri)
 	assert(pRes != NULL);
 	assert(pResLen > 0);
 
-	snprintf(pRes, pResLen, "%s.%s<%d>", syslog_fac_names[LOG_FAC(pri)],
-		 syslog_severity_names[LOG_PRI(pri)], pri);
+	snprintf(pRes, pResLen, "%s.%s", syslog_fac_names[LOG_FAC(pri)],
+		 syslog_severity_names[LOG_PRI(pri)]);
 
 	return pRes;
 }
@@ -2301,6 +2415,238 @@ static uchar *getNOW(eNOWType eNow)
 #undef tmpBUFSIZE /* clean up */
 
 
+/* Get a CEE-Property as string value*/
+rsRetVal
+getCEEPropVal(msg_t *pM, es_str_t *propName, uchar **pRes, rs_size_t *buflen, unsigned short *pbMustBeFreed)
+{
+	uchar *name = NULL;
+	uchar *leaf;
+	struct json_object *parent;
+	struct json_object *field;
+	DEFiRet;
+
+	if(*pbMustBeFreed)
+		free(*pRes);
+	*pRes = NULL;
+	// TODO: mutex?
+	if(pM->json == NULL) goto finalize_it;
+
+	if(!es_strbufcmp(propName, (uchar*)"!", 1)) {
+		field = pM->json;
+	} else {
+		name = (uchar*)es_str2cstr(propName, NULL);
+		leaf = jsonPathGetLeaf(name, ustrlen(name));
+		CHKiRet(jsonPathFindParent(pM, name, leaf, &parent, 1));
+		field = json_object_object_get(parent, (char*)leaf);
+	}
+	if(field != NULL) {
+		*pRes = (uchar*) strdup(json_object_get_string(field));
+		*buflen = (int) ustrlen(*pRes);
+		*pbMustBeFreed = 1;
+	}
+
+finalize_it:
+	free(name);
+	if(*pRes == NULL) {
+		/* could not find any value, so set it to empty */
+		*pRes = (unsigned char*)"";
+		*pbMustBeFreed = 0;
+	}
+	RETiRet;
+}
+
+
+/* Get a CEE-Property as native json object
+ */
+rsRetVal
+msgGetCEEPropJSON(msg_t *pM, es_str_t *propName, struct json_object **pjson)
+{
+	uchar *name = NULL;
+	uchar *leaf;
+	struct json_object *parent;
+	DEFiRet;
+
+	// TODO: mutex?
+	if(pM->json == NULL) {
+		ABORT_FINALIZE(RS_RET_NOT_FOUND);
+	}
+
+	if(!es_strbufcmp(propName, (uchar*)"!", 1)) {
+		*pjson = pM->json;
+		FINALIZE;
+	}
+	name = (uchar*)es_str2cstr(propName, NULL);
+	leaf = jsonPathGetLeaf(name, ustrlen(name));
+	CHKiRet(jsonPathFindParent(pM, name, leaf, &parent, 1));
+	*pjson = json_object_object_get(parent, (char*)leaf);
+	if(*pjson == NULL) {
+		ABORT_FINALIZE(RS_RET_NOT_FOUND);
+	}
+
+finalize_it:
+	free(name);
+	RETiRet;
+}
+
+
+/* Encode a JSON value and add it to provided string. Note that 
+ * the string object may be NULL. In this case, it is created
+ * if and only if escaping is needed.
+ */
+static rsRetVal
+jsonAddVal(uchar *pSrc, unsigned buflen, es_str_t **dst)
+{
+	unsigned char c;
+	es_size_t i;
+	char numbuf[4];
+	int j;
+	DEFiRet;
+
+	for(i = 0 ; i < buflen ; ++i) {
+		c = pSrc[i];
+		if(   (c >= 0x23 && c <= 0x5b)
+		   || (c >= 0x5d /* && c <= 0x10FFFF*/)
+		   || c == 0x20 || c == 0x21) {
+			/* no need to escape */
+			if(*dst != NULL)
+				es_addChar(dst, c);
+		} else {
+			if(*dst == NULL) {
+				if(i == 0) {
+					/* we hope we have only few escapes... */
+					*dst = es_newStr(buflen+10);
+				} else {
+					*dst = es_newStrFromBuf((char*)pSrc, i);
+				}
+				if(*dst == NULL) {
+					ABORT_FINALIZE(RS_RET_OUT_OF_MEMORY);
+				}
+			}
+			/* we must escape, try RFC4627-defined special sequences first */
+			switch(c) {
+			case '\0':
+				es_addBuf(dst, "\\u0000", 6);
+				break;
+			case '\"':
+				es_addBuf(dst, "\\\"", 2);
+				break;
+			case '/':
+				es_addBuf(dst, "\\/", 2);
+				break;
+			case '\\':
+				es_addBuf(dst, "\\\\", 2);
+				break;
+			case '\010':
+				es_addBuf(dst, "\\b", 2);
+				break;
+			case '\014':
+				es_addBuf(dst, "\\f", 2);
+				break;
+			case '\n':
+				es_addBuf(dst, "\\n", 2);
+				break;
+			case '\r':
+				es_addBuf(dst, "\\r", 2);
+				break;
+			case '\t':
+				es_addBuf(dst, "\\t", 2);
+				break;
+			default:
+				/* TODO : proper Unicode encoding (see header comment) */
+				for(j = 0 ; j < 4 ; ++j) {
+					numbuf[3-j] = hexdigit[c % 16];
+					c = c / 16;
+				}
+				es_addBuf(dst, "\\u", 2);
+				es_addBuf(dst, numbuf, 4);
+				break;
+			}
+		}
+	}
+finalize_it:
+	RETiRet;
+}
+
+
+/* encode a property in JSON escaped format. This is a helper
+ * to MsgGetProp. It needs to update all provided parameters.
+ * Note: Code is borrowed from libee (my own code, so ASL 2.0
+ * is fine with it); this function may later be replaced by
+ * some "better" and more complete implementation (maybe from
+ * libee or its helpers).
+ * For performance reasons, we begin to copy the string only
+ * when we recognice that we actually need to do some escaping.
+ * rgerhards, 2012-03-16
+ */
+static rsRetVal
+jsonEncode(uchar **ppRes, unsigned short *pbMustBeFreed, int *pBufLen)
+{
+	unsigned buflen;
+	uchar *pSrc;
+	es_str_t *dst = NULL;
+	DEFiRet;
+
+	pSrc = *ppRes;
+	buflen = (*pBufLen == -1) ? ustrlen(pSrc) : *pBufLen;
+	CHKiRet(jsonAddVal(pSrc, buflen, &dst));
+
+	if(dst != NULL) {
+		/* we updated the string and need to replace the
+		 * previous data.
+		 */
+		if(*pbMustBeFreed)
+			free(*ppRes);
+		*ppRes = (uchar*)es_str2cstr(dst, NULL);
+		*pbMustBeFreed = 1;
+		*pBufLen = -1;
+		es_deleteStr(dst);
+	}
+
+finalize_it:
+	RETiRet;
+}
+
+
+/* Format a property as JSON field, that means
+ * "name"="value"
+ * where value is JSON-escaped (here we assume that the name
+ * only contains characters from the valid character set).
+ * Note: this function duplicates code from jsonEncode(). 
+ * TODO: these two functions should be combined, at least if
+ * that makes any sense from a performance PoV - definitely
+ * something to consider at a later stage. rgerhards, 2012-04-19
+ */
+static rsRetVal
+jsonField(struct templateEntry *pTpe, uchar **ppRes, unsigned short *pbMustBeFreed, int *pBufLen)
+{
+	unsigned buflen;
+	uchar *pSrc;
+	es_str_t *dst = NULL;
+	DEFiRet;
+
+	pSrc = *ppRes;
+	buflen = (*pBufLen == -1) ? ustrlen(pSrc) : *pBufLen;
+	/* we hope we have only few escapes... */
+	dst = es_newStr(buflen+pTpe->lenFieldName+15);
+	es_addChar(&dst, '"');
+	es_addBuf(&dst, (char*)pTpe->fieldName, pTpe->lenFieldName);
+	es_addBufConstcstr(&dst, "\":\"");
+	CHKiRet(jsonAddVal(pSrc, buflen, &dst));
+	es_addChar(&dst, '"');
+
+	if(*pbMustBeFreed)
+		free(*ppRes);
+	/* we know we do not have \0 chars - so the size does not change */
+	*pBufLen = es_strlen(dst);
+	*ppRes = (uchar*)es_str2cstr(dst, NULL);
+	*pbMustBeFreed = 1;
+	es_deleteStr(dst);
+
+finalize_it:
+	RETiRet;
+}
+
+
 /* This function returns a string-representation of the 
  * requested message property. This is a generic function used
  * to abstract properties so that these can be easier
@@ -2343,11 +2689,11 @@ static uchar *getNOW(eNOWType eNow)
 	*pPropLen = sizeof("**OUT OF MEMORY**") - 1; \
 	return(UCHAR_CONSTANT("**OUT OF MEMORY**"));}
 uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
-                 propid_t propID, size_t *pPropLen,
+                 propid_t propid, es_str_t *propName, rs_size_t *pPropLen,
 		 unsigned short *pbMustBeFreed)
 {
 	uchar *pRes; /* result pointer */
-	int bufLen = -1; /* length of string or -1, if not known */
+	rs_size_t bufLen = -1; /* length of string or -1, if not known */
 	uchar *pBufStart;
 	uchar *pBuf;
 	int iLen;
@@ -2365,7 +2711,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 
 	*pbMustBeFreed = 0;
 
-	switch(propID) {
+	switch(propid) {
 		case PROP_MSG:
 			pRes = getMSG(pMsg);
 			bufLen = getMSGLen(pMsg);
@@ -2383,12 +2729,6 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 		case PROP_RAWMSG:
 			getRawMsg(pMsg, &pRes, &bufLen);
 			break;
-		/* enable this, if someone actually uses UxTradMsg, delete after some  time has
-		 * passed and nobody complained -- rgerhards, 2009-06-16
-		case PROP_UXTRADMSG:
-			pRes = getUxTradMsg(pMsg);
-			break;
-		*/
 		case PROP_INPUTNAME:
 			getInputName(pMsg, &pRes, &bufLen);
 			break;
@@ -2447,6 +2787,12 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 		case PROP_MSGID:
 			pRes = (uchar*)getMSGID(pMsg);
 			break;
+		case PROP_UUID:
+			getUUID(pMsg, &pRes, &bufLen);
+			break;
+		case PROP_PARSESUCCESS:
+			pRes = (uchar*)getParseSuccess(pMsg);
+			break;
 		case PROP_SYS_NOW:
 			if((pRes = getNOW(NOW_NOW)) == NULL) {
 				RET_OUT_OF_MEMORY;
@@ -2498,17 +2844,54 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 		case PROP_SYS_MYHOSTNAME:
 			pRes = glbl.GetLocalHostName();
 			break;
+		case PROP_CEE_ALL_JSON:
+			if(pMsg->json == NULL) {
+				if(*pbMustBeFreed == 1)
+					free(pRes);
+				pRes = (uchar*) "{}";
+				bufLen = 2;
+				*pbMustBeFreed = 0;
+			} else {
+				pRes = (uchar*)strdup(json_object_get_string(pMsg->json));
+				*pbMustBeFreed = 1;
+			}
+			break;
+		case PROP_CEE:
+			getCEEPropVal(pMsg, propName, &pRes, &bufLen, pbMustBeFreed);
+			break;
 		case PROP_SYS_BOM:
 			if(*pbMustBeFreed == 1)
 				free(pRes);
 			pRes = (uchar*) "\xEF\xBB\xBF";
 			*pbMustBeFreed = 0;
 			break;
+		case PROP_SYS_UPTIME:
+#			ifdef OS_SOLARIS
+			pRes = (uchar*) "UPTIME NOT available under Solaris";
+			*pbMustBeFreed = 0;
+#			else
+			{
+			struct sysinfo s_info;
+
+			if((pRes = (uchar*) MALLOC(sizeof(uchar) * 32)) == NULL) {
+				RET_OUT_OF_MEMORY;
+			}
+			*pbMustBeFreed = 1;
+
+			if(sysinfo(&s_info) < 0) {
+				*pPropLen = sizeof("**SYSCALL FAILED**") - 1;
+				return(UCHAR_CONSTANT("**SYSCALL FAILED**"));
+			}
+
+			snprintf((char*) pRes, sizeof(uchar) * 32, "%ld", s_info.uptime);
+			}
+#			endif
+		break;
 		default:
 			/* there is no point in continuing, we may even otherwise render the
 			 * error message unreadable. rgerhards, 2007-07-10
 			 */
-			dbgprintf("invalid property id: '%d'\n", propID);
+			dbgprintf("invalid property id: '%d'\n", propid);
 			*pbMustBeFreed = 0;
 			*pPropLen = sizeof("**INVALID PROPERTY NAME**") - 1;
 			return UCHAR_CONSTANT("**INVALID PROPERTY NAME**");
@@ -2516,6 +2899,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 
 	/* If we did not receive a template pointer, we are already done... */
 	if(pTpe == NULL) {
+		*pPropLen = (bufLen == -1) ? ustrlen(pRes) : bufLen;
 		return pRes;
 	}
 	
@@ -2537,23 +2921,25 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 		 */
 		iCurrFld = 1;
 		pFld = pRes;
-		while(*pFld && iCurrFld < pTpe->data.field.iToPos) {
+		while(*pFld && iCurrFld < pTpe->data.field.iFieldNr) {
 			/* skip fields until the requested field or end of string is found */
 			while(*pFld && (uchar) *pFld != pTpe->data.field.field_delim)
 				++pFld; /* skip to field terminator */
 			if(*pFld == pTpe->data.field.field_delim) {
 				++pFld; /* eat it */
+#ifdef STRICT_GPLV3
 				if (pTpe->data.field.field_expand != 0) {
 					while (*pFld == pTpe->data.field.field_delim) {
 						++pFld;
 					}
 				}
+#endif
 				++iCurrFld;
 			}
 		}
-		dbgprintf("field requested %d, field found %d\n", pTpe->data.field.iToPos, (int) iCurrFld);
+		dbgprintf("field requested %d, field found %d\n", pTpe->data.field.iFieldNr, (int) iCurrFld);
 		
-		if(iCurrFld == pTpe->data.field.iToPos) {
+		if(iCurrFld == pTpe->data.field.iFieldNr) {
 			/* field found, now extract it */
 			/* first of all, we need to find the end */
 			pFldEnd = pFld;
@@ -2587,58 +2973,6 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			*pbMustBeFreed = 0;
 			*pPropLen = sizeof("**FIELD NOT FOUND**") - 1;
 			return UCHAR_CONSTANT("**FIELD NOT FOUND**");
-		}
-	} else if(pTpe->data.field.iFromPos != 0 || pTpe->data.field.iToPos != 0) {
-		/* we need to obtain a private copy */
-		int iFrom, iTo;
-		uchar *pSb;
-		iFrom = pTpe->data.field.iFromPos;
-		iTo = pTpe->data.field.iToPos;
-		/* need to zero-base to and from (they are 1-based!) */
-		if(iFrom > 0)
-			--iFrom;
-		if(iTo > 0)
-			--iTo;
-		if(bufLen == -1)
-			bufLen = ustrlen(pRes);
-		if(iFrom == 0 && iTo >=  bufLen) { 
-			/* in this case, the requested string is a superset of what we already have,
-			 * so there is no need to do any processing. This is a frequent case for size-limited
-			 * fields like TAG in the default forwarding template (so it is a useful optimization
-			 * to check for this condition ;)). -- rgerhards, 2009-07-09
-			 */
-			; /*DO NOTHING*/
-		} else {
-			iLen = iTo - iFrom + 1; /* the +1 is for an actual char, NOT \0! */
-			pBufStart = pBuf = MALLOC((iLen + 1) * sizeof(char));
-			if(pBuf == NULL) {
-				if(*pbMustBeFreed == 1)
-					free(pRes);
-				RET_OUT_OF_MEMORY;
-			}
-			pSb = pRes;
-			if(iFrom) {
-			/* skip to the start of the substring (can't do pointer arithmetic
-			 * because the whole string might be smaller!!)
-			 */
-				while(*pSb && iFrom) {
-					--iFrom;
-					++pSb;
-				}
-			}
-			/* OK, we are at the begin - now let's copy... */
-			bufLen = iLen;
-			while(*pSb && iLen) {
-				*pBuf++ = *pSb;
-				++pSb;
-				--iLen;
-			}
-			*pBuf = '\0';
-			bufLen -= iLen; /* subtract remaining length if the string was smaller! */
-			if(*pbMustBeFreed == 1)
-				free(pRes);
-			pRes = pBufStart;
-			*pbMustBeFreed = 1;
 		}
 #ifdef FEATURE_REGEXP
 	} else {
@@ -2763,6 +3097,60 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			}
 		}
 #endif /* #ifdef FEATURE_REGEXP */
+	}
+
+	if(pTpe->data.field.iFromPos != 0 || pTpe->data.field.iToPos != 0) {
+		/* we need to obtain a private copy */
+		int iFrom, iTo;
+		uchar *pSb;
+		iFrom = pTpe->data.field.iFromPos;
+		iTo = pTpe->data.field.iToPos;
+		/* need to zero-base to and from (they are 1-based!) */
+		if(iFrom > 0)
+			--iFrom;
+		if(iTo > 0)
+			--iTo;
+		if(bufLen == -1)
+			bufLen = ustrlen(pRes);
+		if(iFrom == 0 && iTo >=  bufLen) { 
+			/* in this case, the requested string is a superset of what we already have,
+			 * so there is no need to do any processing. This is a frequent case for size-limited
+			 * fields like TAG in the default forwarding template (so it is a useful optimization
+			 * to check for this condition ;)). -- rgerhards, 2009-07-09
+			 */
+			; /*DO NOTHING*/
+		} else {
+			iLen = iTo - iFrom + 1; /* the +1 is for an actual char, NOT \0! */
+			pBufStart = pBuf = MALLOC((iLen + 1) * sizeof(char));
+			if(pBuf == NULL) {
+				if(*pbMustBeFreed == 1)
+					free(pRes);
+				RET_OUT_OF_MEMORY;
+			}
+			pSb = pRes;
+			if(iFrom) {
+			/* skip to the start of the substring (can't do pointer arithmetic
+			 * because the whole string might be smaller!!)
+			 */
+				while(*pSb && iFrom) {
+					--iFrom;
+					++pSb;
+				}
+			}
+			/* OK, we are at the begin - now let's copy... */
+			bufLen = iLen;
+			while(*pSb && iLen) {
+				*pBuf++ = *pSb;
+				++pSb;
+				--iLen;
+			}
+			*pBuf = '\0';
+			bufLen -= iLen; /* subtract remaining length if the string was smaller! */
+			if(*pbMustBeFreed == 1)
+				free(pRes);
+			pRes = pBufStart;
+			*pbMustBeFreed = 1;
+		}
 	}
 
 	/* now check if we need to do our "SP if first char is non-space" hack logic */
@@ -2933,7 +3321,6 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 		}
 	}
 
-dbgprintf("prop repl 4, pRes='%s', len %d\n", pRes, bufLen);
 	/* Take care of spurious characters to make the property safe
 	 * for a path definition
 	 */
@@ -3057,8 +3444,8 @@ dbgprintf("prop repl 4, pRes='%s', len %d\n", pRes, bufLen);
 		}
 	}
 
-	/* finally, we need to check if the property should be formatted in CSV
-	 * format (we use RFC 4180, and always use double quotes). As of this writing,
+	/* finally, we need to check if the property should be formatted in CSV or JSON.
+	 * For CSV we use RFC 4180, and always use double quotes. As of this writing,
 	 * this should be the last action carried out on the property, but in the
 	 * future there may be reasons to change that. -- rgerhards, 2009-04-02
 	 */
@@ -3092,60 +3479,81 @@ dbgprintf("prop repl 4, pRes='%s', len %d\n", pRes, bufLen);
 		pRes = pBStart;
 		bufLen = -1;
 		*pbMustBeFreed = 1;
+	} else if(pTpe->data.field.options.bJSON) {
+		jsonEncode(&pRes, pbMustBeFreed, &bufLen);
+	} else if(pTpe->data.field.options.bJSONf) {
+		jsonField(pTpe, &pRes, pbMustBeFreed, &bufLen);
 	}
 
 	if(bufLen == -1)
 		bufLen = ustrlen(pRes);
 	*pPropLen = bufLen;
 
-dbgprintf("end prop repl, pRes='%s', len %d\n", pRes, bufLen);
 	ENDfunc
 	return(pRes);
 }
 
 
-/* The returns a message variable suitable for use with RainerScript. Most importantly, this means
- * that the value is returned in a var_t object. The var_t is constructed inside this function and
- * MUST be freed by the caller.
- * rgerhards, 2008-02-25
+/* The function returns a cee variable suitable for use with RainerScript. 
+ * Note: caller must free the returned string.
+ * Note that we need to do a lot of conversions between es_str_t and cstr -- this will go away once
+ * we have moved larger parts of rsyslog to es_str_t. Acceptable for the moment, especially as we intend
+ * to rewrite the script engine as well!
+ * rgerhards, 2010-12-03
  */
-rsRetVal
-msgGetMsgVar(msg_t *pThis, cstr_t *pstrPropName, var_t **ppVar)
+es_str_t*
+msgGetCEEVarNew(msg_t *pMsg, char *name)
 {
-	DEFiRet;
-	var_t *pVar;
-	size_t propLen;
+	uchar *leaf;
+	char *val;
+	es_str_t *estr = NULL;
+	struct json_object *json, *parent;
+
+	ISOBJ_TYPE_assert(pMsg, msg);
+
+	if(pMsg->json == NULL) {
+		estr = es_newStr(1);
+		goto done;
+	}
+	leaf = jsonPathGetLeaf((uchar*)name, strlen(name));
+	if(jsonPathFindParent(pMsg, (uchar*)name, leaf, &parent, 1) != RS_RET_OK) {
+		estr = es_newStr(1);
+		goto done;
+	}
+	json = json_object_object_get(parent, (char*)leaf);
+	val = (char*)json_object_get_string(json);
+	estr = es_newStrFromCStr(val, strlen(val));
+done:
+	return estr;
+}
+
+
+/* Return an es_str_t for given message property.
+ */
+es_str_t*
+msgGetMsgVarNew(msg_t *pThis, uchar *name)
+{
+	rs_size_t propLen;
 	uchar *pszProp = NULL;
-	cstr_t *pstrProp;
 	propid_t propid;
 	unsigned short bMustBeFreed = 0;
+	es_str_t *estr;
 
 	ISOBJ_TYPE_assert(pThis, msg);
-	ASSERT(pstrPropName != NULL);
-	ASSERT(ppVar != NULL);
-
-	/* make sure we have a var_t instance */
-	CHKiRet(var.Construct(&pVar));
-	CHKiRet(var.ConstructFinalize(pVar));
 
 	/* always call MsgGetProp() without a template specifier */
 	/* TODO: optimize propNameToID() call -- rgerhards, 2009-06-26 */
-	propNameToID(pstrPropName, &propid);
-	pszProp = (uchar*) MsgGetProp(pThis, NULL, propid, &propLen, &bMustBeFreed);
+	propNameStrToID(name, &propid);
+	pszProp = (uchar*) MsgGetProp(pThis, NULL, propid, NULL, &propLen, &bMustBeFreed);
 
-	/* now create a string object out of it and hand that over to the var */
-	CHKiRet(rsCStrConstructFromszStr(&pstrProp, pszProp));
-	CHKiRet(var.SetString(pVar, pstrProp));
-
-	/* finally store var */
-	*ppVar = pVar;
-
-finalize_it:
+	estr = es_newStrFromCStr((char*)pszProp, propLen);
 	if(bMustBeFreed)
 		free(pszProp);
 
-	RETiRet;
+	return estr;
 }
+
+
 /* This function can be used as a generic way to set properties.
  * We have to handle a lot of legacy, so our return value is not always
  * 100% correct (called functions do not always provide one, should
@@ -3158,6 +3566,8 @@ rsRetVal MsgSetProperty(msg_t *pThis, var_t *pProp)
 	prop_t *myProp;
 	prop_t *propRcvFrom = NULL;
 	prop_t *propRcvFromIP = NULL;
+	struct json_tokener *tokener;
+	struct json_object *json;
 	DEFiRet;
 
 	ISOBJ_TYPE_assert(pThis, msg);
@@ -3175,11 +3585,6 @@ rsRetVal MsgSetProperty(msg_t *pThis, var_t *pProp)
 		MsgSetMSGoffs(pThis, pProp->val.num);
 	} else if(isProp("pszRawMsg")) {
 		MsgSetRawMsg(pThis, (char*) rsCStrGetSzStrNoNULL(pProp->val.pStr), cstrLen(pProp->val.pStr));
- 	/* enable this, if someone actually uses UxTradMsg, delete after some  time has
-	 * passed and nobody complained -- rgerhards, 2009-06-16
-	} else if(isProp("offAfterPRI")) {
-		pThis->offAfterPRI = pProp->val.num;
-	*/
 	} else if(isProp("pszUxTradMsg")) {
 		/*IGNORE*/; /* this *was* a property, but does no longer exist */
 	} else if(isProp("pszTAG")) {
@@ -3217,6 +3622,12 @@ rsRetVal MsgSetProperty(msg_t *pThis, var_t *pProp)
 		MsgSetRulesetByName(pThis, pProp->val.pStr);
 	} else if(isProp("pszMSG")) {
 		dbgprintf("no longer supported property pszMSG silently ignored\n");
+	} else if(isProp("json")) {
+		tokener = json_tokener_new();
+		json = json_tokener_parse_ex(tokener, (char*)rsCStrGetSzStrNoNULL(pProp->val.pStr),
+					     cstrLen(pProp->val.pStr));
+		json_tokener_free(tokener);
+		msgAddJSON(pThis, (uchar*)"!", json);
 	} else {
 		dbgprintf("unknown supported property '%s' silently ignored\n",
 			  rsCStrGetSzStrNoNULL(pProp->pcsName));
@@ -3254,6 +3665,285 @@ MsgGetSeverity(obj_t_ptr pThis, int *piSeverity)
 }
 
 
+static uchar *
+jsonPathGetLeaf(uchar *name, int lenName)
+{
+	int i;
+	for(i = lenName ; name[i] != '!' && i >= 0 ; --i)
+		/* just skip */;
+	if(name[i] == '!')
+		++i;
+	return name + i;
+}
+
+
+static rsRetVal
+jsonPathFindNext(struct json_object *root, uchar **name, uchar *leaf,
+		 struct json_object **found, int bCreate)
+{
+	uchar namebuf[1024];
+	struct json_object *json;
+	size_t i;
+	uchar *p = *name;
+	DEFiRet;
+
+	if(*p == '!')
+		++p;
+	for(i = 0 ; *p && *p != '!' && p != leaf && i < sizeof(namebuf)-1 ; ++i, ++p)
+		namebuf[i] = *p;
+	if(i > 0) {
+		namebuf[i] = '\0';
+		dbgprintf("AAAA: next JSONPath elt: '%s'\n", namebuf);
+		json = json_object_object_get(root, (char*)namebuf);
+	} else
+		json = root;
+	if(json == NULL) {
+		if(!bCreate) {
+			ABORT_FINALIZE(RS_RET_JNAME_INVALID);
+		} else {
+			json = json_object_new_object();
+			json_object_object_add(root, (char*)namebuf, json);
+		}
+	}
+
+	*name = p;
+	*found = json;
+finalize_it:
+	RETiRet;
+}
+
+static rsRetVal
+jsonPathFindParent(msg_t *pM, uchar *name, uchar *leaf, struct json_object **parent, int bCreate)
+{
+	DEFiRet;
+	*parent = pM->json;
+	while(name < leaf-1) {
+		jsonPathFindNext(*parent, &name, leaf, parent, bCreate);
+	}
+	RETiRet;
+}
+
+static rsRetVal
+jsonMerge(struct json_object *existing, struct json_object *json)
+{
+	/* TODO: check & handle duplicate names */
+	DEFiRet;
+	struct json_object_iter it;
+
+	json_object_object_foreachC(json, it) {
+DBGPRINTF("AAAA jsonMerge adds '%s'\n", it.key);
+		json_object_object_add(existing, it.key,
+			json_object_get(it.val));
+	}
+	/* note: json-c does ref counting. We added all descandants refcounts
+	 * in the loop above. So when we now free(_put) the root object, only
+	 * root gets freed().
+	 */
+	json_object_put(json);
+	RETiRet;
+}
+
+/* find a JSON structure element (field or container doesn't matter).  */
+rsRetVal
+jsonFind(msg_t *pM, es_str_t *propName, struct json_object **jsonres)
+{
+	uchar *name = NULL;
+	uchar *leaf;
+	struct json_object *parent;
+	struct json_object *field;
+	DEFiRet;
+
+	if(pM->json == NULL) {
+		field = NULL;
+		goto finalize_it;
+	}
+
+	if(!es_strbufcmp(propName, (uchar*)"!", 1)) {
+		field = pM->json;
+	} else {
+		name = (uchar*)es_str2cstr(propName, NULL);
+		leaf = jsonPathGetLeaf(name, ustrlen(name));
+		CHKiRet(jsonPathFindParent(pM, name, leaf, &parent, 0));
+		field = json_object_object_get(parent, (char*)leaf);
+	}
+	*jsonres = field;
+
+finalize_it:
+	free(name);
+	RETiRet;
+}
+
+rsRetVal
+msgAddJSON(msg_t *pM, uchar *name, struct json_object *json)
+{
+	/* TODO: error checks! This is a quick&dirty PoC! */
+	struct json_object *parent, *leafnode;
+	uchar *leaf;
+	DEFiRet;
+
+	MsgLock(pM);
+	if(name[0] == '!' && name[1] == '\0') {
+		if(pM->json == NULL)
+			pM->json = json;
+		else
+			CHKiRet(jsonMerge(pM->json, json));
+	} else {
+		if(pM->json == NULL) {
+			/* now we need a root obj */
+			pM->json = json_object_new_object();
+		}
+		leaf = jsonPathGetLeaf(name, ustrlen(name));
+		CHKiRet(jsonPathFindParent(pM, name, leaf, &parent, 1));
+		leafnode = json_object_object_get(parent, (char*)leaf);
+		if(leafnode == NULL) {
+			json_object_object_add(parent, (char*)leaf, json);
+		} else {
+			if(json_object_get_type(json) == json_type_object) {
+				CHKiRet(jsonMerge(pM->json, json));
+			} else {
+//dbgprintf("AAAA: leafnode already exists, type is %d, update with %d\n", (int)json_object_get_type(leafnode), (int)json_object_get_type(json));
+				/* TODO: improve the code below, however, the current
+				 *       state is not really bad */
+				if(json_object_get_type(leafnode) == json_type_object) {
+					DBGPRINTF("msgAddJSON: trying to update a container "
+						  "node with a leaf, name is '%s' - "
+						  "forbidden\n", name);
+					json_object_put(json);
+					ABORT_FINALIZE(RS_RET_INVLD_SETOP);
+				}
+				/* json-c code indicates we can simply replace a
+				 * json type. Unfortunaltely, this is not documented
+				 * as part of the interface spec. We still use it,
+				 * because it speeds up processing. If it does not work
+				 * at some point, use
+				 * json_object_object_del(parent, (char*)leaf);
+				 * before adding. rgerhards, 2012-09-17
+				 */
+				json_object_object_add(parent, (char*)leaf, json);
+			}
+		}
+	}
+
+finalize_it:
+	MsgUnlock(pM);
+	RETiRet;
+}
+
+rsRetVal
+msgDelJSON(msg_t *pM, uchar *name)
+{
+	struct json_object *parent, *leafnode;
+	uchar *leaf;
+	DEFiRet;
+
+dbgprintf("AAAA: unset variable '%s'\n", name);
+	MsgLock(pM);
+	if(name[0] == '!' && name[1] == '\0') {
+		/* strange, but I think we should permit this. After all,
+		 * we trust rsyslog.conf to be written by the admin.
+		 */
+		DBGPRINTF("unsetting JSON root object\n");
+		json_object_put(pM->json);
+		pM->json = NULL;
+	} else {
+		if(pM->json == NULL) {
+			/* now we need a root obj */
+			pM->json = json_object_new_object();
+		}
+		leaf = jsonPathGetLeaf(name, ustrlen(name));
+		CHKiRet(jsonPathFindParent(pM, name, leaf, &parent, 1));
+		leafnode = json_object_object_get(parent, (char*)leaf);
+DBGPRINTF("AAAA: unset found JSON value path '%s', " "leaf '%s', leafnode %p\n", name, leaf, leafnode);
+		if(leafnode == NULL) {
+			DBGPRINTF("unset JSON: could not find '%s'\n", name);
+			ABORT_FINALIZE(RS_RET_JNAME_NOTFOUND);
+		} else {
+			DBGPRINTF("deleting JSON value path '%s', "
+				  "leaf '%s', type %d\n",
+				  name, leaf, json_object_get_type(leafnode));
+			json_object_object_del(parent, (char*)leaf);
+		}
+	}
+
+finalize_it:
+	MsgUnlock(pM);
+	RETiRet;
+}
+
+static struct json_object *
+jsonDeepCopy(struct json_object *src)
+{
+	struct json_object *dst = NULL, *json;
+	struct json_object_iter it;
+	int arrayLen, i;
+
+	if(src == NULL) goto done;
+
+	switch(json_object_get_type(src)) {
+	case json_type_boolean:
+		dst = json_object_new_boolean(json_object_get_boolean(src));
+		break;
+	case json_type_double:
+		dst = json_object_new_double(json_object_get_double(src));
+		break;
+	case json_type_int:
+		dst = json_object_new_int(json_object_get_int(src));
+		break;
+	case json_type_string:
+		dst = json_object_new_string(json_object_get_string(src));
+		break;
+	case json_type_object:
+		dst = json_object_new_object();
+		json_object_object_foreachC(src, it) {
+			json = jsonDeepCopy(it.val);
+			json_object_object_add(dst, it.key, json);
+		}
+		break;
+	case json_type_array:
+		arrayLen = json_object_array_length(src);
+		dst = json_object_new_array();
+		for(i = 0 ; i < arrayLen ; ++i) {
+			json = json_object_array_get_idx(src, i);
+			json = jsonDeepCopy(json);
+			json_object_array_add(dst, json);
+		}
+		break;
+	default:DBGPRINTF("jsonDeepCopy(): error unknown type %d\n",
+			 json_object_get_type(src));
+		dst = NULL;
+		break;
+	}
+done:	return dst;
+}
+
+
+rsRetVal
+msgSetJSONFromVar(msg_t *pMsg, uchar *varname, struct var *var)
+{
+	struct json_object *json = NULL;
+	char *cstr;
+	DEFiRet;
+	switch(var->datatype) {
+	case 'S':/* string */
+		cstr = es_str2cstr(var->d.estr, NULL);
+		json = json_object_new_string(cstr);
+		free(cstr);
+		break;
+	case 'N':/* number (integer) */
+		json = json_object_new_int((int) var->d.n);
+		break;
+	case 'J':/* native JSON */
+		json = jsonDeepCopy(var->d.json);
+		break;
+	default:DBGPRINTF("msgSetJSONFromVar: unsupported datatype %c\n",
+		var->datatype);
+		ABORT_FINALIZE(RS_RET_ERR);
+	}
+	msgAddJSON(pMsg, varname+1, json);
+finalize_it:
+	RETiRet;
+}
+
 /* dummy */
 rsRetVal msgQueryInterface(void) { return RS_RET_NOT_IMPLEMENTED; }
 
@@ -3263,7 +3953,6 @@ rsRetVal msgQueryInterface(void) { return RS_RET_NOT_IMPLEMENTED; }
  */
 BEGINObjClassInit(msg, 1, OBJ_IS_CORE_MODULE)
 	/* request objects we use */
-	CHKiRet(objUse(var, CORE_COMPONENT));
 	CHKiRet(objUse(datetime, CORE_COMPONENT));
 	CHKiRet(objUse(glbl, CORE_COMPONENT));
 	CHKiRet(objUse(prop, CORE_COMPONENT));

@@ -3,7 +3,7 @@
  *
  * File begun on 2007-07-13 by RGerhards (extracted from syslogd.c)
  *
- * Copyright 2007-2009 Rainer Gerhards and Adiscon GmbH.
+ * Copyright 2007-2012 Rainer Gerhards and Adiscon GmbH.
  *
  * This file is part of the rsyslog runtime library.
  *
@@ -29,10 +29,13 @@
 #define	MSG_H_INCLUDED 1
 
 #include <pthread.h>
+#include <libestr.h>
+#include <json/json.h>
 #include "obj.h"
 #include "syslogd-types.h"
 #include "template.h"
 #include "atomic.h"
+#include "libee/libee.h"
 
 
 /* rgerhards 2004-11-08: The following structure represents a
@@ -63,6 +66,7 @@ struct msg {
 	int	iRefCount;	/* reference counter (0 = unused) */
 	sbool	bDoLock;	/* use the mutex? */
 	sbool	bAlreadyFreed;	/* aid to help detect a well-hidden bad bug -- TODO: remove when no longer needed */
+	sbool	bParseSuccess;	/* set to reflect state of last executed higher level parser */
 	short	iSeverity;	/* the severity 0..7 */
 	short	iFacility;	/* Facility code 0 .. 23*/
 	short	offAfterPRI;	/* offset, at which raw message WITHOUT PRI part starts in pszRawMsg */
@@ -106,6 +110,7 @@ struct msg {
 				   it obviously is solved in way or another...). */
 	struct syslogTime tRcvdAt;/* time the message entered this program */
 	struct syslogTime tTIMESTAMP;/* (parsed) value of the timestamp */
+	struct json_object *json;
 	/* some fixed-size buffers to save malloc()/free() for frequently used fields (from the default templates) */
 	uchar szRawMsg[CONF_RAWMSG_BUFSIZE];	/* most messages are small, and these are stored here (without malloc/free!) */
 	uchar szHOSTNAME[CONF_HOSTNAME_BUFSIZE];
@@ -117,6 +122,9 @@ struct msg {
 	char pszTimestamp3339[CONST_LEN_TIMESTAMP_3339 + 1];
 	char pszTIMESTAMP_SecFrac[7]; /* Note: a pointer is 64 bits/8 char, so this is actually fewer than a pointer! */
 	char pszRcvdAt_SecFrac[7];	     /* same as above. Both are fractional seconds for their respective timestamp */
+	char pszTIMESTAMP_Unix[12]; /* almost as small as a pointer! */
+	char pszRcvdAt_Unix[12];
+    uchar *pszUUID; /* The message's UUID */
 };
 
 
@@ -147,6 +155,7 @@ void MsgSetInputName(msg_t *pMsg, prop_t*);
 rsRetVal MsgSetAPPNAME(msg_t *pMsg, char* pszAPPNAME);
 rsRetVal MsgSetPROCID(msg_t *pMsg, char* pszPROCID);
 rsRetVal MsgSetMSGID(msg_t *pMsg, char* pszMSGID);
+void MsgSetParseSuccess(msg_t *pMsg, int bSuccess);
 void MsgSetTAG(msg_t *pMsg, uchar* pszBuf, size_t lenBuf);
 void MsgSetRuleset(msg_t *pMsg, ruleset_t*);
 rsRetVal MsgSetFlowControlType(msg_t *pMsg, flowControl_t eFlowCtl);
@@ -163,15 +172,21 @@ void MsgSetRawMsgWOSize(msg_t *pMsg, char* pszRawMsg);
 void MsgSetRawMsg(msg_t *pMsg, char* pszRawMsg, size_t lenMsg);
 rsRetVal MsgReplaceMSG(msg_t *pThis, uchar* pszMSG, int lenMSG);
 uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
-                 propid_t propID, size_t *pPropLen, unsigned short *pbMustBeFreed);
+                  propid_t propid, es_str_t *propName,
+		  rs_size_t *pPropLen, unsigned short *pbMustBeFreed);
 char *textpri(char *pRes, size_t pResLen, int pri);
 rsRetVal msgGetMsgVar(msg_t *pThis, cstr_t *pstrPropName, var_t **ppVar);
+es_str_t* msgGetMsgVarNew(msg_t *pThis, uchar *name);
 rsRetVal MsgEnableThreadSafety(void);
 uchar *getRcvFrom(msg_t *pM);
 void getTAG(msg_t *pM, uchar **ppBuf, int *piLen);
 char *getTimeReported(msg_t *pM, enum tplFormatTypes eFmt);
 char *getPRI(msg_t *pMsg);
-
+void getRawMsg(msg_t *pM, uchar **pBuf, int *piLen);
+rsRetVal msgGetCEEVar(msg_t *pThis, cstr_t *propName, var_t **ppVar);
+es_str_t* msgGetCEEVarNew(msg_t *pMsg, char *name);
+rsRetVal msgAddJSON(msg_t *pM, uchar *name, struct json_object *json);
+rsRetVal getCEEPropVal(msg_t *pM, es_str_t *propName, uchar **pRes, rs_size_t *buflen, unsigned short *pbMustBeFreed);
 
 /* TODO: remove these five (so far used in action.c) */
 uchar *getMSG(msg_t *pM);
@@ -187,6 +202,15 @@ int getProgramNameLen(msg_t *pM, sbool bLockMutex);
 uchar *getRcvFrom(msg_t *pM);
 rsRetVal propNameToID(cstr_t *pCSPropName, propid_t *pPropID);
 uchar *propIDToName(propid_t propID);
+rsRetVal msgGetCEEPropJSON(msg_t *pM, es_str_t *propName, struct json_object **pjson);
+rsRetVal msgSetJSONFromVar(msg_t *pMsg, uchar *varname, struct var *var);
+rsRetVal msgDelJSON(msg_t *pMsg, uchar *varname);
+rsRetVal jsonFind(msg_t *pM, es_str_t *propName, struct json_object **jsonres);
+
+static inline rsRetVal
+msgUnsetJSON(msg_t *pMsg, uchar *varname) {
+	return msgDelJSON(pMsg, varname+1);
+}
 
 
 /* The MsgPrepareEnqueue() function is a macro for performance reasons.
