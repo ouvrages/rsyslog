@@ -45,6 +45,9 @@
 
 MODULE_TYPE_OUTPUT
 MODULE_TYPE_NOKEEP
+MODULE_CNFNAME("ommysql")
+
+static rsRetVal resetConfigVariables(uchar __attribute__((unused)) *pp, void __attribute__((unused)) *pVal);
 
 /* internal structures
  */
@@ -52,21 +55,48 @@ DEF_OMOD_STATIC_DATA
 DEFobjCurrIf(errmsg)
 
 typedef struct _instanceData {
-	MYSQL	*f_hmysql;		/* handle to MySQL */
+	MYSQL	*f_hmysql;			/* handle to MySQL */
 	char	f_dbsrv[MAXHOSTNAMELEN+1];	/* IP or hostname of DB server*/ 
 	unsigned int f_dbsrvPort;		/* port of MySQL server */
 	char	f_dbname[_DB_MAXDBLEN+1];	/* DB name */
 	char	f_dbuid[_DB_MAXUNAMELEN+1];	/* DB user */
 	char	f_dbpwd[_DB_MAXPWDLEN+1];	/* DB user's password */
-	unsigned uLastMySQLErrno;	/* last errno returned by MySQL or 0 if all is well */
-	uchar * f_configfile; /* MySQL Client Configuration File */
-	uchar * f_configsection; /* MySQL Client Configuration Section */
+	unsigned uLastMySQLErrno;		/* last errno returned by MySQL or 0 if all is well */
+	uchar * f_configfile;			/* MySQL Client Configuration File */
+	uchar * f_configsection;		/* MySQL Client Configuration Section */
+	uchar	*tplName;       /* format template to use */
 } instanceData;
 
-/* config variables */
-static uchar * pszMySQLConfigFile = NULL;	/* MySQL Client Configuration File */
-static uchar * pszMySQLConfigSection = NULL;	/* MySQL Client Configuration Section */ 
-static int iSrvPort = 0;	/* database server port */
+typedef struct configSettings_s {
+	int iSrvPort;				/* database server port */
+	uchar *pszMySQLConfigFile;	/* MySQL Client Configuration File */
+	uchar *pszMySQLConfigSection;	/* MySQL Client Configuration Section */ 
+} configSettings_t;
+static configSettings_t cs;
+
+/* tables for interfacing with the v6 config system */
+/* action (instance) parameters */
+static struct cnfparamdescr actpdescr[] = {
+	{ "server", eCmdHdlrGetWord, 1 },
+	{ "db", eCmdHdlrGetWord, 1 },
+	{ "uid", eCmdHdlrGetWord, 1 },
+	{ "pwd", eCmdHdlrGetWord, 1 },
+	{ "serverport", eCmdHdlrInt, 0 },
+	{ "mysqlconfig.file", eCmdHdlrGetWord, 0 },
+	{ "mysqlconfig.section", eCmdHdlrGetWord, 0 },
+	{ "template", eCmdHdlrGetWord, 0 }
+};
+static struct cnfparamblk actpblk =
+	{ CNFPARAMBLK_VERSION,
+	  sizeof(actpdescr)/sizeof(struct cnfparamdescr),
+	  actpdescr
+	};
+
+
+BEGINinitConfVars		/* (re)set config variables to default values */
+CODESTARTinitConfVars 
+	resetConfigVariables(NULL, NULL);
+ENDinitConfVars
 
 
 BEGINcreateInstance
@@ -105,6 +135,9 @@ static void closeMySQL(instanceData *pData)
 
 BEGINfreeInstance
 CODESTARTfreeInstance
+	free(pData->f_configfile);
+	free(pData->f_configsection);
+	free(pData->tplName);
 	closeMySQL(pData);
 ENDfreeInstance
 
@@ -246,6 +279,80 @@ CODESTARTdoAction
 ENDdoAction
 
 
+static inline void
+setInstParamDefaults(instanceData *pData)
+{
+	pData->f_dbsrvPort = 0;
+	pData->f_configfile = NULL;
+	pData->f_configsection = NULL;
+	pData->tplName = NULL;
+	pData->f_hmysql = NULL; /* initialize, but connect only on first message (important for queued mode!) */
+}
+
+
+/* note: we use the fixed-size buffers inside the config object to avoid
+ * changing too much of the previous plumbing. rgerhards, 2012-02-02
+ */
+BEGINnewActInst
+	struct cnfparamvals *pvals;
+	int i;
+	char *cstr;
+CODESTARTnewActInst
+	if((pvals = nvlstGetParams(lst, &actpblk, NULL)) == NULL) {
+		ABORT_FINALIZE(RS_RET_MISSING_CNFPARAMS);
+	}
+
+	CHKiRet(createInstance(&pData));
+	setInstParamDefaults(pData);
+
+	CODE_STD_STRING_REQUESTparseSelectorAct(1)
+	for(i = 0 ; i < actpblk.nParams ; ++i) {
+		if(!pvals[i].bUsed)
+			continue;
+		if(!strcmp(actpblk.descr[i].name, "server")) {
+			cstr = es_str2cstr(pvals[i].val.d.estr, NULL);
+			strncpy(pData->f_dbsrv, cstr, sizeof(pData->f_dbsrv));
+			free(cstr);
+		} else if(!strcmp(actpblk.descr[i].name, "serverport")) {
+			pData->f_dbsrvPort = (int) pvals[i].val.d.n, NULL;
+		} else if(!strcmp(actpblk.descr[i].name, "db")) {
+			cstr = es_str2cstr(pvals[i].val.d.estr, NULL);
+			strncpy(pData->f_dbname, cstr, sizeof(pData->f_dbname));
+			free(cstr);
+		} else if(!strcmp(actpblk.descr[i].name, "uid")) {
+			cstr = es_str2cstr(pvals[i].val.d.estr, NULL);
+			strncpy(pData->f_dbuid, cstr, sizeof(pData->f_dbuid));
+			free(cstr);
+		} else if(!strcmp(actpblk.descr[i].name, "pwd")) {
+			cstr = es_str2cstr(pvals[i].val.d.estr, NULL);
+			strncpy(pData->f_dbpwd, cstr, sizeof(pData->f_dbpwd));
+			free(cstr);
+		} else if(!strcmp(actpblk.descr[i].name, "mysqlconfig.file")) {
+			pData->f_configfile = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
+		} else if(!strcmp(actpblk.descr[i].name, "mysqlconfig.section")) {
+			pData->f_configsection = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
+		} else if(!strcmp(actpblk.descr[i].name, "template")) {
+			pData->tplName = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
+		} else {
+			dbgprintf("ommysql: program error, non-handled "
+			  "param '%s'\n", actpblk.descr[i].name);
+		}
+	}
+
+	if(pData->tplName == NULL) {
+		CHKiRet(OMSRsetEntry(*ppOMSR, 0, (uchar*) strdup(" StdDBFmt"),
+			OMSR_RQD_TPL_OPT_SQL));
+	} else {
+		CHKiRet(OMSRsetEntry(*ppOMSR, 0,
+			(uchar*) strdup((char*) pData->tplName),
+			OMSR_RQD_TPL_OPT_SQL));
+	}
+CODE_STD_FINALIZERnewActInst
+dbgprintf("XXXX: added param, iRet %d\n", iRet);
+	cnfparamvalsDestruct(pvals, &actpblk);
+ENDnewActInst
+
+
 BEGINparseSelectorAct
 	int iMySQLPropErr = 0;
 CODESTARTparseSelectorAct
@@ -306,9 +413,9 @@ CODE_STD_STRING_REQUESTparseSelectorAct(1)
 		errmsg.LogError(0, RS_RET_INVALID_PARAMS, "Trouble with MySQL connection properties. -MySQL logging disabled");
 		ABORT_FINALIZE(RS_RET_INVALID_PARAMS);
 	} else {
-		pData->f_dbsrvPort = (unsigned) iSrvPort;	/* set configured port */
-		pData->f_configfile = pszMySQLConfigFile;
-		pData->f_configsection = pszMySQLConfigSection;
+		pData->f_dbsrvPort = (unsigned) cs.iSrvPort;	/* set configured port */
+		pData->f_configfile = cs.pszMySQLConfigFile;
+		pData->f_configsection = cs.pszMySQLConfigSection;
 		pData->f_hmysql = NULL; /* initialize, but connect only on first message (important for queued mode!) */
 	}
 
@@ -329,6 +436,7 @@ ENDmodExit
 BEGINqueryEtryPt
 CODESTARTqueryEtryPt
 CODEqueryEtryPt_STD_OMOD_QUERIES
+CODEqueryEtryPt_STD_CONF2_OMOD_QUERIES
 ENDqueryEtryPt
 
 
@@ -337,16 +445,17 @@ ENDqueryEtryPt
 static rsRetVal resetConfigVariables(uchar __attribute__((unused)) *pp, void __attribute__((unused)) *pVal)
 {
 	DEFiRet;
-	iSrvPort = 0; /* zero is the default port */
-	free(pszMySQLConfigFile);
-	pszMySQLConfigFile = NULL;
-	free(pszMySQLConfigSection);
-	pszMySQLConfigSection = NULL;
+	cs.iSrvPort = 0; /* zero is the default port */
+	free(cs.pszMySQLConfigFile);
+	cs.pszMySQLConfigFile = NULL;
+	free(cs.pszMySQLConfigSection);
+	cs.pszMySQLConfigSection = NULL;
 	RETiRet;
 }
 
 BEGINmodInit()
 CODESTARTmodInit
+INITLegCnfVars
 	*ipIFVersProvided = CURR_MOD_IF_VERSION; /* we only support the current interface specification */
 CODEmodInit_QueryRegCFSLineHdlr
 	CHKiRet(objUse(errmsg, CORE_COMPONENT));
@@ -365,10 +474,10 @@ CODEmodInit_QueryRegCFSLineHdlr
 	}
 
 	/* register our config handlers */
-	CHKiRet(omsdRegCFSLineHdlr((uchar *)"actionommysqlserverport", 0, eCmdHdlrInt, NULL, &iSrvPort, STD_LOADABLE_MODULE_ID));
+	CHKiRet(omsdRegCFSLineHdlr((uchar *)"actionommysqlserverport", 0, eCmdHdlrInt, NULL, &cs.iSrvPort, STD_LOADABLE_MODULE_ID));
+	CHKiRet(omsdRegCFSLineHdlr((uchar *)"ommysqlconfigfile",0,eCmdHdlrGetWord,NULL,&cs.pszMySQLConfigFile,STD_LOADABLE_MODULE_ID));
+	CHKiRet(omsdRegCFSLineHdlr((uchar *)"ommysqlconfigsection",0,eCmdHdlrGetWord,NULL,&cs.pszMySQLConfigSection,STD_LOADABLE_MODULE_ID));
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"resetconfigvariables", 1, eCmdHdlrCustomHandler, resetConfigVariables, NULL, STD_LOADABLE_MODULE_ID));
-	CHKiRet(omsdRegCFSLineHdlr((uchar *)"ommysqlconfigfile",0,eCmdHdlrGetWord,NULL,&pszMySQLConfigFile,STD_LOADABLE_MODULE_ID));
-	CHKiRet(omsdRegCFSLineHdlr((uchar *)"ommysqlconfigsection",0,eCmdHdlrGetWord,NULL,&pszMySQLConfigSection,STD_LOADABLE_MODULE_ID));
 ENDmodInit
 
 /* vi:set ai:

@@ -1,6 +1,8 @@
 sbin_PROGRAMS =
 pkglib_LTLIBRARIES = 
 
+pkgconfigdir = $(libdir)/pkgconfig
+
 if ENABLE_INET
 pkglib_LTLIBRARIES += lmtcpsrv.la lmtcpclt.la
 #
@@ -68,7 +70,7 @@ EXTRA_DIST = \
 	contrib/gnutls/key.pem \
 	rsyslog.service.in
 
-SUBDIRS = doc runtime . plugins/immark plugins/imuxsock plugins/imtcp plugins/imudp plugins/omtesting
+SUBDIRS = doc runtime grammar . plugins/immark plugins/imuxsock plugins/imtcp plugins/imudp plugins/omtesting
 
 if ENABLE_RSYSLOGD
 SUBDIRS += tools
@@ -76,6 +78,10 @@ endif
 
 if ENABLE_IMKLOG
 SUBDIRS += plugins/imklog
+endif
+
+if ENABLE_IMKMSG
+SUBDIRS += plugins/imkmsg
 endif
 
 if ENABLE_IMPSTATS
@@ -110,16 +116,8 @@ if ENABLE_SNMP
 SUBDIRS += plugins/omsnmp
 endif
 
-if ENABLE_CUST1
-SUBDIRS += plugins/cust1
-endif
-
 if ENABLE_SMCUSTBINDCDR
 SUBDIRS += plugins/sm_cust_bindcdr
-endif
-
-if ENABLE_IMTEMPLATE
-SUBDIRS += plugins/imtemplate
 endif
 
 if ENABLE_OMSTDOUT
@@ -150,12 +148,24 @@ if ENABLE_OMRULESET
 SUBDIRS += plugins/omruleset
 endif
 
-if ENABLE_OMDBALERTING
-SUBDIRS += plugins/omdbalerting
-endif
-
 if ENABLE_OMUDPSPOOF
 SUBDIRS += plugins/omudpspoof
+endif
+
+if ENABLE_OMMONGODB
+SUBDIRS += plugins/ommongodb
+endif
+
+if ENABLE_OMHIREDIS
+SUBDIRS += plugins/omhiredis
+endif
+
+if ENABLE_OMZMQ3
+SUBDIRS += plugins/omzmq3
+endif
+
+if ENABLE_IMZMQ3
+SUBDIRS += plugins/imzmq3
 endif
 
 if ENABLE_OMUXSOCK
@@ -166,8 +176,8 @@ if ENABLE_OMHDFS
 SUBDIRS += plugins/omhdfs
 endif
 
-if ENABLE_OMTEMPLATE
-SUBDIRS += plugins/omtemplate
+if ENABLE_ELASTICSEARCH
+SUBDIRS += plugins/omelasticsearch
 endif
 
 if ENABLE_MMSNMPTRAPD
@@ -180,6 +190,10 @@ endif
 
 if ENABLE_IMPTCP
 SUBDIRS += plugins/imptcp
+endif
+
+if ENABLE_IMTTCP
+SUBDIRS += plugins/imttcp
 endif
 
 if ENABLE_IMDIAG
@@ -196,6 +210,18 @@ endif
 
 if ENABLE_RFC3195
 SUBDIRS += plugins/im3195
+endif
+
+if ENABLE_MMNORMALIZE
+SUBDIRS += plugins/mmnormalize
+endif
+
+if ENABLE_MMJSONPARSE
+SUBDIRS += plugins/mmjsonparse
+endif
+
+if ENABLE_MMAUDIT
+SUBDIRS += plugins/mmaudit
 endif
 
 if ENABLE_ORACLE
@@ -218,9 +244,9 @@ SUBDIRS += tests
 # in a make distcheck is so that we detect code that accidently was not updated
 # when some global update happened.
 DISTCHECK_CONFIGURE_FLAGS=	--enable-gssapi_krb5 \
+				--enable-gnutls \
 				--enable-imfile \
 				--enable-snmp \
-				--enable-pgsql \
 				--enable-libdbi \
 				--enable-mysql \
 				--enable-relp \
@@ -235,16 +261,17 @@ DISTCHECK_CONFIGURE_FLAGS=	--enable-gssapi_krb5 \
 				--enable-omprog \
 				--enable-imdiag \
 				--enable-imptcp \
+				--enable-imttcp \
 				--enable-omuxsock \
-				--enable-extended-tests \
 				--enable-impstats \
-				--enable-imptcp \
 				--enable-memcheck \
 				--enable-pmaixforwardedfrom \
 				--enable-pmcisconames \
 				--enable-pmsnare \
-				--enable-imtemplate \
-				--enable-omtemplate \
 				--enable-mmsnmptrapd \
-				--with-systemdsystemunitdir=$$dc_install_base/$(systemdsystemunitdir)
+				--enable-elasticsearch \
+				--with-systemdsystemunitdir=$$dc_install_base/$(systemdsystemunitdir) 
+# temporarily disable these checks for make distcheck 2012-09-06 rgerhards
+#				--enable-extended-tests \
+#				--enable-pgsql \
 ACLOCAL_AMFLAGS = -I m4

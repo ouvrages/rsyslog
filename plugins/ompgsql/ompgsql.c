@@ -50,6 +50,7 @@
 
 MODULE_TYPE_OUTPUT
 MODULE_TYPE_NOKEEP
+MODULE_CNFNAME("ompgsql")
 
 /* internal structures
  */
@@ -64,6 +65,15 @@ typedef struct _instanceData {
 	char	f_dbpwd[_DB_MAXPWDLEN+1];	/* DB user's password */
 	ConnStatusType	eLastPgSQLStatus; 	/* last status from postgres */
 } instanceData;
+
+typedef struct configSettings_s {
+	EMPTY_STRUCT
+} configSettings_t;
+static configSettings_t __attribute__((unused)) cs;
+
+BEGINinitConfVars		/* (re)set config variables to default values */
+CODESTARTinitConfVars 
+ENDinitConfVars
 
 
 static rsRetVal writePgSQL(uchar *psz, instanceData *pData);
@@ -357,6 +367,7 @@ ENDqueryEtryPt
 
 BEGINmodInit()
 CODESTARTmodInit
+INITLegCnfVars
 	*ipIFVersProvided = CURR_MOD_IF_VERSION; /* we only support the current interface specification */
 CODEmodInit_QueryRegCFSLineHdlr
 	CHKiRet(objUse(errmsg, CORE_COMPONENT));

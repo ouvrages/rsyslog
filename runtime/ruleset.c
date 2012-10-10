@@ -1,7 +1,7 @@
 /* ruleset.c - rsyslog's ruleset object
  *
- * We have a two-way structure of linked lists: one global linked list
- * (llAllRulesets) hold alls rule sets that we know. Included in each
+ * We have a two-way structure of linked lists: one config-specifc linked list
+ * (conf->rulesets.llRulesets) hold alls rule sets that we know. Included in each
  * list is a list of rules (which contain a list of actions, but that's
  * a different story).
  *
@@ -11,30 +11,26 @@
  *
  * Module begun 2009-06-10 by Rainer Gerhards
  *
- * Copyright 2009 Rainer Gerhards and Adiscon GmbH.
+ * Copyright 2009-2012 Rainer Gerhards and Adiscon GmbH.
  *
  * This file is part of the rsyslog runtime library.
  *
- * The rsyslog runtime library is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * The rsyslog runtime library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with the rsyslog runtime library.  If not, see <http://www.gnu.org/licenses/>.
- *
- * A copy of the GPL can be found in the file "COPYING" in this distribution.
- * A copy of the LGPL can be found in the file "COPYING.LESSER" in this distribution.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *       -or-
+ *       see COPYING.ASL20 in the source distribution
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-
 #include "config.h"
 #include <stdlib.h>
-#include <string.h>
 #include <assert.h>
 #include <ctype.h>
 
@@ -43,78 +39,106 @@
 #include "cfsysline.h"
 #include "msg.h"
 #include "ruleset.h"
-#include "rule.h"
 #include "errmsg.h"
 #include "parser.h"
 #include "batch.h"
 #include "unicode-helper.h"
+#include "rsconf.h"
+#include "action.h"
+#include "rainerscript.h"
+#include "srUtils.h"
+#include "modules.h"
 #include "dirty.h" /* for main ruleset queue creation */
 
 /* static data */
 DEFobjStaticHelpers
 DEFobjCurrIf(errmsg)
-DEFobjCurrIf(rule)
 DEFobjCurrIf(parser)
 
-linkedList_t llRulesets; /* this is NOT a pointer - no typo here ;) */
-ruleset_t *pCurrRuleset = NULL; /* currently "active" ruleset */
-ruleset_t *pDfltRuleset = NULL; /* current default ruleset, e.g. for binding to actions which have no other */
+/* tables for interfacing with the v6 config system (as far as we need to) */
+static struct cnfparamdescr rspdescr[] = {
+	{ "name", eCmdHdlrString, CNFPARAM_REQUIRED },
+	{ "parser", eCmdHdlrArray, 0 }
+};
+static struct cnfparamblk rspblk =
+	{ CNFPARAMBLK_VERSION,
+	  sizeof(rspdescr)/sizeof(struct cnfparamdescr),
+	  rspdescr
+	};
 
 /* forward definitions */
 static rsRetVal processBatch(batch_t *pBatch);
+static rsRetVal scriptExec(struct cnfstmt *root, batch_t *pBatch, sbool *active);
 
-/* ---------- linked-list key handling functions ---------- */
+
+/* ---------- linked-list key handling functions (ruleset) ---------- */
 
 /* destructor for linked list keys.
  */
-static rsRetVal keyDestruct(void __attribute__((unused)) *pData)
+rsRetVal
+rulesetKeyDestruct(void __attribute__((unused)) *pData)
 {
 	free(pData);
 	return RS_RET_OK;
 }
+/* ---------- END linked-list key handling functions (ruleset) ---------- */
 
 
-/* ---------- END linked-list key handling functions ---------- */
-
+/* iterate over all actions in a script (stmt subtree) */
+static void
+scriptIterateAllActions(struct cnfstmt *root, rsRetVal (*pFunc)(void*, void*), void* pParam)
+{
+	struct cnfstmt *stmt;
+	for(stmt = root ; stmt != NULL ; stmt = stmt->next) {
+		switch(stmt->nodetype) {
+		case S_NOP:
+		case S_STOP:
+		case S_CALL:/* call does not need to do anything - done in called ruleset! */
+			break;
+		case S_ACT:
+			DBGPRINTF("iterateAllActions calling into action %p\n", stmt->d.act);
+			pFunc(stmt->d.act, pParam);
+			break;
+		case S_IF:
+			if(stmt->d.s_if.t_then != NULL)
+				scriptIterateAllActions(stmt->d.s_if.t_then,
+							pFunc, pParam);
+			if(stmt->d.s_if.t_else != NULL)
+				scriptIterateAllActions(stmt->d.s_if.t_else,
+							pFunc, pParam);
+			break;
+		case S_PRIFILT:
+			if(stmt->d.s_prifilt.t_then != NULL)
+				scriptIterateAllActions(stmt->d.s_prifilt.t_then,
+							pFunc, pParam);
+			if(stmt->d.s_prifilt.t_else != NULL)
+				scriptIterateAllActions(stmt->d.s_prifilt.t_else,
+							pFunc, pParam);
+			break;
+		case S_PROPFILT:
+			scriptIterateAllActions(stmt->d.s_propfilt.t_then,
+						pFunc, pParam);
+			break;
+		default:
+			dbgprintf("error: unknown stmt type %u during iterateAll\n",
+				(unsigned) stmt->nodetype);
+			break;
+		}
+	}
+}
 
 /* driver to iterate over all of this ruleset actions */
 typedef struct iterateAllActions_s {
 	rsRetVal (*pFunc)(void*, void*);
 	void *pParam;
 } iterateAllActions_t;
-DEFFUNC_llExecFunc(doIterateRulesetActions)
-{
-	DEFiRet;
-	rule_t* pRule = (rule_t*) pData;
-	iterateAllActions_t *pMyParam = (iterateAllActions_t*) pParam;
-	iRet = rule.IterateAllActions(pRule, pMyParam->pFunc, pMyParam->pParam);
-	RETiRet;
-}
-/* iterate over all actions of THIS rule set.
- */
-static rsRetVal
-iterateRulesetAllActions(ruleset_t *pThis, rsRetVal (*pFunc)(void*, void*), void* pParam)
-{
-	iterateAllActions_t params;
-	DEFiRet;
-	assert(pFunc != NULL);
-
-	params.pFunc = pFunc;
-	params.pParam = pParam;
-	CHKiRet(llExecFunc(&(pThis->llRules), doIterateRulesetActions, &params));
-
-finalize_it:
-	RETiRet;
-}
-
-
 /* driver to iterate over all actions */
 DEFFUNC_llExecFunc(doIterateAllActions)
 {
 	DEFiRet;
 	ruleset_t* pThis = (ruleset_t*) pData;
 	iterateAllActions_t *pMyParam = (iterateAllActions_t*) pParam;
-	iRet = iterateRulesetAllActions(pThis, pMyParam->pFunc, pMyParam->pParam);
+	scriptIterateAllActions(pThis->root, pMyParam->pFunc, pMyParam->pParam);
 	RETiRet;
 }
 /* iterate over ALL actions present in the WHOLE system.
@@ -122,7 +146,7 @@ DEFFUNC_llExecFunc(doIterateAllActions)
  * must be done or a shutdown is pending.
  */
 static rsRetVal
-iterateAllActions(rsRetVal (*pFunc)(void*, void*), void* pParam)
+iterateAllActions(rsconf_t *conf, rsRetVal (*pFunc)(void*, void*), void* pParam)
 {
 	iterateAllActions_t params;
 	DEFiRet;
@@ -130,37 +154,17 @@ iterateAllActions(rsRetVal (*pFunc)(void*, void*), void* pParam)
 
 	params.pFunc = pFunc;
 	params.pParam = pParam;
-	CHKiRet(llExecFunc(&llRulesets, doIterateAllActions, &params));
+	CHKiRet(llExecFunc(&(conf->rulesets.llRulesets), doIterateAllActions, &params));
 
 finalize_it:
 	RETiRet;
 }
 
 
-
-/* helper to processBatch(), used to call the configured actions. It is
- * executed from within llExecFunc() of the action list.
- * rgerhards, 2007-08-02
- */
-DEFFUNC_llExecFunc(processBatchDoRules)
-{
-	rsRetVal iRet;
-	ISOBJ_TYPE_assert(pData, rule);
-	dbgprintf("Processing next rule\n");
-	iRet = rule.ProcessBatch((rule_t*) pData, (batch_t*) pParam);
-dbgprintf("ruleset: get iRet %d from rule.ProcessMsg()\n", iRet);
-	return iRet;
-}
-
-
-
 /* This function is similar to processBatch(), but works on a batch that
  * contains rules from multiple rulesets. In this case, we can not push
  * the whole batch through the ruleset. Instead, we examine it and
  * partition it into sub-rulesets which we then push through the system.
- * Note that when we evaluate which message must be processed, we do NOT need
- * to look at bFilterOK, because this value is only set in a later processing
- * stage. Doing so caused a bug during development ;)
  * rgerhards, 2010-06-15
  */
 static inline rsRetVal
@@ -210,6 +214,326 @@ finalize_it:
 	RETiRet;
 }
 
+/* return a new "active" structure for the batch. Free with freeActive(). */
+static inline sbool *newActive(batch_t *pBatch)
+{
+	return malloc(sizeof(sbool) * batchNumMsgs(pBatch));
+	
+}
+static inline void freeActive(sbool *active) { free(active); }
+
+
+/* for details, see scriptExec() header comment! */
+/* call action for all messages with filter on */
+static rsRetVal
+execAct(struct cnfstmt *stmt, batch_t *pBatch, sbool *active)
+{
+	DEFiRet;
+dbgprintf("RRRR: execAct [%s]: batch of %d elements, active %p\n", modGetName(stmt->d.act->pMod), batchNumMsgs(pBatch), active);
+	pBatch->active = active;
+	stmt->d.act->submitToActQ(stmt->d.act, pBatch);
+	RETiRet;
+}
+
+static rsRetVal
+execSet(struct cnfstmt *stmt, batch_t *pBatch, sbool *active)
+{
+	int i;
+	struct var result;
+	DEFiRet;
+	for(i = 0 ; i < batchNumMsgs(pBatch) && !*(pBatch->pbShutdownImmediate) ; ++i) {
+		if(   pBatch->pElem[i].state != BATCH_STATE_DISC
+		   && (active == NULL || active[i])) {
+			cnfexprEval(stmt->d.s_set.expr, &result, pBatch->pElem[i].pUsrp);
+			msgSetJSONFromVar((msg_t*)pBatch->pElem[i].pUsrp, stmt->d.s_set.varname,
+					  &result);
+			varDelete(&result);
+		}
+	}
+	RETiRet;
+}
+
+static rsRetVal
+execUnset(struct cnfstmt *stmt, batch_t *pBatch, sbool *active)
+{
+	int i;
+	DEFiRet;
+	for(i = 0 ; i < batchNumMsgs(pBatch) && !*(pBatch->pbShutdownImmediate) ; ++i) {
+		if(   pBatch->pElem[i].state != BATCH_STATE_DISC
+		   && (active == NULL || active[i])) {
+			msgUnsetJSON((msg_t*)pBatch->pElem[i].pUsrp, stmt->d.s_unset.varname);
+		}
+	}
+	RETiRet;
+}
+
+/* for details, see scriptExec() header comment! */
+/* "stop" simply discards the filtered items - it's just a (hopefully more intuitive
+ * shortcut for users.
+ */
+static rsRetVal
+execStop(batch_t *pBatch, sbool *active)
+{
+	int i;
+	DEFiRet;
+	for(i = 0 ; i < batchNumMsgs(pBatch) && !*(pBatch->pbShutdownImmediate) ; ++i) {
+		if(   pBatch->pElem[i].state != BATCH_STATE_DISC
+		   && (active == NULL || active[i])) {
+			pBatch->pElem[i].state = BATCH_STATE_DISC;
+		}
+	}
+	RETiRet;
+}
+
+/* for details, see scriptExec() header comment! */
+// save current filter, evaluate new one
+// perform then (if any message)
+// if ELSE given:
+//    set new filter, inverted
+//    perform else (if any messages)
+static rsRetVal
+execIf(struct cnfstmt *stmt, batch_t *pBatch, sbool *active)
+{
+	sbool *newAct;
+	int i;
+	sbool bRet;
+	DEFiRet;
+	newAct = newActive(pBatch);
+	for(i = 0 ; i < batchNumMsgs(pBatch) && !*(pBatch->pbShutdownImmediate) ; ++i) {
+		if(pBatch->pElem[i].state == BATCH_STATE_DISC)
+			continue; /* will be ignored in any case */
+		if(active == NULL || active[i]) {
+			bRet = cnfexprEvalBool(stmt->d.s_if.expr,
+					       (msg_t*)(pBatch->pElem[i].pUsrp));
+		} else 
+			bRet = 0;
+		newAct[i] = bRet;
+		DBGPRINTF("batch: item %d: expr eval: %d\n", i, bRet);
+	}
+
+	if(stmt->d.s_if.t_then != NULL) {
+		scriptExec(stmt->d.s_if.t_then, pBatch, newAct);
+	}
+	if(stmt->d.s_if.t_else != NULL) {
+		for(i = 0 ; i < batchNumMsgs(pBatch) && !*(pBatch->pbShutdownImmediate)
+		    ; ++i)
+			if(pBatch->pElem[i].state != BATCH_STATE_DISC)
+				newAct[i] = !newAct[i];
+		scriptExec(stmt->d.s_if.t_else, pBatch, newAct);
+	}
+	freeActive(newAct);
+	RETiRet;
+}
+
+/* for details, see scriptExec() header comment! */
+static void
+execPRIFILT(struct cnfstmt *stmt, batch_t *pBatch, sbool *active)
+{
+	sbool *newAct;
+	msg_t *pMsg;
+	int bRet;
+	int i;
+	newAct = newActive(pBatch);
+	for(i = 0 ; i < batchNumMsgs(pBatch) && !*(pBatch->pbShutdownImmediate) ; ++i) {
+		if(pBatch->pElem[i].state == BATCH_STATE_DISC)
+			continue; /* will be ignored in any case */
+		pMsg = (msg_t*)(pBatch->pElem[i].pUsrp);
+		if(active == NULL || active[i]) {
+			if( (stmt->d.s_prifilt.pmask[pMsg->iFacility] == TABLE_NOPRI) ||
+			   ((stmt->d.s_prifilt.pmask[pMsg->iFacility]
+			            & (1<<pMsg->iSeverity)) == 0) )
+				bRet = 0;
+			else
+				bRet = 1;
+		} else 
+			bRet = 0;
+		newAct[i] = bRet;
+		DBGPRINTF("batch: item %d PRIFILT %d\n", i, newAct[i]);
+	}
+
+	if(stmt->d.s_prifilt.t_then != NULL) {
+		scriptExec(stmt->d.s_prifilt.t_then, pBatch, newAct);
+	}
+	if(stmt->d.s_prifilt.t_else != NULL) {
+		for(i = 0 ; i < batchNumMsgs(pBatch) && !*(pBatch->pbShutdownImmediate)
+		    ; ++i)
+			if(pBatch->pElem[i].state != BATCH_STATE_DISC)
+				newAct[i] = !newAct[i];
+		scriptExec(stmt->d.s_prifilt.t_else, pBatch, newAct);
+	}
+	freeActive(newAct);
+}
+
+
+/* helper to execPROPFILT(), as the evaluation itself is quite lengthy */
+static int
+evalPROPFILT(struct cnfstmt *stmt, msg_t *pMsg)
+{
+	unsigned short pbMustBeFreed;
+	uchar *pszPropVal;
+	int bRet = 0;
+	rs_size_t propLen;
+
+	if(stmt->d.s_propfilt.propID == PROP_INVALID)
+		goto done;
+
+	pszPropVal = MsgGetProp(pMsg, NULL, stmt->d.s_propfilt.propID,
+				stmt->d.s_propfilt.propName, &propLen, &pbMustBeFreed);
+
+	/* Now do the compares (short list currently ;)) */
+	switch(stmt->d.s_propfilt.operation ) {
+	case FIOP_CONTAINS:
+		if(rsCStrLocateInSzStr(stmt->d.s_propfilt.pCSCompValue, (uchar*) pszPropVal) != -1)
+			bRet = 1;
+		break;
+	case FIOP_ISEMPTY:
+		if(propLen == 0)
+			bRet = 1; /* process message! */
+		break;
+	case FIOP_ISEQUAL:
+		if(rsCStrSzStrCmp(stmt->d.s_propfilt.pCSCompValue,
+				  pszPropVal, ustrlen(pszPropVal)) == 0)
+			bRet = 1; /* process message! */
+		break;
+	case FIOP_STARTSWITH:
+		if(rsCStrSzStrStartsWithCStr(stmt->d.s_propfilt.pCSCompValue,
+				  pszPropVal, ustrlen(pszPropVal)) == 0)
+			bRet = 1; /* process message! */
+		break;
+	case FIOP_REGEX:
+		if(rsCStrSzStrMatchRegex(stmt->d.s_propfilt.pCSCompValue,
+				(unsigned char*) pszPropVal, 0, &stmt->d.s_propfilt.regex_cache) == RS_RET_OK)
+			bRet = 1;
+		break;
+	case FIOP_EREREGEX:
+		if(rsCStrSzStrMatchRegex(stmt->d.s_propfilt.pCSCompValue,
+				  (unsigned char*) pszPropVal, 1, &stmt->d.s_propfilt.regex_cache) == RS_RET_OK)
+			bRet = 1;
+		break;
+	default:
+		/* here, it handles NOP (for performance reasons) */
+		assert(stmt->d.s_propfilt.operation == FIOP_NOP);
+		bRet = 1; /* as good as any other default ;) */
+		break;
+	}
+
+	/* now check if the value must be negated */
+	if(stmt->d.s_propfilt.isNegated)
+		bRet = (bRet == 1) ?  0 : 1;
+
+	if(Debug) {
+		char *cstr;
+		if(stmt->d.s_propfilt.propID == PROP_CEE) {
+			cstr = es_str2cstr(stmt->d.s_propfilt.propName, NULL);
+			DBGPRINTF("Filter: check for CEE property '%s' (value '%s') ",
+				cstr, pszPropVal);
+			free(cstr);
+		} else {
+			DBGPRINTF("Filter: check for property '%s' (value '%s') ",
+				propIDToName(stmt->d.s_propfilt.propID), pszPropVal);
+		}
+		if(stmt->d.s_propfilt.isNegated)
+			DBGPRINTF("NOT ");
+		if(stmt->d.s_propfilt.operation == FIOP_ISEMPTY) {
+			DBGPRINTF("%s : %s\n",
+			       getFIOPName(stmt->d.s_propfilt.operation),
+			       bRet ? "TRUE" : "FALSE");
+		} else {
+			DBGPRINTF("%s '%s': %s\n",
+			       getFIOPName(stmt->d.s_propfilt.operation),
+			       rsCStrGetSzStrNoNULL(stmt->d.s_propfilt.pCSCompValue),
+			       bRet ? "TRUE" : "FALSE");
+		}
+	}
+
+	/* cleanup */
+	if(pbMustBeFreed)
+		free(pszPropVal);
+done:
+	return bRet;
+}
+
+/* for details, see scriptExec() header comment! */
+static void
+execPROPFILT(struct cnfstmt *stmt, batch_t *pBatch, sbool *active)
+{
+	sbool *thenAct;
+	msg_t *pMsg;
+	sbool bRet;
+	int i;
+	thenAct = newActive(pBatch);
+	for(i = 0 ; i < batchNumMsgs(pBatch) && !*(pBatch->pbShutdownImmediate) ; ++i) {
+		if(pBatch->pElem[i].state == BATCH_STATE_DISC)
+			continue; /* will be ignored in any case */
+		pMsg = (msg_t*)(pBatch->pElem[i].pUsrp);
+		if(active == NULL || active[i]) {
+			bRet = evalPROPFILT(stmt, (msg_t*)(pBatch->pElem[i].pUsrp));
+		} else 
+			bRet = 0;
+		thenAct[i] = bRet;
+		DBGPRINTF("batch: item %d PROPFILT %d\n", i, thenAct[i]);
+	}
+
+	scriptExec(stmt->d.s_propfilt.t_then, pBatch, thenAct);
+	freeActive(thenAct);
+}
+
+/* The rainerscript execution engine. It is debatable if that would be better
+ * contained in grammer/rainerscript.c, HOWEVER, that file focusses primarily
+ * on the parsing and object creation part. So as an actual executor, it is
+ * better suited here.
+ * param active: if NULL, all messages are active (to be processed), if non-null
+ *               this is an array of the same size as the batch. If 1, the message
+ *               is to be processed, otherwise not.
+ * NOTE: this function must receive batches which contain a single ruleset ONLY!
+ * rgerhards, 2012-09-04
+ */
+static rsRetVal
+scriptExec(struct cnfstmt *root, batch_t *pBatch, sbool *active)
+{
+	DEFiRet;
+	struct cnfstmt *stmt;
+
+	for(stmt = root ; stmt != NULL ; stmt = stmt->next) {
+dbgprintf("RRRR: scriptExec: batch of %d elements, active %p, stmt %p, nodetype %u\n", batchNumMsgs(pBatch), active, stmt, stmt->nodetype);
+		switch(stmt->nodetype) {
+		case S_NOP:
+			break;
+		case S_STOP:
+			execStop(pBatch, active);
+			break;
+		case S_ACT:
+			execAct(stmt, pBatch, active);
+			break;
+		case S_SET:
+			execSet(stmt, pBatch, active);
+			break;
+		case S_UNSET:
+			execUnset(stmt, pBatch, active);
+			break;
+		case S_CALL:
+			DBGPRINTF("calling ruleset\n"); // TODO: add Name
+			scriptExec(stmt->d.s_call.stmt, pBatch, active);
+			break;
+		case S_IF:
+			execIf(stmt, pBatch, active);
+			break;
+		case S_PRIFILT:
+			execPRIFILT(stmt, pBatch, active);
+			break;
+		case S_PROPFILT:
+			execPROPFILT(stmt, pBatch, active);
+			break;
+		default:
+			dbgprintf("error: unknown stmt type %u during exec\n",
+				(unsigned) stmt->nodetype);
+			break;
+		}
+	}
+	RETiRet;
+}
+
+
 /* Process (consume) a batch of messages. Calls the actions configured.
  * If the whole batch uses a singel ruleset, we can process the batch as 
  * a whole. Otherwise, we need to process it slower, on a message-by-message
@@ -227,9 +551,9 @@ processBatch(batch_t *pBatch)
 	if(pBatch->bSingleRuleset) {
 		pThis = batchGetRuleset(pBatch);
 		if(pThis == NULL)
-			pThis = pDfltRuleset;
+			pThis = ourConf->rulesets.pDflt;
 		ISOBJ_TYPE_assert(pThis, ruleset);
-		CHKiRet(llExecFunc(&pThis->llRules, processBatchDoRules, pBatch));
+		CHKiRet(scriptExec(pThis->root, pBatch, NULL));
 	} else {
 		CHKiRet(processBatchMultiRuleset(pBatch));
 	}
@@ -245,40 +569,27 @@ finalize_it:
  * rgerhards, 2009-11-04
  */
 static parserList_t*
-GetParserList(msg_t *pMsg)
+GetParserList(rsconf_t *conf, msg_t *pMsg)
 {
-	return (pMsg->pRuleset == NULL) ? pDfltRuleset->pParserLst : pMsg->pRuleset->pParserLst;
+	return (pMsg->pRuleset == NULL) ? conf->rulesets.pDflt->pParserLst : pMsg->pRuleset->pParserLst;
 }
 
 
-/* Add a new rule to the end of the current rule set. We do a number
- * of checks and ignore the rule if it does not pass them.
- */
-static rsRetVal
-addRule(ruleset_t *pThis, rule_t **ppRule)
+/* Add a script block to the current ruleset */
+static void
+addScript(ruleset_t *pThis, struct cnfstmt *script)
 {
-	int iActionCnt;
-	DEFiRet;
-
-	ISOBJ_TYPE_assert(pThis, ruleset);
-	ISOBJ_TYPE_assert(*ppRule, rule);
-
-	CHKiRet(llGetNumElts(&(*ppRule)->llActList, &iActionCnt));
-	if(iActionCnt == 0) {
-		errmsg.LogError(0, NO_ERRCODE, "warning: selector line without actions will be discarded");
-		rule.Destruct(ppRule);
-	} else {
-		CHKiRet(llAppend(&pThis->llRules, NULL, *ppRule));
-		dbgprintf("selector line successfully processed\n");
+	if(pThis->last == NULL)
+		pThis->root = pThis->last = script;
+	else {
+		pThis->last->next = script;
+		pThis->last = script;
 	}
-
-finalize_it:
-	RETiRet;
 }
 
 
 /* set name for ruleset */
-static rsRetVal setName(ruleset_t *pThis, uchar *pszName)
+static rsRetVal rulesetSetName(ruleset_t *pThis, uchar *pszName)
 {
 	DEFiRet;
 	free(pThis->pszName);
@@ -294,9 +605,9 @@ finalize_it:
  * is really much more natural to return the pointer directly.
  */
 static ruleset_t*
-GetCurrent(void)
+GetCurrent(rsconf_t *conf)
 {
-	return pCurrRuleset;
+	return conf->rulesets.pCurr;
 }
 
 
@@ -316,13 +627,13 @@ GetRulesetQueue(ruleset_t *pThis)
 /* Find the ruleset with the given name and return a pointer to its object.
  */
 rsRetVal
-rulesetGetRuleset(ruleset_t **ppRuleset, uchar *pszName)
+rulesetGetRuleset(rsconf_t *conf, ruleset_t **ppRuleset, uchar *pszName)
 {
 	DEFiRet;
 	assert(ppRuleset != NULL);
 	assert(pszName != NULL);
 
-	CHKiRet(llFind(&llRulesets, pszName, (void*) ppRuleset));
+	CHKiRet(llFind(&(conf->rulesets.llRulesets), pszName, (void*) ppRuleset));
 
 finalize_it:
 	RETiRet;
@@ -332,47 +643,34 @@ finalize_it:
 /* Set a new default rule set. If the default can not be found, no change happens.
  */
 static rsRetVal
-SetDefaultRuleset(uchar *pszName)
+SetDefaultRuleset(rsconf_t *conf, uchar *pszName)
 {
 	ruleset_t *pRuleset;
 	DEFiRet;
 	assert(pszName != NULL);
 
-	CHKiRet(rulesetGetRuleset(&pRuleset, pszName));
-	pDfltRuleset = pRuleset;
-	dbgprintf("default rule set changed to %p: '%s'\n", pRuleset, pszName);
+	CHKiRet(rulesetGetRuleset(conf, &pRuleset, pszName));
+	conf->rulesets.pDflt = pRuleset;
+	DBGPRINTF("default rule set changed to %p: '%s'\n", pRuleset, pszName);
 
 finalize_it:
 	RETiRet;
 }
 
 
-/* Set a new current rule set. If the ruleset can not be found, no change happens.
- */
+/* Set a new current rule set. If the ruleset can not be found, no change happens */
 static rsRetVal
-SetCurrRuleset(uchar *pszName)
+SetCurrRuleset(rsconf_t *conf, uchar *pszName)
 {
 	ruleset_t *pRuleset;
 	DEFiRet;
 	assert(pszName != NULL);
 
-	CHKiRet(rulesetGetRuleset(&pRuleset, pszName));
-	pCurrRuleset = pRuleset;
-	dbgprintf("current rule set changed to %p: '%s'\n", pRuleset, pszName);
+	CHKiRet(rulesetGetRuleset(conf, &pRuleset, pszName));
+	conf->rulesets.pCurr = pRuleset;
+	DBGPRINTF("current rule set changed to %p: '%s'\n", pRuleset, pszName);
 
 finalize_it:
-	RETiRet;
-}
-
-
-/* destructor we need to destruct rules inside our linked list contents.
- */
-static rsRetVal
-doRuleDestruct(void *pData)
-{
-	rule_t *pRule = (rule_t *) pData;
-	DEFiRet;
-	rule.Destruct(&pRule);
 	RETiRet;
 }
 
@@ -380,8 +678,8 @@ doRuleDestruct(void *pData)
 /* Standard-Constructor
  */
 BEGINobjConstruct(ruleset) /* be sure to specify the object type also in END macro! */
-	CHKiRet(llInit(&pThis->llRules, doRuleDestruct, NULL, NULL));
-finalize_it:
+	pThis->root = NULL;
+	pThis->last = NULL;
 ENDobjConstruct(ruleset)
 
 
@@ -389,7 +687,7 @@ ENDobjConstruct(ruleset)
  * This also adds the rule set to the list of all known rulesets.
  */
 static rsRetVal
-rulesetConstructFinalize(ruleset_t *pThis)
+rulesetConstructFinalize(rsconf_t *conf, ruleset_t *pThis)
 {
 	uchar *keyName;
 	DEFiRet;
@@ -400,14 +698,11 @@ rulesetConstructFinalize(ruleset_t *pThis)
 	 * two separate copies.
 	 */
 	CHKmalloc(keyName = ustrdup(pThis->pszName));
-	CHKiRet(llAppend(&llRulesets, keyName, pThis));
-
-	/* this now also is the new current ruleset */
-	pCurrRuleset = pThis;
+	CHKiRet(llAppend(&(conf->rulesets.llRulesets), keyName, pThis));
 
 	/* and also the default, if so far none has been set */
-	if(pDfltRuleset == NULL)
-		pDfltRuleset = pThis;
+	if(conf->rulesets.pDflt == NULL)
+		conf->rulesets.pDflt = pThis;
 
 finalize_it:
 	RETiRet;
@@ -417,27 +712,16 @@ finalize_it:
 /* destructor for the ruleset object */
 BEGINobjDestruct(ruleset) /* be sure to specify the object type also in END and CODESTART macros! */
 CODESTARTobjDestruct(ruleset)
-	dbgprintf("destructing ruleset %p, name %p\n", pThis, pThis->pszName);
+	DBGPRINTF("destructing ruleset %p, name %p\n", pThis, pThis->pszName);
 	if(pThis->pQueue != NULL) {
 		qqueueDestruct(&pThis->pQueue);
 	}
 	if(pThis->pParserLst != NULL) {
 		parser.DestructParserList(&pThis->pParserLst);
 	}
-	llDestroy(&pThis->llRules);
 	free(pThis->pszName);
+	cnfstmtDestruct(pThis->root);
 ENDobjDestruct(ruleset)
-
-/* this is a special destructor for the linkedList class. LinkedList does NOT
- * provide a pointer to the pointer, but rather the raw pointer itself. So we 
- * must map this, otherwise the destructor will abort.
- */
-static rsRetVal
-rulesetDestructForLinkedList(void *pData)
-{
-	ruleset_t *pThis = (ruleset_t*) pData;
-	return rulesetDestruct(&pThis);
-}
 
 
 /* destruct ALL rule sets that reside in the system. This must
@@ -447,28 +731,36 @@ rulesetDestructForLinkedList(void *pData)
  * everything runs stable again. -- rgerhards, 2009-06-10
  */
 static rsRetVal
-destructAllActions(void)
+destructAllActions(rsconf_t *conf)
 {
 	DEFiRet;
 
-	CHKiRet(llDestroy(&llRulesets));
-	CHKiRet(llInit(&llRulesets, rulesetDestructForLinkedList, keyDestruct, strcasecmp));
-	pDfltRuleset = NULL;
+	CHKiRet(llDestroy(&(conf->rulesets.llRulesets)));
+	CHKiRet(llInit(&(conf->rulesets.llRulesets), rulesetDestructForLinkedList, rulesetKeyDestruct, strcasecmp));
+	conf->rulesets.pDflt = NULL;
 
 finalize_it:
 	RETiRet;
 }
 
-/* helper for debugPrint(), initiates rule printing */
-DEFFUNC_llExecFunc(doDebugPrintRule)
+/* this is a special destructor for the linkedList class. LinkedList does NOT
+ * provide a pointer to the pointer, but rather the raw pointer itself. So we 
+ * must map this, otherwise the destructor will abort.
+ */
+rsRetVal
+rulesetDestructForLinkedList(void *pData)
 {
-	return rule.DebugPrint((rule_t*) pData);
+	ruleset_t *pThis = (ruleset_t*) pData;
+	return rulesetDestruct(&pThis);
 }
+
 /* debugprint for the ruleset object */
 BEGINobjDebugPrint(ruleset) /* be sure to specify the object type also in END and CODESTART macros! */
 CODESTARTobjDebugPrint(ruleset)
 	dbgoprint((obj_t*) pThis, "rsyslog ruleset %s:\n", pThis->pszName);
-	llExecFunc(&pThis->llRules, doDebugPrintRule, NULL);
+	cnfstmtPrint(pThis->root, 0);
+	dbgoprint((obj_t*) pThis, "ruleset %s assigned parser list:\n", pThis->pszName);
+	printParserList(pThis->pParserLst);
 ENDobjDebugPrint(ruleset)
 
 
@@ -480,12 +772,46 @@ DEFFUNC_llExecFunc(doDebugPrintAll)
 /* debug print all rulesets
  */
 static rsRetVal
-debugPrintAll(void)
+debugPrintAll(rsconf_t *conf)
 {
 	DEFiRet;
 	dbgprintf("All Rulesets:\n");
-	llExecFunc(&llRulesets, doDebugPrintAll, NULL);
+	llExecFunc(&(conf->rulesets.llRulesets), doDebugPrintAll, NULL);
 	dbgprintf("End of Rulesets.\n");
+	RETiRet;
+}
+
+static inline void
+rulesetOptimize(ruleset_t *pRuleset)
+{
+	if(Debug) {
+		dbgprintf("ruleset '%s' before optimization:\n",
+			  pRuleset->pszName);
+		rulesetDebugPrint((ruleset_t*) pRuleset);
+	}
+	cnfstmtOptimize(pRuleset->root);
+	if(Debug) {
+		dbgprintf("ruleset '%s' after optimization:\n",
+			  pRuleset->pszName);
+		rulesetDebugPrint((ruleset_t*) pRuleset);
+	}
+}
+
+/* helper for rulsetOptimizeAll(), optimizes a single ruleset */
+DEFFUNC_llExecFunc(doRulesetOptimizeAll)
+{
+	rulesetOptimize((ruleset_t*) pData);
+	return RS_RET_OK;
+}
+/* optimize all rulesets
+ */
+rsRetVal
+rulesetOptimizeAll(rsconf_t *conf)
+{
+	DEFiRet;
+	dbgprintf("begin ruleset optimization phase\n");
+	llExecFunc(&(conf->rulesets.llRulesets), doRulesetOptimizeAll, NULL);
+	dbgprintf("ruleset optimization phase finished.\n");
 	RETiRet;
 }
 
@@ -497,18 +823,19 @@ debugPrintAll(void)
  * considered acceptable for the time being.
  * rgerhards, 2009-10-27
  */
-static rsRetVal
-rulesetCreateQueue(void __attribute__((unused)) *pVal, int *pNewVal)
+static inline rsRetVal
+doRulesetCreateQueue(rsconf_t *conf, int *pNewVal)
 {
+	uchar *rsname;
 	DEFiRet;
 
-	if(pCurrRuleset == NULL) {
+	if(conf->rulesets.pCurr == NULL) {
 		errmsg.LogError(0, RS_RET_NO_CURR_RULESET, "error: currently no specific ruleset specified, thus a "
 				"queue can not be added to it");
 		ABORT_FINALIZE(RS_RET_NO_CURR_RULESET);
 	}
 
-	if(pCurrRuleset->pQueue != NULL) {
+	if(conf->rulesets.pCurr->pQueue != NULL) {
 		errmsg.LogError(0, RS_RET_RULES_QUEUE_EXISTS, "error: ruleset already has a main queue, can not "
 				"add another one");
 		ABORT_FINALIZE(RS_RET_RULES_QUEUE_EXISTS);
@@ -517,13 +844,19 @@ rulesetCreateQueue(void __attribute__((unused)) *pVal, int *pNewVal)
 	if(pNewVal == 0)
 		FINALIZE; /* if it is turned off, we do not need to change anything ;) */
 
-	dbgprintf("adding a ruleset-specific \"main\" queue");
-	CHKiRet(createMainQueue(&pCurrRuleset->pQueue, UCHAR_CONSTANT("ruleset")));
+	rsname = (conf->rulesets.pCurr->pszName == NULL) ? (uchar*) "[ruleset]" : conf->rulesets.pCurr->pszName;
+	DBGPRINTF("adding a ruleset-specific \"main\" queue for ruleset '%s'\n", rsname);
+	CHKiRet(createMainQueue(&conf->rulesets.pCurr->pQueue, rsname));
 
 finalize_it:
 	RETiRet;
 }
 
+static rsRetVal
+rulesetCreateQueue(void __attribute__((unused)) *pVal, int *pNewVal)
+{
+	return doRulesetCreateQueue(ourConf, pNewVal);
+}
 
 /* Add a ruleset specific parser to the ruleset. Note that adding the first
  * parser automatically disables the default parsers. If they are needed as well,
@@ -535,12 +868,10 @@ finalize_it:
  * rgerhards, 2009-11-04
  */
 static rsRetVal
-rulesetAddParser(void __attribute__((unused)) *pVal, uchar *pName)
+doRulesetAddParser(ruleset_t *pRuleset, uchar *pName)
 {
 	parser_t *pParser;
 	DEFiRet;
-
-	assert(pCurrRuleset != NULL); 
 
 	CHKiRet(objUse(parser, CORE_COMPONENT));
 	iRet = parser.FindParser(&pParser, pName);
@@ -553,14 +884,75 @@ rulesetAddParser(void __attribute__((unused)) *pVal, uchar *pName)
 		FINALIZE;
 	}
 
-	CHKiRet(parser.AddParserToList(&pCurrRuleset->pParserLst, pParser));
+	CHKiRet(parser.AddParserToList(&pRuleset->pParserLst, pParser));
 
-	dbgprintf("added parser '%s' to ruleset '%s'\n", pName, pCurrRuleset->pszName);
-RUNLOG_VAR("%p", pCurrRuleset->pParserLst);
+	DBGPRINTF("added parser '%s' to ruleset '%s'\n", pName, pRuleset->pszName);
 
 finalize_it:
 	d_free(pName); /* no longer needed */
 
+	RETiRet;
+}
+
+static rsRetVal
+rulesetAddParser(void __attribute__((unused)) *pVal, uchar *pName)
+{
+	return doRulesetAddParser(ourConf->rulesets.pCurr, pName);
+}
+
+
+/* Process ruleset() objects */
+rsRetVal
+rulesetProcessCnf(struct cnfobj *o)
+{
+	struct cnfparamvals *pvals;
+	rsRetVal localRet;
+	uchar *rsName = NULL;
+	uchar *parserName;
+	int nameIdx, parserIdx;
+	ruleset_t *pRuleset;
+	struct cnfarray *ar;
+	int i;
+	DEFiRet;
+
+	pvals = nvlstGetParams(o->nvlst, &rspblk, NULL);
+	if(pvals == NULL) {
+		ABORT_FINALIZE(RS_RET_CONFIG_ERROR);
+	}
+	DBGPRINTF("ruleset param blk after rulesetProcessCnf:\n");
+	cnfparamsPrint(&rspblk, pvals);
+	nameIdx = cnfparamGetIdx(&rspblk, "name");
+	rsName = (uchar*)es_str2cstr(pvals[nameIdx].val.d.estr, NULL);
+	localRet = rulesetGetRuleset(loadConf, &pRuleset, rsName);
+	if(localRet == RS_RET_OK) {
+		errmsg.LogError(0, RS_RET_RULESET_EXISTS,
+			"error: ruleset '%s' specified more than once",
+			rsName);
+		cnfstmtDestruct(o->script);
+		ABORT_FINALIZE(RS_RET_RULESET_EXISTS);
+	} else if(localRet != RS_RET_NOT_FOUND) {
+		ABORT_FINALIZE(localRet);
+	}
+	CHKiRet(rulesetConstruct(&pRuleset));
+	CHKiRet(rulesetSetName(pRuleset, rsName));
+	CHKiRet(rulesetConstructFinalize(loadConf, pRuleset));
+	addScript(pRuleset, o->script);
+
+	/* we have only two params, so we do NOT do the usual param loop */
+	parserIdx = cnfparamGetIdx(&rspblk, "parser");
+	if(parserIdx == -1  || !pvals[parserIdx].bUsed)
+		FINALIZE;
+
+	ar = pvals[parserIdx].val.d.ar;
+	for(i = 0 ; i <  ar->nmemb ; ++i) {
+		parserName = (uchar*)es_str2cstr(ar->arr[i], NULL);
+		doRulesetAddParser(pRuleset, parserName);
+		free(parserName);
+	}
+
+finalize_it:
+	free(rsName);
+	cnfparamvalsDestruct(pvals, &rspblk);
 	RETiRet;
 }
 
@@ -586,9 +978,9 @@ CODESTARTobjQueryInterface(ruleset)
 
 	pIf->IterateAllActions = iterateAllActions;
 	pIf->DestructAllActions = destructAllActions;
-	pIf->AddRule = addRule;
+	pIf->AddScript = addScript;
 	pIf->ProcessBatch = processBatch;
-	pIf->SetName = setName;
+	pIf->SetName = rulesetSetName;
 	pIf->DebugPrintAll = debugPrintAll;
 	pIf->GetCurrent = GetCurrent;
 	pIf->GetRuleset = rulesetGetRuleset;
@@ -604,9 +996,7 @@ ENDobjQueryInterface(ruleset)
  * rgerhards, 2009-04-06
  */
 BEGINObjClassExit(ruleset, OBJ_IS_CORE_MODULE) /* class, version */
-	llDestroy(&llRulesets);
 	objRelease(errmsg, CORE_COMPONENT);
-	objRelease(rule, CORE_COMPONENT);
 	objRelease(parser, CORE_COMPONENT);
 ENDObjClassExit(ruleset)
 
@@ -618,14 +1008,10 @@ ENDObjClassExit(ruleset)
 BEGINObjClassInit(ruleset, 1, OBJ_IS_CORE_MODULE) /* class, version */
 	/* request objects we use */
 	CHKiRet(objUse(errmsg, CORE_COMPONENT));
-	CHKiRet(objUse(rule, CORE_COMPONENT));
 
 	/* set our own handlers */
 	OBJSetMethodHandler(objMethod_DEBUGPRINT, rulesetDebugPrint);
 	OBJSetMethodHandler(objMethod_CONSTRUCTION_FINALIZER, rulesetConstructFinalize);
-
-	/* prepare global data */
-	CHKiRet(llInit(&llRulesets, rulesetDestructForLinkedList, keyDestruct, strcasecmp));
 
 	/* config file handlers */
 	CHKiRet(regCfSysLineHdlr((uchar *)"rulesetparser", 0, eCmdHdlrGetWord, rulesetAddParser, NULL, NULL));

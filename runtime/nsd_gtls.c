@@ -29,7 +29,9 @@
 #include <string.h>
 #include <gnutls/gnutls.h>
 #include <gnutls/x509.h>
-#include <gcrypt.h>
+#if GNUTLS_VERSION_NUMBER <= 0x020b00
+#	include <gcrypt.h>
+#endif
 #include <errno.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -50,11 +52,12 @@
 #include "nsd_gtls.h"
 
 /* things to move to some better place/functionality - TODO */
-#define DH_BITS 1024
 #define CRLFILE "crl.pem"
 
 
+#if GNUTLS_VERSION_NUMBER <= 0x020b00
 GCRY_THREAD_OPTION_PTHREAD_IMPL;
+#endif
 MODULE_TYPE_LIB
 MODULE_TYPE_KEEP
 
@@ -82,7 +85,6 @@ static pthread_mutex_t mutGtlsStrerror; /**< a mutex protecting the potentially 
 
 /* ------------------------------ GnuTLS specifics ------------------------------ */
 static gnutls_certificate_credentials xcred;
-static gnutls_dh_params dh_params;
 
 #ifdef DEBUG
 #if 0 /* uncomment, if needed some time again -- DEV Debug only */
@@ -567,7 +569,9 @@ gtlsGlblInit(void)
 	DEFiRet;
 
 	/* gcry_control must be called first, so that the thread system is correctly set up */
+	#if GNUTLS_VERSION_NUMBER <= 0x020b00
 	gcry_control (GCRYCTL_SET_THREAD_CBS, &gcry_threads_pthread);
+	#endif
 	CHKgnutls(gnutls_global_init());
 	
 	/* X509 stuff */
@@ -614,27 +618,9 @@ gtlsInitSession(nsd_gtls_t *pThis)
 
 	/* request client certificate if any.  */
 	gnutls_certificate_server_set_request( session, GNUTLS_CERT_REQUEST);
-	gnutls_dh_set_prime_bits(session, DH_BITS);
 
 	pThis->sess = session;
 
-finalize_it:
-	RETiRet;
-}
-
-
-static rsRetVal
-generate_dh_params(void)
-{
-	int gnuRet;
-	DEFiRet;
-	/* Generate Diffie Hellman parameters - for use with DHE
-	 * kx algorithms. These should be discarded and regenerated
-	 * once a day, once a week or once a month. Depending on the
-	 * security requirements.
-	 */
-	CHKgnutls(gnutls_dh_params_init( &dh_params));
-	CHKgnutls(gnutls_dh_params_generate2( dh_params, DH_BITS));
 finalize_it:
 	RETiRet;
 }
@@ -653,8 +639,6 @@ gtlsGlblInitLstn(void)
 		 * considered legacy. -- rgerhards, 2008-05-05
 		 */
 		/*CHKgnutls(gnutls_certificate_set_x509_crl_file(xcred, CRLFILE, GNUTLS_X509_FMT_PEM));*/
-		CHKiRet(generate_dh_params());
-		gnutls_certificate_set_dh_params(xcred, dh_params); /* this is void */
 		bGlblSrvrInitDone = 1; /* we are all set now */
 
 		/* now we need to add our certificate */
@@ -1332,13 +1316,16 @@ finalize_it:
  * This is a dummy here. For details, check function common in ptcp driver.
  * rgerhards, 2008-06-09
  */
-static void
+static rsRetVal
 CheckConnection(nsd_t __attribute__((unused)) *pNsd)
 {
+	DEFiRet;
 	nsd_gtls_t *pThis = (nsd_gtls_t*) pNsd;
 	ISOBJ_TYPE_assert(pThis, nsd_gtls);
 
-	nsd_ptcp.CheckConnection(pThis->pTcp);
+	CHKiRet(nsd_ptcp.CheckConnection(pThis->pTcp));
+finalize_it:
+	RETiRet;
 }
 
 
@@ -1426,6 +1413,10 @@ AcceptConnReq(nsd_t *pNsd, nsd_t **ppNew)
 		/* we got a handshake, now check authorization */
 		CHKiRet(gtlsChkPeerAuth(pNew));
 	} else {
+		uchar *pGnuErr = gtlsStrerror(gnuRet);
+		errmsg.LogError(0, RS_RET_TLS_HANDSHAKE_ERR, 
+			"gnutls returned error on handshake: %s\n", pGnuErr);
+		free(pGnuErr);
 		ABORT_FINALIZE(RS_RET_TLS_HANDSHAKE_ERR);
 	}
 

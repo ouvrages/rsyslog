@@ -35,6 +35,7 @@
 /* external static data elements (some time to be replaced) */
 extern int Debug;		/* debug flag  - read-only after startup */
 extern int debugging_on;	 /* read-only, except on sig USR1 */
+extern int stddbg; /* the handle for regular debug output, set to stdout if not forking, -1 otherwise */
 
 /* data types */
 
@@ -105,8 +106,13 @@ void dbgPrintAllDebugInfo(void);
 void *dbgmalloc(size_t size);
 
 /* macros */
-#define DBGPRINTF(...) if(Debug) { dbgprintf(__VA_ARGS__); }
-#define DBGOPRINT(...) if(Debug) { dbgoprint(__VA_ARGS__); }
+#ifdef DEBUGLESS
+#	define DBGPRINTF(...) {}
+#	define DBGOPRINT(...) {}
+#else
+#	define DBGPRINTF(...) if(Debug) { dbgprintf(__VA_ARGS__); }
+#	define DBGOPRINT(...) if(Debug) { dbgoprint(__VA_ARGS__); }
+#endif
 #ifdef RTINST
 #	define BEGINfunc static dbgFuncDB_t *pdbgFuncDB; int dbgCALLStaCK_POP_POINT = dbgEntrFunc(&pdbgFuncDB, __FILE__, __func__, __LINE__);
 #	define ENDfunc dbgExitFunc(pdbgFuncDB, dbgCALLStaCK_POP_POINT, RS_RET_NO_IRET);

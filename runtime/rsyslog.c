@@ -62,23 +62,16 @@
 
 #include "rsyslog.h"
 #include "obj.h"
-#include "vm.h"
-#include "sysvar.h"
 #include "stringbuf.h"
 #include "wti.h"
 #include "wtp.h"
-#include "expr.h"
-#include "ctok.h"
-#include "vmop.h"
-#include "vmstk.h"
-#include "vmprg.h"
 #include "datetime.h"
 #include "queue.h"
 #include "conf.h"
+#include "rsconf.h"
 #include "glbl.h"
 #include "errmsg.h"
 #include "prop.h"
-#include "rule.h"
 #include "ruleset.h"
 #include "parser.h"
 #include "strgen.h"
@@ -177,24 +170,6 @@ rsrtInit(char **ppErrObj, obj_if_t *pObjIF)
 		CHKiRet(glblClassInit(NULL));
 		if(ppErrObj != NULL) *ppErrObj = "msg";
 		CHKiRet(msgClassInit(NULL));
-		if(ppErrObj != NULL) *ppErrObj = "ctok_token";
-		CHKiRet(ctok_tokenClassInit(NULL));
-		if(ppErrObj != NULL) *ppErrObj = "ctok";
-		CHKiRet(ctokClassInit(NULL));
-		if(ppErrObj != NULL) *ppErrObj = "vmstk";
-		CHKiRet(vmstkClassInit(NULL));
-		if(ppErrObj != NULL) *ppErrObj = "sysvar";
-		CHKiRet(sysvarClassInit(NULL));
-		if(ppErrObj != NULL) *ppErrObj = "vm";
-		CHKiRet(vmClassInit(NULL));
-		if(ppErrObj != NULL) *ppErrObj = "vmop";
-		CHKiRet(vmopClassInit(NULL));
-		if(ppErrObj != NULL) *ppErrObj = "vmprg";
-		CHKiRet(vmprgClassInit(NULL));
-		if(ppErrObj != NULL) *ppErrObj = "expr";
-		CHKiRet(exprClassInit(NULL));
-		if(ppErrObj != NULL) *ppErrObj = "rule";
-		CHKiRet(ruleClassInit(NULL));
 		if(ppErrObj != NULL) *ppErrObj = "ruleset";
 		CHKiRet(rulesetClassInit(NULL));
 		if(ppErrObj != NULL) *ppErrObj = "wti";
@@ -209,6 +184,8 @@ rsrtInit(char **ppErrObj, obj_if_t *pObjIF)
 		CHKiRet(parserClassInit(NULL));
 		if(ppErrObj != NULL) *ppErrObj = "strgen";
 		CHKiRet(strgenClassInit(NULL));
+		if(ppErrObj != NULL) *ppErrObj = "rsconf";
+		CHKiRet(rsconfClassInit(NULL));
 
 		/* dummy "classes" */
 		if(ppErrObj != NULL) *ppErrObj = "str";
@@ -240,7 +217,6 @@ rsrtExit(void)
 		confClassExit();
 		glblClassExit();
 		rulesetClassExit();
-		ruleClassExit();
 
 		objClassExit(); /* *THIS* *MUST/SHOULD?* always be the first class initilizer being called (except debug)! */
 	}
