@@ -13,6 +13,9 @@ rsyslog (7.1.10-1) UNRELEASED; urgency=low
   * Build message modification modules mmjsonparse and mmnormalize which
     provide functionality related to structured logging/lumberjack/CEE. This
     requires liblognorm.
+  * Build ommongodb module which provides support for logging to a MongoDB
+    database. Split that module into a separate package called
+    rsyslog-mongodb.
   * Use --list-missing to show uninstalled files.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 10 Oct 2012 06:45:17 +0200
