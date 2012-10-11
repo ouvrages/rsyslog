@@ -6,6 +6,8 @@ rsyslog (7.1.10-1) UNRELEASED; urgency=low
   * Update Build-Depends:
     - Add libestr-dev, libee-dev, libjson0-dev and uuid-dev.
     - Bump librelp-dev to (>= 1.0.1).
+  * Build imkmsg module which provides support for reading structured kernel
+    log messages.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 10 Oct 2012 06:45:17 +0200
 
