@@ -24,6 +24,12 @@
 /* Define to 1 if you have the <arpa/nameser.h> header file. */
 #undef HAVE_ARPA_NAMESER_H
 
+/* Define if compiler provides atomic builtins */
+#undef HAVE_ATOMIC_BUILTINS
+
+/* Define if compiler provides 64 bit atomic builtins */
+#undef HAVE_ATOMIC_BUILTINS_64BIT
+
 /* Define to 1 if you have the `basename' function. */
 #undef HAVE_BASENAME
 
