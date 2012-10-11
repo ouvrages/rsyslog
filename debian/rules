@@ -25,6 +25,8 @@ override_dh_auto_configure:
 		--enable-omprog \
 		--enable-omuxsock \
 		--enable-kmsg \
+		--enable-mmnormalize \
+		--enable-mmjsonparse \
 		--disable-testbench \
 		--with-systemdsystemunitdir=/lib/systemd/system
 

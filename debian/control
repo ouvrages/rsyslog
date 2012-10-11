@@ -13,6 +13,7 @@ Build-Depends: debhelper (>= 8),
                librelp-dev (>= 1.0.1),
                libestr-dev (>= 0.1.2),
                libee-dev (>= 0.4.0),
+               liblognorm-dev (>= 0.3.1),
                libjson0-dev,
                uuid-dev,
                pkg-config
