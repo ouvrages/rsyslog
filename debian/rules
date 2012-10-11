@@ -12,6 +12,7 @@ override_dh_auto_configure:
 		--enable-pgsql \
 		--enable-mail \
 		--enable-imfile \
+		--enable-imptcp \
 		--enable-impstats \
 		--enable-gssapi-krb5 \
 		--enable-gnutls \
