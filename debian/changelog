@@ -8,6 +8,7 @@ rsyslog (7.1.10-1) UNRELEASED; urgency=low
     - Bump librelp-dev to (>= 1.0.1).
   * Build imkmsg module which provides support for reading structured kernel
     log messages.
+  * Use --list-missing to show uninstalled files.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 10 Oct 2012 06:45:17 +0200
 
