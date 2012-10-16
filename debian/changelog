@@ -1,4 +1,4 @@
-rsyslog (7.1.10-1) UNRELEASED; urgency=low
+rsyslog (7.1.11-1) UNRELEASED; urgency=low
 
   * New major upstream release from the v7 beta branch. (Closes: #645640)
   * Update watch file to track beta releases.
