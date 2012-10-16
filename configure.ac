@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[7.1.10],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[7.1.11],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -1188,7 +1188,7 @@ AM_CONDITIONAL(ENABLE_PMRFC3164SD, test x$enable_pmrfc3164sd = xyes)
 
 # settings for omruleset
 AC_ARG_ENABLE(omruleset,
-        [AS_HELP_STRING([--enable-omruleset],[Compiles ruleset forwarding module @<:@default=yes@:>@])],
+        [AS_HELP_STRING([--enable-omruleset],[Compiles ruleset forwarding module @<:@default=no@:>@])],
         [case "${enableval}" in
          yes) enable_omruleset="yes" ;;
           no) enable_omruleset="no" ;;
