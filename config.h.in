@@ -289,9 +289,6 @@
 /* Define to 1 if you have the <utmp.h> header file. */
 #undef HAVE_UTMP_H
 
-/* Define to 1 if you have the <uuid/uuid.h> header file. */
-#undef HAVE_UUID_UUID_H
-
 /* Define to 1 if you have the `vfork' function. */
 #undef HAVE_VFORK
 

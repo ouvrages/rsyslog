@@ -1,4 +1,17 @@
- ---------------------------------------------------------------------------
+----------------------------------------------------------------------------
+Version 7.1.12  [beta] 2012-10-18
+- minor updates to better support newer systemd developments
+  Thanks to Michael Biebl for the patches.
+- build system cleanup
+  Thanks to Michael Biebl for the patch series.
+- cleanup: removed remains of -c option (compatibility mode)
+  both from code & doc and emitted warning message if still used
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=361
+  Thanks to Michael Biebl for reporting & suggestions
+- bugfix: imklog truncated head of received message
+  This happened only under some circumstances. Thanks to Marius
+  Tomaschwesky and Florian Piekert for their help in solving this issue.
+----------------------------------------------------------------------------
 Version 7.1.11  [beta] 2012-10-16
 - bugfix: imuxsock truncated head of received message
   This happened only under some circumstances. Thanks to Marius
@@ -14,7 +27,7 @@ Version 7.1.11  [beta] 2012-10-16
   Thanks to Miloslav Trmač for pointing this out and a similiar v7 patch.
 - added deprecated note to omruleset (plus clue to use "call")
 - added deprecated note to discard action (plus clue to use "stop")
- ---------------------------------------------------------------------------
+---------------------------------------------------------------------------
 Version 7.1.10  [beta] 2012-10-11
  - bugfix: m4 directory was not present in release tarball
  - bugfix: small memory leak with string-type templates
@@ -22,7 +35,7 @@ Version 7.1.10  [beta] 2012-10-11
  - bugfix: some config processing warning messages were treated as errors
  - bugfix: small memory leak when processing action() statements
  - bugfix: unknown action() parameters were not reported
- ---------------------------------------------------------------------------
+---------------------------------------------------------------------------
 Version 7.1.9  [beta] 2012-10-09
 - bugfix: comments inside objects (e.g. action()) were not properly handled
 - bugfix: in (non)equal comparisons the position of arrays influenced result
@@ -172,7 +185,11 @@ Version 6.5.0  [devel] 2012-08-28
   http://bugzilla.adiscon.com/show_bug.cgi?id=353
 ---------------------------------------------------------------------------
 Version 6.4.3  [V6-STABLE] 2012-??-??
-- bugfix: imuxsock truncated head of received message
+- cleanup: removed remains of -c option (compatibility mode)
+  both from code & doc and emitted warning message if still used
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=361
+  Thanks to Michael Biebl for reporting & suggestions
+- bugfix: imuxsock and imklog truncated head of received message
   This happened only under some circumstances. Thanks to Marius
   Tomaschwesky, Florian Piekert and Milan Bartos for their help in
   solving this issue.
@@ -756,8 +773,8 @@ expected that interfaces, even new ones, break during the initial
   syslog plain tcp input plugin (NOT supporting TLS!)
   [ported from v4]
 ---------------------------------------------------------------------------
-Version 5.10.1  [V5-STABLE], 2012-0?-??
-- bugfix: imuxsock truncated head of received message
+Version 5.10.1  [V5-STABLE], 2012-10-17
+- bugfix: imuxsock and imklog truncated head of received message
   This happened only under some circumstances. Thanks to Marius
   Tomaschwesky, Florian Piekert and Milan Bartos for their help in
   solving this issue.
