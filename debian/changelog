@@ -1,6 +1,12 @@
 rsyslog (7.1.12-1) UNRELEASED; urgency=low
 
   * New major upstream release from the v7 beta branch. (Closes: #645640)
+    - Greatly improved configuration language and execution engine.
+    - Full support for structured logging and project lumberjack / CEE.
+    - More plugins - like support for MongoDB or the kernel's new structured
+      logging system.
+    - Higher performance - optimizations for script-based filters, enhanced
+      multithreaded TCP input plugin, DNS cache and more.
   * Update watch file to track beta releases.
   * Drop patches which have been merged upstream.
   * Update Build-Depends:
