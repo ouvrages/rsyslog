@@ -18,6 +18,8 @@ rsyslog (7.1.12-1) UNRELEASED; urgency=low
     rsyslog-mongodb.
   * Use --list-missing to show uninstalled files.
   * Remove upgrade code from rsyslog.postinst which is no longer necessary.
+  * Remove the -c compatibility mode option from rsyslog.default. This option
+    has been obsoleted upstream.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 10 Oct 2012 06:45:17 +0200
 
