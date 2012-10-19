@@ -16,14 +16,6 @@ set -e
 
 case "$1" in
     configure)
-	# Update init script priorities
-	if dpkg --compare-versions "$2" lt "3.20.2-1"; then
-		for i in 0 6 ; do
-			if [ -e /etc/rc$i.d/K90rsyslog ]; then
-				mv /etc/rc$i.d/K90rsyslog /etc/rc$i.d/S30rsyslog
-			fi
-		done
-	fi
 	# /run transition (see #633036)
 	if dpkg --compare-versions "$2" lt "5.8.2-2"; then
 		rm -f /lib/init/rw/sendsigs.omit.d/rsyslog
