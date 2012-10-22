@@ -7,6 +7,8 @@ rsyslog (7.2.0-1) UNRELEASED; urgency=low
     - No longer requires libgcrypt with newer GnuTLS versions.
       (Closes: #638658)
   * Track stable releases again.
+  * Remove unnecessary duplication from the init script and also drop the -c
+    compatibility mode option.
 
  -- Michael Biebl <biebl@debian.org>  Tue, 23 Oct 2012 00:52:43 +0200
 
