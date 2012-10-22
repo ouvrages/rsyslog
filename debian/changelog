@@ -1,4 +1,4 @@
-rsyslog (7.2.0-1) UNRELEASED; urgency=low
+rsyslog (7.2.0-1) experimental; urgency=low
 
   * New upstream release.
     - Support for BSD-style blocks has been removed and the rsyslog.conf
@@ -10,7 +10,7 @@ rsyslog (7.2.0-1) UNRELEASED; urgency=low
   * Remove unnecessary duplication from the init script and also drop the -c
     compatibility mode option.
 
- -- Michael Biebl <biebl@debian.org>  Tue, 23 Oct 2012 00:52:43 +0200
+ -- Michael Biebl <biebl@debian.org>  Tue, 23 Oct 2012 01:03:54 +0200
 
 rsyslog (7.1.12-1) experimental; urgency=low
 
