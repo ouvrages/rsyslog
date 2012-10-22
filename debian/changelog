@@ -1,3 +1,9 @@
+rsyslog (7.1.12-2) UNRELEASED; urgency=low
+
+  * Track stable releases again.
+
+ -- Michael Biebl <biebl@debian.org>  Tue, 23 Oct 2012 00:52:43 +0200
+
 rsyslog (7.1.12-1) experimental; urgency=low
 
   * New major upstream release from the v7 beta branch. (Closes: #645640)

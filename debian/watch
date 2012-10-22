@@ -1,2 +1,2 @@
 version=3
-http://rsyslog.com/tag/beta/ .*rsyslog-(.*)\.tar\.gz
+http://rsyslog.com/tag/stable/ .*rsyslog-(.*)\.tar\.gz
