@@ -1,6 +1,11 @@
 rsyslog (7.2.0-1) UNRELEASED; urgency=low
 
   * New upstream release.
+    - Support for BSD-style blocks has been removed and the rsyslog.conf
+      man page was updated accordingly. (Closes: #585536)
+    - Fixes immark documentation wrt $MarkMessagePeriod. (Closes: #605831)
+    - No longer requires libgcrypt with newer GnuTLS versions.
+      (Closes: #638658)
   * Track stable releases again.
 
  -- Michael Biebl <biebl@debian.org>  Tue, 23 Oct 2012 00:52:43 +0200
