@@ -1,4 +1,15 @@
 ----------------------------------------------------------------------------
+Version 7.2.1  [v7-stable] 2012-10-29
+- bugfix: ruleset()-object did only support a single statement
+- added -D rsyslogd option to enable config parser debug mode
+- improved syntax error messages by outputting the error token
+- the rsyslog core now suspeneds actions after 10 failures in a row
+  This was former the case after 1,000 failures and could cause rsyslog
+  to be spammed/ressources misused. See the v6 compatibility doc for more
+  details.
+- ommongodb rate-limits error messages to prevent spamming the syslog
+  closes (for v7.2): http://bugzilla.adiscon.com/show_bug.cgi?id=366
+----------------------------------------------------------------------------
 Version 7.2.0  [v7-stable] 2012-10-22
 This starts a new stable branch based on 7.1.12 plus the following changes:
 - bugfix: imuxsock did not properly honor $LocalHostIPIF
@@ -138,7 +149,11 @@ Version 7.1.0  [devel] 2012-09-06
 - bugfix: imtcp could abort on exit due to invalid free()
 - imported bugfixes from 6.4.1
 ---------------------------------------------------------------------------
-Version 6.5.1  [devel] 2012-08-??
+Version 6.6.0  [v6-stable] 2012-10-22
+This starts a new stable branch, based on the 6.5.x series, plus:
+- bugfix: imuxsock did not properly honor $LocalHostIPIF
+---------------------------------------------------------------------------
+Version 6.5.1  [beta] 2012-10-11
 - added tool "logctl" to handle lumberjack logs in MongoDB
 - imfile ported to new v6 config interface
 - imfile now supports config parameter for maximum number of submits
@@ -188,7 +203,9 @@ Version 6.5.0  [devel] 2012-08-28
   Note: patches were released under ASL 2.0, see
   http://bugzilla.adiscon.com/show_bug.cgi?id=353
 ---------------------------------------------------------------------------
-Version 6.4.3  [V6-STABLE] 2012-??-??
+Version 6.4.3  [V6-STABLE/NEVER RELEASED] 2012-??-??
+This version was never released as 6.6.0 came quickly enough. Note that
+all these patches here are present in 6.6.0.
 - cleanup: removed remains of -c option (compatibility mode)
   both from code & doc and emitted warning message if still used
   closes: http://bugzilla.adiscon.com/show_bug.cgi?id=361

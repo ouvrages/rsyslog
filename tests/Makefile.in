@@ -542,6 +542,8 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/rscript_prifilt.conf \
 	   rscript_optimizer1.sh \
 	   testsuites/rscript_optimizer1.conf \
+	   rscript_ruleset_call.sh \
+	   testsuites/rscript_ruleset_call.conf \
 	   cee_simple.sh \
 	   testsuites/cee_simple.conf \
 	   cee_diskqueue.sh \
@@ -1232,6 +1234,7 @@ uninstall-am:
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_stop2.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_prifilt.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_optimizer1.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_ruleset_call.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	cee_simple.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	cee_diskqueue.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	linkedlistqueue.sh
