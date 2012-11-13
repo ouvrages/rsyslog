@@ -7,6 +7,7 @@ rsyslog (7.2.1-2) UNRELEASED; urgency=low
     non-Linux plattforms.
   * debian/patches/03-sysinfo.patch: Getting the uptime via sysinfo() is
     Linux-specific, so only use that on architectures supporting it.
+  * Use dh-autoreconf to update the build system.
 
  -- Michael Biebl <biebl@debian.org>  Tue, 13 Nov 2012 22:28:48 +0100
 
