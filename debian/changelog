@@ -7,7 +7,6 @@ rsyslog (7.2.2-1) UNRELEASED; urgency=low
 
 rsyslog (7.2.1-2) experimental; urgency=low
 
-  * Fix example configuration for logging to tty8.
   * Disable imptcp on non-Linux plattforms as this module is Linux-specific.
     Making it available everywhere would require more extensive porting work.
   * debian/patches/02-imkmsg-includes.patch: Don't include <sys/klog.h> on
