@@ -1099,7 +1099,6 @@ doFuncCall(struct cnffunc *func, struct var *ret, void* usrptr)
 		}
 		ret->datatype = 'N';
 		if(bMustFree) free(str);
-		free(str);
 		if(r[0].datatype == 'S') es_deleteStr(r[0].d.estr);
 		break;
 	case CNFFUNC_FIELD:
@@ -1231,7 +1230,7 @@ evalStrArrayCmp(es_str_t *estr_l, struct cnfarray* ar, int cmpop)
 
 #define FREE_TWO_STRINGS \
 		if(bMustFree) es_deleteStr(estr_r);  \
-		if(expr->r->nodetype != 'A' && r.datatype == 'S') es_deleteStr(r.d.estr);  \
+		if(expr->r->nodetype != 'S' && expr->r->nodetype != 'A' && r.datatype == 'S') es_deleteStr(r.d.estr);  \
 		if(bMustFree2) es_deleteStr(estr_l);  \
 		if(l.datatype == 'S') es_deleteStr(l.d.estr)
 
@@ -2762,42 +2761,56 @@ int
 cnfDoInclude(char *name)
 {
 	char *cfgFile;
+	char *finalName;
 	unsigned i;
 	int result;
 	glob_t cfgFiles;
 	struct stat fileInfo;
+	char nameBuf[MAXFNAME+1];
 
-	/* Use GLOB_MARK to append a trailing slash for directories.
-	 * Required by doIncludeDirectory().
-	 */
-	result = glob(name, GLOB_MARK, NULL, &cfgFiles);
+	finalName = name;
+	if(stat(name, &fileInfo) == 0) {
+		/* stat usually fails if we have a wildcard - so this does NOT indicate error! */
+		if(S_ISDIR(fileInfo.st_mode)) {
+			/* if we have a directory, we need to add "*" to get its files */
+			snprintf(nameBuf, sizeof(nameBuf), "%s*", name);
+			finalName = nameBuf;
+		}
+	}
+
+	/* Use GLOB_MARK to append a trailing slash for directories. */
+	/* Use GLOB_NOMAGIC to detect wildcards that match nothing. */
+	result = glob(finalName, GLOB_MARK | GLOB_NOMAGIC, NULL, &cfgFiles);
+
+	/* Silently ignore wildcards that match nothing */
+	if(result == GLOB_NOMATCH) {
+		return 1;
+	}
+
 	if(result == GLOB_NOSPACE || result == GLOB_ABORTED) {
-#if 0
 		char errStr[1024];
 		rs_strerror_r(errno, errStr, sizeof(errStr));
-		errmsg.LogError(0, RS_RET_FILE_NOT_FOUND, "error accessing config file or directory '%s': %s",
-				pattern, errStr);
-		ABORT_FINALIZE(RS_RET_FILE_NOT_FOUND);
-#endif
-		dbgprintf("includeconfig glob error %d\n", errno);
+		parser_errmsg("error accessing config file or directory '%s': %s",
+				finalName, errStr);
 		return 1;
 	}
 
 	for(i = 0; i < cfgFiles.gl_pathc; i++) {
 		cfgFile = cfgFiles.gl_pathv[i];
-
-		if(stat(cfgFile, &fileInfo) != 0) 
-			continue; /* continue with the next file if we can't stat() the file */
+		if(stat(cfgFile, &fileInfo) != 0) {
+			char errStr[1024];
+			rs_strerror_r(errno, errStr, sizeof(errStr));
+			parser_errmsg("error accessing config file or directory '%s': %s",
+					cfgFile, errStr);
+			continue;
+		}
 
 		if(S_ISREG(fileInfo.st_mode)) { /* config file */
 			dbgprintf("requested to include config file '%s'\n", cfgFile);
 			cnfSetLexFile(cfgFile);
 		} else if(S_ISDIR(fileInfo.st_mode)) { /* config directory */
-			if(strcmp(name, cfgFile)) {
-				/* do not include ourselves! */
-				dbgprintf("requested to include directory '%s'\n", cfgFile);
-				cnfDoInclude(cfgFile);
-			}
+			dbgprintf("requested to include directory '%s'\n", cfgFile);
+			cnfDoInclude(cfgFile);
 		} else {
 			dbgprintf("warning: unable to process IncludeConfig directive '%s'\n", cfgFile);
 		}

@@ -1,6 +1,6 @@
 if ENABLE_TESTBENCH
 # TODO: reenable TESTRUNS = rt_init rscript
-check_PROGRAMS = $(TESTRUNS) ourtail nettester tcpflood chkseq msleep randomgen diagtalker uxsockrcvr syslog_caller syslog_inject inputfilegen
+check_PROGRAMS = $(TESTRUNS) ourtail nettester tcpflood chkseq msleep randomgen diagtalker uxsockrcvr syslog_caller syslog_inject inputfilegen minitcpsrv
 TESTS = $(TESTRUNS) 
 #TESTS = $(TESTRUNS) cfg.sh
 
@@ -73,6 +73,9 @@ TESTS +=  \
 	rscript_ruleset_call.sh \
 	cee_simple.sh \
 	cee_diskqueue.sh \
+	incltest.sh \
+	incltest_dir.sh \
+	incltest_dir_wildcard.sh \
 	linkedlistqueue.sh
 
 if HAVE_VALGRIND
@@ -291,6 +294,13 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/cee_simple.conf \
 	   cee_diskqueue.sh \
 	   testsuites/cee_diskqueue.conf \
+	   incltest.sh \
+	   testsuites/incltest.conf \
+	   incltest_dir.sh \
+	   testsuites/incltest_dir.conf \
+	   incltest_dir_wildcard.sh \
+	   testsuites/incltest_dir_wildcard.conf \
+	   testsuites/incltest.d/include.conf \
 	   linkedlistqueue.sh \
 	   testsuites/linkedlistqueue.conf \
 	   da-mainmsg-q.sh \
@@ -518,6 +528,9 @@ tcpflood_LDADD = $(SOL_LIBS) $(PTHREADS_LIBS) $(GNUTLS_LIBS)
 if ENABLE_GNUTLS
 tcpflood_LDADD += -lgcrypt
 endif
+
+minitcpsrv_SOURCES = minitcpsrvr.c
+minitcpsrv_LDADD = $(SOL_LIBS)
 
 syslog_caller_SOURCES = syslog_caller.c
 syslog_caller_LDADD = $(SOL_LIBS)

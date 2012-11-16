@@ -547,9 +547,14 @@ tplConstruct(rsconf_t *conf)
 
 /* helper to tplAddLine. Parses a constant and generates
  * the necessary structure.
+ * Paramter "bDoEscapes" is to support legacy vs. v6+ config system. In
+ * legacy, we must do escapes ourselves, whereas v6+ passes in already
+ * escaped strings (which we are NOT permitted to further escape, this would
+ * cause invalid result strings!). Note: if escapes are not permitted,
+ * quotes (") are just a regular character and do NOT terminate the constant!
  * returns: 0 - ok, 1 - failure
  */
-static int do_Constant(unsigned char **pp, struct template *pTpl)
+static int do_Constant(unsigned char **pp, struct template *pTpl, int bDoEscapes)
 {
 	register unsigned char *p;
 	cstr_t *pStrB;
@@ -567,8 +572,8 @@ static int do_Constant(unsigned char **pp, struct template *pTpl)
 	/* process the message and expand escapes
 	 * (additional escapes can be added here if needed)
 	 */
-	while(*p && *p != '%' && *p != '\"') {
-		if(*p == '\\') {
+	while(*p && *p != '%' && !(bDoEscapes && *p == '\"')) {
+		if(bDoEscapes && *p == '\\') {
 			switch(*++p) {
 				case '\0':	
 					/* the best we can do - it's invalid anyhow... */
@@ -726,7 +731,8 @@ static void doOptions(unsigned char **pp, struct templateEntry *pTpe)
 		 } else if(!strcmp((char*)Buf, "mandatory-field")) {
 			 pTpe->data.field.options.bMandatory = 1;
 		 } else {
-			dbgprintf("Invalid field option '%s' specified - ignored.\n", Buf);
+			errmsg.LogError(0, NO_ERRCODE, "template error: invalid field option '%s' "
+				"specified - ignored", Buf);
 		 }
 	}
 
@@ -1090,7 +1096,7 @@ static int do_Parameter(unsigned char **pp, struct template *pTpl)
 		}
 	} else {
 		pTpe->fieldName = ustrdup(cstrGetSzStrNoNULL(pStrField));
-		pTpe->lenFieldName = cstrLen(pStrProp);
+		pTpe->lenFieldName = ustrlen(pTpe->fieldName);
 		cstrDestruct(&pStrField);
 	}
 	if(pTpe->fieldName == NULL)
@@ -1233,7 +1239,7 @@ struct template *tplAddLine(rsconf_t *conf, char* pName, uchar** ppRestOfConfLin
 				do_Parameter(&p, pTpl);
 				break;
 			default: /* constant */
-				do_Constant(&p, pTpl);
+				do_Constant(&p, pTpl, 1);
 				break;
 		}
 		if(*p == '"') {/* end of template string? */
@@ -1813,7 +1819,7 @@ tplProcessCnf(struct cnfobj *o)
 						do_Parameter(&p, pTpl);
 						break;
 					default: /* constant */
-						do_Constant(&p, pTpl);
+						do_Constant(&p, pTpl, 0);
 						break;
 				}
 			}
