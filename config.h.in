@@ -235,6 +235,9 @@
 /* Define to 1 if `sa_len' is a member of `struct sockaddr'. */
 #undef HAVE_STRUCT_SOCKADDR_SA_LEN
 
+/* Define to 1 if you have the `sysinfo' function. */
+#undef HAVE_SYSINFO
+
 /* Define to 1 if you have the <syslog.h> header file. */
 #undef HAVE_SYSLOG_H
 
@@ -382,9 +385,6 @@
 /* network support is integrated. */
 #undef SYSLOG_INET
 
-/* Description */
-#undef SYSLOG_UNIXAF
-
 /* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
 #undef TIME_WITH_SYS_TIME
 
@@ -393,6 +393,9 @@
 
 /* Define if you want to use GSSAPI */
 #undef USE_GSSAPI
+
+/* Define if you want to enable libuuid support */
+#undef USE_LIBUUID
 
 /* Define if you want to enable zlib support */
 #undef USE_NETZIP

@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[7.2.1],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[7.2.2],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -35,7 +35,6 @@ PKG_PROG_PKG_CONFIG
 PKG_CHECK_MODULES(LIBESTR, libestr >= 0.1.2)
 PKG_CHECK_MODULES(LIBEE, libee >= 0.4.0)
 PKG_CHECK_MODULES([JSON_C], [json])
-PKG_CHECK_MODULES([LIBUUID], [uuid])
 
 case "${host}" in
   *-*-linux*)
@@ -115,7 +114,7 @@ AC_TYPE_SIGNAL
 AC_FUNC_STAT
 AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS([flock basename alarm clock_gettime gethostbyname gethostname gettimeofday localtime_r memset mkdir regcomp select setid socket strcasecmp strchr strdup strerror strndup strnlen strrchr strstr strtol strtoul uname ttyname_r getline malloc_trim prctl epoll_create epoll_create1 fdatasync lseek64])
+AC_CHECK_FUNCS([flock basename alarm clock_gettime gethostbyname gethostname gettimeofday localtime_r memset mkdir regcomp select setid socket strcasecmp strchr strdup strerror strndup strnlen strrchr strstr strtol strtoul sysinfo uname ttyname_r getline malloc_trim prctl epoll_create epoll_create1 fdatasync lseek64])
 
 # the check below is probably ugly. If someone knows how to do it in a better way, please
 # let me know! -- rgerhards, 2010-10-06
@@ -340,27 +339,6 @@ AC_ARG_ENABLE(kmsg,
         [enable_kmsg="no"]
 )
 AM_CONDITIONAL(ENABLE_IMKMSG, test x$enable_kmsg = xyes)
-
-
-#
-# SYSLOG_UNIXAF
-#
-AC_MSG_CHECKING(for SYSLOG_UNIXAF support)
-AC_ARG_ENABLE([unix],
-  [AS_HELP_STRING([--disable-unix], [Disable support for unix])],
-  [
-    if test "x${enableval}" = "xyes"; then
-      AC_MSG_RESULT([yes])
-      AC_DEFINE([SYSLOG_UNIXAF], [1], [Description])
-    else
-      AC_MSG_RESULT([no])
-    fi
-  ],
-  [
-    # enabled by default
-    AC_MSG_RESULT([yes])
-    AC_DEFINE([SYSLOG_UNIXAF], [1], [Description])
-  ])
 
 
 # inet
@@ -727,6 +705,23 @@ fi
 AM_CONDITIONAL(ENABLE_SNMP, test x$enable_snmp = xyes)
 AC_SUBST(SNMP_CFLAGS)
 AC_SUBST(SNMP_LIBS)
+
+
+# uuid support
+AC_ARG_ENABLE(uuid,
+        [AS_HELP_STRING([--enable-uuid],[Enable support for uuid generation @<:@default=yes@:>@])],
+        [case "${enableval}" in
+         yes) enable_elasticsearch="yes" ;;
+          no) enable_elasticsearch="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-uuid) ;;
+         esac],
+        [enable_uuid=yes]
+)
+if test "x$enable_elasticsearch" = "xyes"; then
+	PKG_CHECK_MODULES([LIBUUID], [uuid])
+	AC_DEFINE(USE_LIBUUID, 1, [Define if you want to enable libuuid support])
+fi
+AM_CONDITIONAL(ENABLE_UUID, test x$enable_uuid = xyes)
 
 
 # elasticsearch support
@@ -1365,6 +1360,7 @@ echo "    rsyslog runtime will be built:            $enable_rsyslogrt"
 echo "    rsyslogd will be built:                   $enable_rsyslogd"
 echo "    GUI components will be built:             $enable_gui"
 echo "    Unlimited select() support enabled:       $enable_unlimited_select"
+echo "    uuid support enabled:                     $enable_uuid"
 echo
 echo "---{ input plugins }---"
 echo "    Klog functionality enabled:               $enable_klog ($os_type)"

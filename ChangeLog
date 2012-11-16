@@ -1,4 +1,55 @@
 ----------------------------------------------------------------------------
+Version 7.2.2  [v7-stable] 2012-10-16
+- doc improvements
+- enabled to build without libuuid, at loss of uuid functionality
+  this enables smoother builds on older systems that do not support
+  libuuid. Loss of functionality should usually not matter too much as
+  uuid support has only recently been added and is very seldom used.
+- bugfix: omfwd did not properly support "template" parameter
+- bugfix: potential segfault when re_match() function was used
+  Thanks to oxpa for the patch.
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=371
+- bugfix: potential abort of imtcp on rsyslogd shutdown
+- bugfix: imzmq3 segfault with PULL subscription
+  Thanks to Martin Nilsson for the patch.
+- bugfix: improper handling of backslash in string-type template()s
+- bugfix: leading quote (") in string-type template() lead to thight loop
+  on startup
+- bugfix: no error msg on invalid field option in legacy/string template
+- bugfix: potential segfault due to invalid param handling in comparisons
+  This could happen in RainerScript comparisons (like contains); in some
+  cases an unitialized variable was accessed, which could lead to an
+  invalid free and in turn to a segfault.
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=372
+  Thanks to Georgi Georgiev for reporting this bug and his great help
+  in solving it.
+- bugfix: no error msg on unreadable $IncludeConfig path
+- bugfix: $IncludeConfig did not correctly process directories
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=376
+  The testbench was also enhanced to check for these cases.
+  Thanks to Georgi Georgiev for the bug report.
+- bugfix: make rsyslog compile on kfreebsd again
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=380
+  Thanks to Guillem Jover for the patch.
+- bugfix: garbled message if field name was used with jsonf property option
+  The length for the field name was invalidly computed, resulting in either
+  truncated field names or including extra random data. If the random data
+  contained NULs, the rest of the message became unreadable.
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=374
+- bugfix: potential segfault at startup with property-based filter
+  If the property name was followed by a space before the comma, rsyslogd
+  aborted on startup. Note that no segfault could happen if the initial
+  startup went well (this was a problem with the config parser).
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=381
+- bugfix: imfile discarded some file parts
+  File lines that were incomplete (LF missing) *at the time imfile polled
+  the file* were partially discarded. That part of the line that was read 
+  without the LF was discarded, and the rest of the line was submitted in
+  the next polling cycle. This is now changed so that the partial content
+  is saved until the complete line is read. Note that the patch affects
+  only read mode 0.
+  Thanks to Milan Bartos for providing the base idea for the solution.
+----------------------------------------------------------------------------
 Version 7.2.1  [v7-stable] 2012-10-29
 - bugfix: ruleset()-object did only support a single statement
 - added -D rsyslogd option to enable config parser debug mode
@@ -148,6 +199,22 @@ Version 7.1.0  [devel] 2012-09-06
 - ommongodb now supports templates
 - bugfix: imtcp could abort on exit due to invalid free()
 - imported bugfixes from 6.4.1
+---------------------------------------------------------------------------
+Version 6.6.1  [v6-stable] 2012-10-??
+- bugfix: build problems on some platforms
+- bugfix: misaddressing of $mmnormalizeuserawmsg parameter
+  On many platforms, this has no effect at all. At some, it may cause
+  a segfault. The problem occurs only during config phase, no segfault
+  happens when rsyslog has fully started.
+- fix API "glitch" in some plugins
+  This did not affect users, but could have caused trouble in the future
+  for developers.
+- bugfix: no error msg on invalid field option in legacy/string template
+- bugfix: no error msg on unreadable $IncludeConfig path
+- bugfix: $IncludeConfig did not correctly process directories
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=376
+  The testbench was also enhanced to check for these cases.
+  Thanks to Georgi Georgiev for the bug report.
 ---------------------------------------------------------------------------
 Version 6.6.0  [v6-stable] 2012-10-22
 This starts a new stable branch, based on the 6.5.x series, plus:
@@ -794,6 +861,10 @@ expected that interfaces, even new ones, break during the initial
 - added imptcp, a simplified, Linux-specific and potentielly fast
   syslog plain tcp input plugin (NOT supporting TLS!)
   [ported from v4]
+---------------------------------------------------------------------------
+Version 5.10.2  [V5-STABLE], 201?-??-??
+- bugfix: spurios error messages from imuxsock about (non-error) EAGAIN
+  Thanks to Marius Tomaschwesky for the patch.
 ---------------------------------------------------------------------------
 Version 5.10.1  [V5-STABLE], 2012-10-17
 - bugfix: imuxsock and imklog truncated head of received message
