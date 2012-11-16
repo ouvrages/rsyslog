@@ -1,4 +1,2 @@
 # Debian patches for rsyslog
 01-dont_create_db.patch
-02-imkmsg-includes.patch
-03-sysinfo.patch

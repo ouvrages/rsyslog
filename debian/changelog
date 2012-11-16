@@ -1,6 +1,7 @@
 rsyslog (7.2.2-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * Drop patches which have been merged upstream.
 
  -- Michael Biebl <biebl@debian.org>  Fri, 16 Nov 2012 17:43:45 +0100
 
