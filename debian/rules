@@ -50,4 +50,4 @@ override_dh_compress:
 	dh_compress -X rsyslog-example.conf
 
 override_dh_installinit:
-	dh_installinit -R -- start 10 2 3 4 5 . start 30 0 6 . stop 90 1 .
+	dh_installinit -R
