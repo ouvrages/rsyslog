@@ -1,6 +1,7 @@
 rsyslog (7.2.3-2) UNRELEASED; urgency=low
 
   * Fix permissions of the spool/work directory. (Closes: #693099)
+  * Suggest rsyslog-mongodb.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 28 Nov 2012 22:14:09 +0100
 
