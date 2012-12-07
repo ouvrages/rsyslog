@@ -1,4 +1,46 @@
 ----------------------------------------------------------------------------
+Version 7.2.4  [v7-stable] 2012-12-07
+- enhance: permit RFC3339 timestamp in local log socket messages
+  Thanks to Sebastien Ponce for the patch.
+- imklog: added ParseKernelTimestamp parameter (import from 5.10.2)
+  Thanks to Marius Tomaschewski for the patch.
+- fix missing functionality: ruleset(){} could not specify ruleset queue
+  The "queue.xxx" parameter set was not supported, and legacy ruleset
+  config statements did not work (by intention). The fix introduces the
+  "queue.xxx" parameter set. It has some regression potential, but only
+  for the new functionality. Note that using that interface it is possible
+  to specify duplicate queue file names, which will cause trouble. This
+  will be solved in v7.3, because there is a too-large regression
+  potential for the v7.2 stable branch.
+- imklog: added KeepKernelTimestamp parameter (import from 5.10.2)
+  Thanks to Marius Tomaschewski for the patch.
+- bugfix: imklog mistakenly took kernel timestamp subseconds as nanoseconds
+  ... actually, they are microseconds. So the fractional part of the 
+  timestamp was not properly formatted. (import from 5.10.2)
+  Thanks to Marius Tomaschewski for the bug report and the patch idea.
+- bugfix: supportoctetcountedframing parameter did not work in imptcp
+- bugfix: modules not (yet) supporting new conf format were not properly
+  registered. This lead to a "module not found" error message instead of
+  the to-be-expected "module does not support new style" error message.
+  That invalid error message could be quite misleading and actually stop
+  people from addressing the real problem (aka "go nuts" ;))
+- bugfix: template "type" parameter is mandatory (but was not)
+- bugfix: some message properties could be garbled due to race condition
+  This happened only on very high volume systems, if the same message was
+  being processed by two different actions. This was a regression caused
+  by the new config processor, which did no longer properly enable msg
+  locking in multithreaded cases. The bugfix is actually a refactoring of
+  the msg locking code - we no longer do unlocked operations, as the use
+  case for it has mostly gone away. It is potentially possible only at
+  very low-end systems, and there the small additional overhead of doing
+  the locking does not really hurt. Instead, the removal of that 
+  capability can actually slightly improve performance in common cases,
+  as the code path is smaller and requires slightly less memory writes.
+  That probably outperforms the extra locking overhead (which in the 
+  low-end case always happens in user space, without need for kernel
+  support as we can always directly aquire the lock - there is no
+  contention at all).
+----------------------------------------------------------------------------
 Version 7.2.3  [v7-stable] 2012-10-21
 - regression fix: rsyslogd terminated when wild-card $IncludeConfig did not
   find actual include files. For example, if this directive is present:
@@ -90,12 +132,12 @@ Version 7.1.12  [beta] 2012-10-18
   Thanks to Michael Biebl for reporting & suggestions
 - bugfix: imklog truncated head of received message
   This happened only under some circumstances. Thanks to Marius
-  Tomaschwesky and Florian Piekert for their help in solving this issue.
+  Tomaschewski and Florian Piekert for their help in solving this issue.
 ----------------------------------------------------------------------------
 Version 7.1.11  [beta] 2012-10-16
 - bugfix: imuxsock truncated head of received message
   This happened only under some circumstances. Thanks to Marius
-  Tomaschwesky, Florian Piekert and Milan Bartos for their help in
+  Tomaschewski, Florian Piekert and Milan Bartos for their help in
   solving this issue.
 - bugfix: do not crash if set statement is used with date field
   Thanks to Miloslav Trmač for the patch.
@@ -227,6 +269,41 @@ Version 6.6.1  [v6-stable] 2012-10-??
   closes: http://bugzilla.adiscon.com/show_bug.cgi?id=376
   The testbench was also enhanced to check for these cases.
   Thanks to Georgi Georgiev for the bug report.
+- bugfix: spurios error messages from imuxsock about (non-error) EAGAIN
+  Thanks to Marius Tomaschewski for the patch.
+- imklog: added $klogParseKernelTimestamp option
+  When enabled, kernel message [timestamp] is converted for message time.
+  Default is to use receive time as in 5.8.x and before, because the clock
+  used to create the timestamp is not supposed to be as accurate as the
+  monotonic clock (depends on hardware and kernel) resulting in differences
+  between kernel and system messages which occurred at same time.
+  Thanks to Marius Tomaschewski for the patch.
+- imklog: added $klogKeepKernelTimestamp option
+  When enabled, the kernel [timestamp] remains at begin of
+  each message, even it is used for the message time too.
+  Thanks to Marius Tomaschewski for the patch.
+- bugfix: imklog mistakenly took kernel timestamp subseconds as nanoseconds
+  ... actually, they are microseconds. So the fractional part of the 
+  timestamp was not properly formatted.
+  Thanks to Marius Tomaschewski for the bug report and the patch idea.
+- bugfix: hostname set in rsyslog.conf was not picked up until HUP
+  which could also mean "never" or "not for a very long time".
+  Thanks to oxpa for providing analysis and a patch
+- bugfix: some message properties could be garbled due to race condition
+  This happened only on very high volume systems, if the same message was
+  being processed by two different actions. This was a regression caused
+  by the new config processor, which did no longer properly enable msg
+  locking in multithreaded cases. The bugfix is actually a refactoring of
+  the msg locking code - we no longer do unlocked operations, as the use
+  case for it has mostly gone away. It is potentially possible only at
+  very low-end systems, and there the small additional overhead of doing
+  the locking does not really hurt. Instead, the removal of that 
+  capability can actually slightly improve performance in common cases,
+  as the code path is smaller and requires slightly less memory writes.
+  That probably outperforms the extra locking overhead (which in the 
+  low-end case always happens in user space, without need for kernel
+  support as we can always directly aquire the lock - there is no
+  contention at all).
 ---------------------------------------------------------------------------
 Version 6.6.0  [v6-stable] 2012-10-22
 This starts a new stable branch, based on the 6.5.x series, plus:
@@ -291,7 +368,7 @@ all these patches here are present in 6.6.0.
   Thanks to Michael Biebl for reporting & suggestions
 - bugfix: imuxsock and imklog truncated head of received message
   This happened only under some circumstances. Thanks to Marius
-  Tomaschwesky, Florian Piekert and Milan Bartos for their help in
+  Tomaschewski, Florian Piekert and Milan Bartos for their help in
   solving this issue.
 - change lumberjack cookie to "@cee:" from "@cee: "
   CEE originally specified the cookie with SP, whereas other lumberjack
@@ -782,7 +859,7 @@ Version 6.1.4  [DEVEL] (rgerhards), 2011-02-18
   has been changed so this can no longer happen.
 - added pmsnare parser module (written by David Lang)
 - enhanced imfile to support non-cancel input termination
-- improved systemd socket activation thanks to Marius Tomaschweski
+- improved systemd socket activation thanks to Marius Tomaschewski
 - improved error reporting for $WorkDirectory
   non-existance and other detectable problems are now reported,
   and the work directory is NOT set in this case
@@ -876,12 +953,35 @@ expected that interfaces, even new ones, break during the initial
 ---------------------------------------------------------------------------
 Version 5.10.2  [V5-STABLE], 201?-??-??
 - bugfix: spurios error messages from imuxsock about (non-error) EAGAIN
-  Thanks to Marius Tomaschwesky for the patch.
+  Thanks to Marius Tomaschewski for the patch.
+- imklog: added $klogParseKernelTimestamp option
+  When enabled, kernel message [timestamp] is converted for message time.
+  Default is to use receive time as in 5.8.x and before, because the clock
+  used to create the timestamp is not supposed to be as accurate as the
+  monotonic clock (depends on hardware and kernel) resulting in differences
+  between kernel and system messages which occurred at same time.
+  Thanks to Marius Tomaschewski for the patch.
+- imklog: added $klogKeepKernelTimestamp option
+  When enabled, the kernel [timestamp] remains at begin of
+  each message, even it is used for the message time too.
+  Thanks to Marius Tomaschewski for the patch.
+- bugfix: imklog mistakenly took kernel timestamp subseconds as nanoseconds
+  ... actually, they are microseconds. So the fractional part of the 
+  timestamp was not properly formatted.
+  Thanks to Marius Tomaschewski for the bug report and the patch idea.
+- imklog: added $klogKeepKernelTimestamp option
+  When enabled, the kernel [timestamp] remains at begin of
+  each message, even it is used for the message time too.
+  Thanks to Marius Tomaschewski for the patch.
+- bugfix: imklog mistakenly took kernel timestamp subseconds as nanoseconds
+  ... actually, they are microseconds. So the fractional part of the 
+  timestamp was not properly formatted.
+  Thanks to Marius Tomaschewski for the bug report and the patch idea.
 ---------------------------------------------------------------------------
 Version 5.10.1  [V5-STABLE], 2012-10-17
 - bugfix: imuxsock and imklog truncated head of received message
   This happened only under some circumstances. Thanks to Marius
-  Tomaschwesky, Florian Piekert and Milan Bartos for their help in
+  Tomaschewski, Florian Piekert and Milan Bartos for their help in
   solving this issue.
 - enable DNS resolution in imrelp
   Thanks to Apollon Oikonomopoulos for the patch
@@ -1418,7 +1518,7 @@ Version 5.7.5  [V5-BETA] (rgerhards), 2011-02-23
 Version 5.7.4  [V5-BETA] (rgerhards), 2011-02-17
 - added pmsnare parser module (written by David Lang)
 - enhanced imfile to support non-cancel input termination
-- improved systemd socket activation thanks to Marius Tomaschweski
+- improved systemd socket activation thanks to Marius Tomaschewski
 - improved error reporting for $WorkDirectory
   non-existance and other detectable problems are now reported,
   and the work directory is NOT set in this case
