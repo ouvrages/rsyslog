@@ -463,17 +463,17 @@ doGetFileCreateMode(struct nvlst *valnode, struct cnfparamdescr *param,
 
 	if(es_strlen(valnode->val.d.estr) == 4) {
 		c = es_getBufAddr(valnode->val.d.estr);
-		if(!(   (c[0] == '0')
-		     && (c[1] >= '0' && c[1] <= '7')
-		     && (c[2] >= '0' && c[2] <= '7')
-		     && (c[3] >= '0' && c[3] <= '7')  )  ) {
+		if(    (c[0] == '0')
+		    && (c[1] >= '0' && c[1] <= '7')
+		    && (c[2] >= '0' && c[2] <= '7')
+		    && (c[3] >= '0' && c[3] <= '7')  )  {
 			fmtOK = 1;
 		}
 	}
 
 	if(fmtOK) {
 		val->val.datatype = 'N';
-		val->val.d.n = (c[1]-'0') * 64 + (c[2]-'0') * 8 + (c[3]-'0');;
+		val->val.d.n = (c[1]-'0') * 64 + (c[2]-'0') * 8 + (c[3]-'0');
 	} else {
 		cstr = es_str2cstr(valnode->val.d.estr, NULL);
 		parser_errmsg("file modes need to be specified as "
@@ -1250,6 +1250,10 @@ evalStrArrayCmp(es_str_t *estr_l, struct cnfarray* ar, int cmpop)
 		} else if(expr->r->nodetype != 'A') { \
 			cnfexprEval(expr->r, &r, usrptr); \
 			estr_r = var2String(&r, &bMustFree); \
+		} else { \
+			/* Note: this is not really necessary, but if we do not */ \
+			/* do it, we get a very irritating compiler warning... */ \
+			estr_r = NULL; \
 		}
 
 #define FREE_TWO_STRINGS \
