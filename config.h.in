@@ -79,6 +79,9 @@
 /* Define to 1 if you have the `gethostname' function. */
 #undef HAVE_GETHOSTNAME
 
+/* Define to 1 if you have the `getifaddrs' function. */
+#undef HAVE_GETIFADDRS
+
 /* Define to 1 if you have the `getline' function. */
 #undef HAVE_GETLINE
 
@@ -235,8 +238,8 @@
 /* Define to 1 if `sa_len' is a member of `struct sockaddr'. */
 #undef HAVE_STRUCT_SOCKADDR_SA_LEN
 
-/* Define to 1 if you have the `sysinfo' function. */
-#undef HAVE_SYSINFO
+/* set define */
+#undef HAVE_SYSINFO_UPTIME
 
 /* Define to 1 if you have the <syslog.h> header file. */
 #undef HAVE_SYSLOG_H
