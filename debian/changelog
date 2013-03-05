@@ -1,11 +1,11 @@
-rsyslog (5.8.11-3) UNRELEASED; urgency=low
+rsyslog (5.8.11-3) unstable; urgency=low
 
   * debian/patches/04-systemd_journal.patch: The journal has replaced
     systemd-kmsg-syslogd and systemd-stdout-bridge. Stopping a non-existing
     service will generate an error in newer versions of systemd, so remove
     that from ExecStartPre.
 
- -- Michael Biebl <biebl@debian.org>  Tue, 05 Mar 2013 23:03:20 +0100
+ -- Michael Biebl <biebl@debian.org>  Tue, 05 Mar 2013 23:06:57 +0100
 
 rsyslog (5.8.11-2) unstable; urgency=low
 
