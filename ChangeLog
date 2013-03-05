@@ -1,4 +1,31 @@
 ----------------------------------------------------------------------------
+Version 7.2.6  [v7-stable] 2013-03-05
+- slightly improved config parser error messages when invalid escapes happen
+- bugfix: include files got included in the wrong order
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=411
+  This happens if an $IncludeConfig directive was done on multiple
+  files (e.g. the distro default of $IncludeConfig /etc/rsyslog.d/*.conf).
+  In that case, the order of include file processing is reversed, which
+  could lead to all sorts of problems.
+  Thanks to Nathan Stratton Treadway for his great analysis of the problem,
+  which made bug fixing really easy.
+- bugfix: omelasticsearch failed when authentication data was provided
+  ... at least in most cases it emitted an error message:
+  "snprintf failed when trying to build auth string"
+  Thanks to Joerg Heinemann for alerting us.
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=404
+- bugfix: some property-based filter were incorrectly parsed
+  This usually lead to a syntax error on startup and rsyslogd not actually
+  starting up. The problem was the regex, which did not care for double
+  quote characters to follow in the action part - unfortunately something
+  that can frequently happen with v6+ format. An example:
+  :programname, isequal, "as" {action(type="omfile" ...) }
+  Here, the part 
+  :programname, isequal, "as" {action(type="omfile"
+  was treated as the property filter, and the rest as action part.
+  Obviously, this did not work out. Unfortunately, such situations usually
+  resulted in very hard to understand error messages.
+----------------------------------------------------------------------------
 Version 7.2.5  [v7-stable] 2013-01-08
 - build system cleanup (thanks to Michael Biebl for this!)
 - bugfix: omelasticsearch did not properly compile on some platforms
@@ -1007,6 +1034,8 @@ Version 5.10.2  [V5-STABLE], 201?-??-??
   Thanks to Marius Tomaschewski for the bug report and the patch idea.
 - bugfix: invalid DST handling under Solaris
   Thanks to Scott Severtson for the patch.
+- bugfix: invalid decrement in pm5424 could lead to log truncation
+  Thanks to Tomas Heinrich for the patch.
 - bugfix[kind of]: omudpspoof discarded messages >1472 bytes (MTU size)
   it now truncates these message, but ensures they are sent. Note that
   7.2.5+ will switch to fragmented UDP messages instead (up to 64K)
