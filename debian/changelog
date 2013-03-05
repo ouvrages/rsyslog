@@ -1,3 +1,9 @@
+rsyslog (7.2.6-1) UNRELEASED; urgency=low
+
+  * New upstream release.
+
+ -- Michael Biebl <biebl@debian.org>  Tue, 05 Mar 2013 17:35:30 +0100
+
 rsyslog (7.2.5-1) experimental; urgency=low
 
   * New upstream release.
