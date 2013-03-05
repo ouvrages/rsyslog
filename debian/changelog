@@ -1,9 +1,9 @@
-rsyslog (7.2.6-1) UNRELEASED; urgency=low
+rsyslog (7.2.6-1) experimental; urgency=low
 
   * New upstream release.
   * Bump Standards-Version to 3.9.4. No further changes.
 
- -- Michael Biebl <biebl@debian.org>  Tue, 05 Mar 2013 17:35:30 +0100
+ -- Michael Biebl <biebl@debian.org>  Tue, 05 Mar 2013 17:36:18 +0100
 
 rsyslog (7.2.5-1) experimental; urgency=low
 
