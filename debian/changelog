@@ -1,6 +1,7 @@
 rsyslog (7.3.8-1) UNRELEASED; urgency=low
 
   * New upstream development release from the v7-devel branch.
+  * Update watch file to track development releases.
 
  -- Michael Biebl <biebl@debian.org>  Mon, 18 Mar 2013 15:40:45 +0100
 
