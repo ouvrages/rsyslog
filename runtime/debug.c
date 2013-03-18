@@ -44,6 +44,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#ifdef HAVE_SYS_SYSCALL_H
+#  include <sys/syscall.h>
+#endif
 #if _POSIX_TIMERS <= 0
 #include <sys/time.h>
 #endif
@@ -66,6 +69,7 @@ static int bPrintMutexAction = 0; /* shall mutex calls be printed to the debug l
 static int bPrintTime = 1;	/* print a timestamp together with debug message */
 static int bPrintAllDebugOnExit = 0;
 static int bAbortTrace = 1;	/* print a trace after SIGABRT or SIGSEGV */
+static int bOutputTidToStderr = 0;/* output TID to stderr on thread creation */
 static char *pszAltDbgFileName = NULL; /* if set, debug output is *also* sent to here */
 static int altdbg = -1;	/* and the handle for alternate debug output */
 int stddbg = 1; /* the handle for regular debug output, set to stdout if not forking, -1 otherwise */
@@ -292,6 +296,21 @@ static inline void dbgFuncDBRemoveMutexLock(dbgFuncDB_t *pFuncDB, pthread_mutex_
 
 
 /* ------------------------- END FuncDB utility functions ------------------------- */ 
+
+/* output the current thread ID to "relevant" places
+ * (what "relevant" means is determinded by various ways)
+ */
+void
+dbgOutputTID(char* name)
+{
+#	ifdef	HAVE_SYSCALL
+	if(bOutputTidToStderr)
+		fprintf(stderr, "thread tid %u, name '%s'\n",
+			(unsigned)syscall(SYS_gettid), name);
+	DBGPRINTF("thread created, tid %u, name '%s'\n",
+	          (unsigned)syscall(SYS_gettid), name);
+#	endif
+}
 
 /* ###########################################################################
  * 				IMPORTANT NOTE
@@ -1296,6 +1315,15 @@ dbgmalloc(size_t size)
 }
 
 
+/* report fd used for debug log. This is needed in case of
+ * auto-backgrounding, where the debug log shall not be closed.
+ */
+int
+dbgGetDbglogFd(void)
+{
+	return altdbg;
+}
+
 /* read in the runtime options
  * rgerhards, 2008-02-28
  */
@@ -1325,6 +1353,7 @@ dbgGetRuntimeOptions(void)
 					"PrintAllDebugInfoOnExit (not yet implemented)\n"
 					"NoLogTimestamp\n"
 					"Nostdoout\n"
+					"OutputTidToStderr\n"
 					"filetrace=file (may be provided multiple times)\n"
 					"DebugOnDemand - enables debugging on USR1, but does not turn on output\n"
 					"\nSee debug.html in your doc set or http://www.rsyslog.com for details\n");
@@ -1358,6 +1387,8 @@ dbgGetRuntimeOptions(void)
 				stddbg = -1;
 			} else if(!strcasecmp((char*)optname, "noaborttrace")) {
 				bAbortTrace = 0;
+			} else if(!strcasecmp((char*)optname, "outputtidtostderr")) {
+				bOutputTidToStderr = 1;
 			} else if(!strcasecmp((char*)optname, "filetrace")) {
 				if(*optval == '\0') {
 					fprintf(stderr, "rsyslogd " VERSION " error: logfile debug option requires filename, "
@@ -1375,6 +1406,25 @@ dbgGetRuntimeOptions(void)
 	}
 }
 
+
+void
+dbgSetDebugLevel(int level)
+{
+	Debug = level;
+	debugging_on = (level == DEBUG_FULL) ? 1 : 0;
+}
+
+void
+dbgSetDebugFile(uchar *fn)
+{
+	if(altdbg != -1) {
+		dbgprintf("switching to debug file %s\n", fn);
+		close(altdbg);
+	}
+	if((altdbg = open((char*)fn, O_WRONLY|O_CREAT|O_TRUNC|O_NOCTTY|O_CLOEXEC, S_IRUSR|S_IWUSR)) == -1) {
+		fprintf(stderr, "alternate debug file could not be opened, ignoring. Error: %s\n", strerror(errno));
+	}
+}
 
 /* end support system to set debug options at runtime */
 

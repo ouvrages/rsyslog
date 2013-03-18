@@ -238,6 +238,9 @@
 /* Define to 1 if `sa_len' is a member of `struct sockaddr'. */
 #undef HAVE_STRUCT_SOCKADDR_SA_LEN
 
+/* Define to 1 if you have the `syscall' function. */
+#undef HAVE_SYSCALL
+
 /* set define */
 #undef HAVE_SYSINFO_UPTIME
 
@@ -267,6 +270,9 @@
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #undef HAVE_SYS_STAT_H
+
+/* Define to 1 if you have the <sys/syscall.h> header file. */
+#undef HAVE_SYS_SYSCALL_H
 
 /* Define to 1 if you have the <sys/time.h> header file. */
 #undef HAVE_SYS_TIME_H

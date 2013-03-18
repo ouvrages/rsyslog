@@ -46,6 +46,7 @@
 #define CONF_HOSTNAME_MAXSIZE		512	/* a value that is deemed far too large for any valid HOSTNAME */
 #define CONF_RAWMSG_BUFSIZE		101
 #define CONF_TAG_BUFSIZE		32
+#define CONF_PROGNAME_BUFSIZE		16
 #define CONF_HOSTNAME_BUFSIZE		32
 #define CONF_PROP_BUFSIZE		16	/* should be close to sizeof(ptr) or lighly above it */
 #define	CONF_MIN_SIZE_FOR_COMPRESS	60 	/* config param: minimum message size to try compression. The smaller
@@ -69,6 +70,7 @@
 						 * approach taken here is considered appropriate.
 						 * rgerhards, 2010-06-24
 						 */
+#define CONF_NUM_MULTISUB		1024	/* default number of messages per multisub structure */
 
 /* ############################################################# *
  * #                  End Config Settings                      # *
@@ -322,7 +324,7 @@ enum rsRetVal_				/** return value. All methods return this if not specified oth
 	RS_RET_ERR_DOOR = -2147, /**< some problems with handling the Solaris door functionality */
 	RS_RET_NO_SRCNAME_TPL = -2150, /**< sourcename template was not specified where one was needed (omudpspoof spoof addr) */
 	RS_RET_HOST_NOT_SPECIFIED = -2151, /**< (target) host was not specified where it was needed */
-	RS_RET_ERR_LIBNET_INIT = -2152, /**< error initializing libnet */
+	RS_RET_ERR_LIBNET_INIT = -2152, /**< error initializing libnet, e.g. because not running as root */
 	RS_RET_FORCE_TERM = -2153,	/**< thread was forced to terminate by bShallShutdown, a state, not an error */
 	RS_RET_RULES_QUEUE_EXISTS = -2154,/**< we were instructed to create a new ruleset queue, but one already exists */
 	RS_RET_NO_CURR_RULESET = -2155,/**< no current ruleset exists (but one is required) */
@@ -376,6 +378,7 @@ enum rsRetVal_				/** return value. All methods return this if not specified oth
 	RS_RET_LEGA_ACT_NOT_SUPPORTED = -2215, /**< the module (no longer) supports legacy action syntax */
 	RS_RET_MAX_OMSR_REACHED = -2216, /**< max nbr of string requests reached, not supported by core */
 	RS_RET_UID_MISSING = -2217,	/**< a user id is missing (but e.g. a password provided) */
+	RS_RET_DATAFAIL = -2218,	/**< data passed to action caused failure */
 	/* reserved for pre-v6.5 */
 	RS_RET_DUP_PARAM = -2220, /**< config parameter is given more than once */
 	RS_RET_MODULE_ALREADY_IN_CONF = -2221, /**< module already in current configuration */
@@ -393,6 +396,12 @@ enum rsRetVal_				/** return value. All methods return this if not specified oth
 	RS_RET_INVLD_SETOP = -2305, /**< invalid variable set operation, incompatible type */
 	RS_RET_RULESET_EXISTS = -2306,/**< ruleset already exists */
 	RS_RET_DEPRECATED = -2307,/**< deprecated functionality is used */
+	RS_RET_DS_PROP_SEQ_ERR = -2308,/**< property sequence error deserializing object */
+	RS_RET_TPL_INVLD_PROP = -2309,/**< property name error in template (unknown name) */
+	RS_RET_NO_RULEBASE = -2310,/**< mmnormalize: rulebase can not be found or otherwise invalid */
+	RS_RET_INVLD_MODE = -2311,/**< invalid mode specified in configuration */
+	RS_RET_INVLD_ANON_BITS = -2312,/**< mmanon: invalid number of bits to anonymize specified */
+	RS_RET_REPLCHAR_IGNORED = -2313,/**< mmanon: replacementChar parameter is ignored */
 
 	/* RainerScript error messages (range 1000.. 1999) */
 	RS_RET_SYSVAR_NOT_FOUND = 1001, /**< system variable could not be found (maybe misspelled) */
