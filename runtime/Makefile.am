@@ -65,11 +65,12 @@ librsyslog_la_SOURCES = \
 	ruleset.h \
 	prop.c \
 	prop.h \
+	ratelimit.c \
+	ratelimit.h \
 	cfsysline.c \
 	cfsysline.h \
 	sd-daemon.c \
 	sd-daemon.h \
-	\
 	\
 	../action.h \
 	../action.c \

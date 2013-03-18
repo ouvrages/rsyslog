@@ -13,20 +13,30 @@
 <p>The omfile plug-in provides the core functionality of writing messages to files residing inside the local file system (which may actually be remote if methods like NFS are used). Both files named with static names as well files with names based on message content are supported by this module. It is a built-in module that does not need to be loaded. </p>
 <p>&nbsp;</p>
 
-<p><b>Global Configuration Directives</b>:</p>
+<p><b>Module Configuration Parameters</b>:</p>
 <ul>
 	<li><strong>Template </strong>[templateName]<br>
 	sets a new default template for file actions.<br></li>
 	
 </ul>
 <p>&nbsp;</p>
-<p><b>Action specific Configuration Directives</b>:</p>
+<p><b>Action Confguration Parameters</b>:</p>
 <ul>
 	<li><strong>DynaFileCacheSize </strong>(not mandatory, default will be used)<br>
 	Defines a template to be used for the output. <br></li><br>
 
 	<li><strong>ZipLevel </strong>0..9 [default 0]<br>
 	if greater 0, turns on gzip compression of the output file. The higher the number, the better the compression, but also the more CPU is required for zipping.<br></li><br>
+
+	<li><b>VeryReliableZip</b> [<b>on</b>/off] (v7.3.0+) - if ZipLevel is greater 0, 
+	then this setting controls if extra headers are written to make the resulting file
+	extra hardened against malfunction. If set to off, data appended to previously unclean
+	closed files may not be accessible without extra tools.
+	Note that this risk is usually expected to be bearable, and thus "off" is the default mode.
+	The extra headers considerably
+	degrade compression, files with this option set to "on" may be four to five times as
+	large as files processed in "off" mode.
+	</li><br>
 
 	<li><strong>FlushInterval </strong>(not mandatory, default will be used)<br>
 	Defines a template to be used for the output. <br></li><br>
@@ -80,7 +90,7 @@
 <p><b>Caveats/Known Bugs:</b></p><ul><li>None.</li></ul>
 <p><b>Sample:</b></p>
 <p>The following command writes all syslog messages into a file.</p>
-<textarea rows="5" cols="60">Module (path="builtin:omfile")
+<textarea rows="5" cols="60">Module (load="builtin:omfile")
 *.* action(type="omfile" 
 DirCreateMode="0700"
 FileCreateMode="0644"
@@ -160,7 +170,7 @@ $FileCreateMode 0644
 index</a>] [<a href="http://www.rsyslog.com/">rsyslog site</a>]</p>
 <p><font size="2">This documentation is part of the
 <a href="http://www.rsyslog.com/">rsyslog</a> project.<br>
-Copyright © 2008 by <a href="http://www.gerhards.net/rainer">Rainer Gerhards</a> and
+Copyright &copy; 2008-2013 by <a href="http://www.gerhards.net/rainer">Rainer Gerhards</a> and
 <a href="http://www.adiscon.com/">Adiscon</a>. Released under the GNU GPL 
 version 3 or higher.</font></p>
 
