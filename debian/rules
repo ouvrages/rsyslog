@@ -33,6 +33,7 @@ override_dh_auto_configure:
 		--enable-pmsnare \
 		--enable-omprog \
 		--enable-omuxsock \
+		--enable-mmanon \
 		--enable-mmnormalize \
 		--enable-mmjsonparse \
 		--disable-testbench \

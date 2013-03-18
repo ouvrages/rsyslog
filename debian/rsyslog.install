@@ -18,6 +18,7 @@ usr/lib/rsyslog/lmstrmsrv.so
 usr/lib/rsyslog/lmtcpclt.so
 usr/lib/rsyslog/lmtcpsrv.so
 usr/lib/rsyslog/lmzlibw.so
+usr/lib/rsyslog/mmanon.so
 usr/lib/rsyslog/mmnormalize.so
 usr/lib/rsyslog/mmjsonparse.so
 usr/lib/rsyslog/ommail.so

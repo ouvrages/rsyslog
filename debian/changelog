@@ -5,6 +5,8 @@ rsyslog (7.3.8-1) UNRELEASED; urgency=low
   * The imrelp module now properly supports listening on IPv4 resp. IPv6 only.
     This requires librelp >= 1.0.2, so bump the Build-Depends accordingly.
     (Closes: #649355)
+  * Enable the mmanon module which adds support for anonymizing IPv4
+    addresses.
 
  -- Michael Biebl <biebl@debian.org>  Mon, 18 Mar 2013 15:40:45 +0100
 
