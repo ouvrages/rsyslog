@@ -1,0 +1,39 @@
+From aef0be0c1799fbb20955fc1dc014cb9c9772af88 Mon Sep 17 00:00:00 2001
+From: Rainer Gerhards <rgerhards@adiscon.com>
+Date: Tue, 19 Mar 2013 16:20:25 +0100
+Subject: [PATCH] bugfix: solve compile problems on non-Linux platforms
+
+Thanks to Michael Biebl for alerting us on this issue.
+---
+ configure.ac    |    1 +
+ runtime/debug.c |    2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/configure.ac b/configure.ac
+index 7a4af19..6876980 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -122,6 +122,7 @@ AC_CHECK_DECL([SCM_CREDENTIALS], [AC_DEFINE(HAVE_SCM_CREDENTIALS, [1], [set defi
+ #include <sys/socket.h>])
+ AC_CHECK_DECL([SO_TIMESTAMP], [AC_DEFINE(HAVE_SO_TIMESTAMP, [1], [set define])], [], [#include <sys/types.h>
+ #include <sys/socket.h>])
++AC_CHECK_DECL([SYS_gettid], [AC_DEFINE(HAVE_SYS_gettid, [1], [set define])], [], [#include <sys/syscall.h>])
+ AC_CHECK_MEMBER([struct sysinfo.uptime], [AC_DEFINE(HAVE_SYSINFO_UPTIME, [1], [set define])], [], [#include <sys/sysinfo.h>])
+ 
+ # Check for MAXHOSTNAMELEN
+diff --git a/runtime/debug.c b/runtime/debug.c
+index 3cb2223..876f61d 100644
+--- a/runtime/debug.c
++++ b/runtime/debug.c
+@@ -303,7 +303,7 @@ static inline void dbgFuncDBRemoveMutexLock(dbgFuncDB_t *pFuncDB, pthread_mutex_
+ void
+ dbgOutputTID(char* name)
+ {
+-#	ifdef	HAVE_SYSCALL
++#	if defined(HAVE_SYSCALL) && defined(HAVE_SYS_gettid)
+ 	if(bOutputTidToStderr)
+ 		fprintf(stderr, "thread tid %u, name '%s'\n",
+ 			(unsigned)syscall(SYS_gettid), name);
+-- 
+1.7.10.4
+

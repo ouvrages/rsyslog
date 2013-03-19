@@ -1,3 +1,10 @@
+rsyslog (7.3.8-2) UNRELEASED; urgency=low
+
+  * Cherry pick patch from upstream which fixes the build on architectures
+    which don't have SYS_gettid. (Closes: #703429)
+
+ -- Michael Biebl <biebl@debian.org>  Tue, 19 Mar 2013 16:37:48 +0100
+
 rsyslog (7.3.8-1) experimental; urgency=low
 
   * New upstream development release from the v7-devel branch.
