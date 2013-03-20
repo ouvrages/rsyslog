@@ -1,9 +1,9 @@
-rsyslog (7.3.8-3) UNRELEASED; urgency=low
+rsyslog (7.3.8-3) experimental; urgency=low
 
   * The previous fix was incomplete. Cherry-pick another upstream patch to fix
     the build failure on non-Linux. (Closes: #703429)
 
- -- Michael Biebl <biebl@debian.org>  Wed, 20 Mar 2013 11:42:10 +0100
+ -- Michael Biebl <biebl@debian.org>  Wed, 20 Mar 2013 11:44:10 +0100
 
 rsyslog (7.3.8-2) experimental; urgency=low
 
