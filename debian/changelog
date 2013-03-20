@@ -1,3 +1,10 @@
+rsyslog (7.3.8-3) UNRELEASED; urgency=low
+
+  * The previous fix was incomplete. Cherry-pick another upstream patch to fix
+    the build failure on non-Linux. (Closes: #703429)
+
+ -- Michael Biebl <biebl@debian.org>  Wed, 20 Mar 2013 11:42:10 +0100
+
 rsyslog (7.3.8-2) experimental; urgency=low
 
   * Cherry pick patch from upstream which fixes the build on architectures

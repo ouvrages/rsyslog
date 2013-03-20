@@ -1,0 +1,23 @@
+commit 7784b65d8709fba647a7beeb934c18b7cb8cb6f1
+Author: Rainer Gerhards <rgerhards@adiscon.com>
+Date:   Wed Mar 20 10:24:36 2013 +0100
+
+    bugfix: build on non-linux platforms failed
+    
+    The previous fix for this was incomplete.
+
+diff --git a/runtime/wtp.c b/runtime/wtp.c
+index f8d3588..19151e7 100644
+--- a/runtime/wtp.c
++++ b/runtime/wtp.c
+@@ -381,9 +381,9 @@ wtpWorker(void *arg) /* the arg is actually a wti object, even though we are in
+ 	if(prctl(PR_SET_NAME, thrdName, 0, 0, 0) != 0) {
+ 		DBGPRINTF("prctl failed, not setting thread name for '%s'\n", wtpGetDbgHdr(pThis));
+ 	}
++	dbgOutputTID((char*)thrdName);
+ #	endif
+ 
+-	dbgOutputTID((char*)thrdName);
+ 	pthread_cleanup_push(wtpWrkrExecCancelCleanup, pWti);
+ 	wtiWorker(pWti);
+ 	pthread_cleanup_pop(0);

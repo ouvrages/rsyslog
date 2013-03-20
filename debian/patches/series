@@ -1,3 +1,4 @@
 # Debian patches for rsyslog
 01-dont_create_db.patch
 02-sys-gettid.patch
+03-build-non-linux.patch
