@@ -1,3 +1,10 @@
+rsyslog (7.3.8-4) UNRELEASED; urgency=low
+
+  * Add Build-Depends on bison so we can build twice in a row. "make clean"
+    removes the generated grammar/grammer.[ch].
+
+ -- Michael Biebl <biebl@debian.org>  Thu, 21 Mar 2013 16:34:25 +0100
+
 rsyslog (7.3.8-3) experimental; urgency=low
 
   * The previous fix was incomplete. Cherry-pick another upstream patch to fix

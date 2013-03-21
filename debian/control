@@ -17,7 +17,8 @@ Build-Depends: debhelper (>= 8),
                liblognorm-dev (>= 0.3.1),
                libjson0-dev,
                uuid-dev,
-               pkg-config
+               pkg-config,
+               bison
 Standards-Version: 3.9.4
 Vcs-Git: git://git.debian.org/git/collab-maint/rsyslog.git
 Vcs-Browser: http://git.debian.org/?p=collab-maint/rsyslog.git;a=summary
