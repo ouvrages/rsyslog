@@ -1,11 +1,11 @@
-rsyslog (7.3.8-4) UNRELEASED; urgency=low
+rsyslog (7.3.8-4) experimental; urgency=low
 
   * Add Build-Depends on bison so we can build twice in a row. "make clean"
     removes the generated grammar/grammer.[ch].
   * Another patch to fix build failures on architectures where prctl is not
     available. (Closes: #703429)
 
- -- Michael Biebl <biebl@debian.org>  Thu, 21 Mar 2013 16:34:25 +0100
+ -- Michael Biebl <biebl@debian.org>  Thu, 21 Mar 2013 16:45:17 +0100
 
 rsyslog (7.3.8-3) experimental; urgency=low
 
