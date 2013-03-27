@@ -1,6 +1,7 @@
 rsyslog (7.3.9-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * Remove patches which have been applied upstream.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 27 Mar 2013 12:04:02 +0100
 
