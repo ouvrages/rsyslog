@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[7.3.10],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[7.3.11],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -337,6 +337,20 @@ AC_ARG_ENABLE(kmsg,
 )
 AM_CONDITIONAL(ENABLE_IMKMSG, test x$enable_kmsg = xyes)
 
+# imjournal
+AC_ARG_ENABLE(imjournal,
+        [AS_HELP_STRING([--enable-imjournal],[Systemd journal message import @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_imjournal="yes" ;;
+          no) enable_imjournal="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-imjournal) ;;
+         esac],
+        [enable_imjournal="no"]
+)
+if test "x$enable_imjournal" = "xyes"; then
+	PKG_CHECK_MODULES([LIBSYSTEMD_JOURNAL], [libsystemd-journal >= 197])
+fi
+AM_CONDITIONAL(ENABLE_IMJOURNAL, test x$enable_imjournal = xyes)
 
 # inet
 AC_ARG_ENABLE(inet,
@@ -758,6 +772,38 @@ if test "x$enable_gnutls" = "xyes"; then
 	AC_DEFINE([ENABLE_GNUTLS], [1], [Indicator that GnuTLS is present])
 fi
 AM_CONDITIONAL(ENABLE_GNUTLS, test x$enable_gnutls = xyes)
+
+# libgcrypt support
+AC_ARG_ENABLE(libgcrypt,
+        [AS_HELP_STRING([--enable-libgcrypt],[Enable libgcrypt support @<:@default=yes@:>@])],
+        [case "${enableval}" in
+         yes) enable_libgcrypt="yes" ;;
+          no) enable_libgcrypt="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-libgcrypt) ;;
+         esac],
+        [enable_libgcrypt=yes]
+)
+if test "x$enable_libgcrypt" = "xyes"; then
+        AC_CHECK_PROG(
+      	    [HAVE_LIBGCRYPT_CONFIG],
+            [libgcrypt-config],
+            [yes],,,
+            )
+        if test "x${HAVE_LIBGCRYPT_CONFIG}" != "xyes"; then
+           AC_MSG_FAILURE([libgcrypt-config not found in PATH])
+        fi
+        AC_CHECK_LIB(
+		[gcrypt],
+        	[gcry_cipher_open],
+        	[LIBGCRYPT_CFLAGS="`libgcrypt-config --cflags`"
+        	LIBGCRYPT_LIBS="`libgcrypt-config --libs`"
+        	],
+        	[AC_MSG_FAILURE([libgrypt is missing])],
+        	[`libgcrypt-config --libs --cflags`]
+        	)
+	AC_DEFINE([ENABLE_LIBGCRYPT], [1], [Indicator that LIBGCRYPT is present])
+fi
+AM_CONDITIONAL(ENABLE_LIBGCRYPT, test x$enable_libgcrypt = xyes)
 
 
 # support for building the rsyslogd runtime
@@ -1351,6 +1397,7 @@ AC_CONFIG_FILES([Makefile \
 		plugins/im3195/Makefile \
 		plugins/imgssapi/Makefile \
 		plugins/imuxsock/Makefile \
+		plugins/imjournal/Makefile \
 		plugins/immark/Makefile \
 		plugins/imklog/Makefile \
 		plugins/imkmsg/Makefile \
@@ -1410,6 +1457,7 @@ echo "    GUI components will be built:             $enable_gui"
 echo "    Unlimited select() support enabled:       $enable_unlimited_select"
 echo "    uuid support enabled:                     $enable_uuid"
 echo "    GuardTime signature support enabled:      $enable_guardtime"
+echo "    libgcrypt support enabled:                $enable_libgcrypt"
 echo "    anonymization support enabled:            $enable_mmanon"
 echo
 echo "---{ input plugins }---"
@@ -1422,6 +1470,7 @@ echo "    file input module enabled:                $enable_imfile"
 echo "    Solaris input module enabled:             $enable_imsolaris"
 echo "    periodic statistics module enabled:       $enable_impstats"
 echo "    imzmq3 input module enabled:              $enable_imzmq3"
+echo "    imjournal input module enabled:           $enable_imjournal"
 echo
 echo "---{ output plugins }---"
 echo "    Mail support enabled:                     $enable_mail"

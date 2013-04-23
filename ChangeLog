@@ -1,4 +1,18 @@
 ---------------------------------------------------------------------------
+Version 7.3.11  [devel] 2013-04-23
+- added support for encrypting log files
+- omhiredis: added support for redis pipeline support
+  Thanks to Brian Knox for the patch.
+- bugfix:  $PreserveFQDN is not properly working
+  Thanks to Louis Bouchard for the patch
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=426
+- bugfix: imuxsock aborted due to problem in ratelimiting code
+  Thanks to Tomas Heinrich for the patch.
+- bugfix: imuxsock aborted under some conditions
+  regression from ratelimiting enhancements - this was a different one
+  to the one Tomas Heinrich patched.
+- bugfix: timestamp problems in imkmsg
+---------------------------------------------------------------------------
 Version 7.3.10  [devel] 2013-04-10
 - added RainerScript re_extract() function
 - omrelp: added support for RainerScript-based configuration
@@ -225,7 +239,7 @@ Version 7.3.0  [devel] 2012-10-09
   This was achieved by somewhat reducing the robustness of the zip archive.
   This is controlled by the new action parameter "VeryReliableZip".
 ----------------------------------------------------------------------------
-Version 7.2.7  [v7-stable] 2013-03-??
+Version 7.2.7  [v7-stable] 2013-04-17
 - rsyslogd startup information is now properly conveyed back to init
   when privileges are beging dropped
   Actually, we have moved termination of the parent in front of the
@@ -272,6 +286,10 @@ Version 7.2.7  [v7-stable] 2013-03-??
   To use that functionality, legacy rsyslog.conf syntax had to be used.
   Also, the doc was missing information on the "ParseTrusted" set of
   config directives.
+- bugfix: parameter action.execOnlyWhenPreviousIsSuspended was accidently 
+  of integer-type. For obvious reasons, it needs to be boolean. Note
+  that this change can break existing configurations if they circumvented
+  the problem by using 0/1 values.
 - doc bugfix: rsyslog.conf man page had invalid file format info
   closes: http://bugzilla.adiscon.com/show_bug.cgi?id=418
 ----------------------------------------------------------------------------

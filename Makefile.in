@@ -86,21 +86,22 @@ sbin_PROGRAMS =
 @ENABLE_OMUXSOCK_TRUE@am__append_27 = plugins/omuxsock
 @ENABLE_OMHDFS_TRUE@am__append_28 = plugins/omhdfs
 @ENABLE_OMJOURNAL_TRUE@am__append_29 = plugins/omjournal
-@ENABLE_ELASTICSEARCH_TRUE@am__append_30 = plugins/omelasticsearch
-@ENABLE_MMSNMPTRAPD_TRUE@am__append_31 = plugins/mmsnmptrapd
-@ENABLE_IMFILE_TRUE@am__append_32 = plugins/imfile
-@ENABLE_IMPTCP_TRUE@am__append_33 = plugins/imptcp
-@ENABLE_IMTTCP_TRUE@am__append_34 = plugins/imttcp
-@ENABLE_IMDIAG_TRUE@am__append_35 = plugins/imdiag
-@ENABLE_MAIL_TRUE@am__append_36 = plugins/ommail
-@ENABLE_OMPROG_TRUE@am__append_37 = plugins/omprog
-@ENABLE_RFC3195_TRUE@am__append_38 = plugins/im3195
-@ENABLE_MMNORMALIZE_TRUE@am__append_39 = plugins/mmnormalize
-@ENABLE_MMJSONPARSE_TRUE@am__append_40 = plugins/mmjsonparse
-@ENABLE_MMAUDIT_TRUE@am__append_41 = plugins/mmaudit
-@ENABLE_MMANON_TRUE@am__append_42 = plugins/mmanon
-@ENABLE_ORACLE_TRUE@am__append_43 = plugins/omoracle
-@ENABLE_GUI_TRUE@am__append_44 = java
+@ENABLE_IMJOURNAL_TRUE@am__append_30 = plugins/imjournal
+@ENABLE_ELASTICSEARCH_TRUE@am__append_31 = plugins/omelasticsearch
+@ENABLE_MMSNMPTRAPD_TRUE@am__append_32 = plugins/mmsnmptrapd
+@ENABLE_IMFILE_TRUE@am__append_33 = plugins/imfile
+@ENABLE_IMPTCP_TRUE@am__append_34 = plugins/imptcp
+@ENABLE_IMTTCP_TRUE@am__append_35 = plugins/imttcp
+@ENABLE_IMDIAG_TRUE@am__append_36 = plugins/imdiag
+@ENABLE_MAIL_TRUE@am__append_37 = plugins/ommail
+@ENABLE_OMPROG_TRUE@am__append_38 = plugins/omprog
+@ENABLE_RFC3195_TRUE@am__append_39 = plugins/im3195
+@ENABLE_MMNORMALIZE_TRUE@am__append_40 = plugins/mmnormalize
+@ENABLE_MMJSONPARSE_TRUE@am__append_41 = plugins/mmjsonparse
+@ENABLE_MMAUDIT_TRUE@am__append_42 = plugins/mmaudit
+@ENABLE_MMANON_TRUE@am__append_43 = plugins/mmanon
+@ENABLE_ORACLE_TRUE@am__append_44 = plugins/omoracle
+@ENABLE_GUI_TRUE@am__append_45 = java
 subdir = .
 DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
@@ -255,11 +256,11 @@ DIST_SUBDIRS = doc runtime grammar compat . plugins/immark \
 	plugins/pmrfc3164sd plugins/omruleset plugins/omudpspoof \
 	plugins/ommongodb plugins/omhiredis plugins/omzmq3 \
 	plugins/imzmq3 plugins/omuxsock plugins/omhdfs \
-	plugins/omjournal plugins/omelasticsearch plugins/mmsnmptrapd \
-	plugins/imfile plugins/imptcp plugins/imttcp plugins/imdiag \
-	plugins/ommail plugins/omprog plugins/im3195 \
-	plugins/mmnormalize plugins/mmjsonparse plugins/mmaudit \
-	plugins/mmanon plugins/omoracle java tests
+	plugins/omjournal plugins/imjournal plugins/omelasticsearch \
+	plugins/mmsnmptrapd plugins/imfile plugins/imptcp \
+	plugins/imttcp plugins/imdiag plugins/ommail plugins/omprog \
+	plugins/im3195 plugins/mmnormalize plugins/mmjsonparse \
+	plugins/mmaudit plugins/mmanon plugins/omoracle java tests
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)
@@ -338,6 +339,7 @@ GREP = @GREP@
 GSS_LIBS = @GSS_LIBS@
 GUARDTIME_CFLAGS = @GUARDTIME_CFLAGS@
 GUARDTIME_LIBS = @GUARDTIME_LIBS@
+HAVE_LIBGCRYPT_CONFIG = @HAVE_LIBGCRYPT_CONFIG@
 HAVE_MYSQL_CONFIG = @HAVE_MYSQL_CONFIG@
 HAVE_ORACLE_CONFIG = @HAVE_ORACLE_CONFIG@
 HAVE_PGSQL_CONFIG = @HAVE_PGSQL_CONFIG@
@@ -556,7 +558,7 @@ SUBDIRS = doc runtime grammar compat . plugins/immark plugins/imuxsock \
 	$(am__append_34) $(am__append_35) $(am__append_36) \
 	$(am__append_37) $(am__append_38) $(am__append_39) \
 	$(am__append_40) $(am__append_41) $(am__append_42) \
-	$(am__append_43) $(am__append_44) tests
+	$(am__append_43) $(am__append_44) $(am__append_45) tests
 
 # make sure "make distcheck" tries to build all modules. This means that
 # a developer must always have an environment where every supporting library

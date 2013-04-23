@@ -181,6 +181,10 @@ if ENABLE_OMJOURNAL
 SUBDIRS += plugins/omjournal
 endif
 
+if ENABLE_IMJOURNAL
+SUBDIRS += plugins/imjournal
+endif
+
 if ENABLE_ELASTICSEARCH
 SUBDIRS += plugins/omelasticsearch
 endif
