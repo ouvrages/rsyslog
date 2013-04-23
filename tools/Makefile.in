@@ -50,12 +50,14 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-sbin_PROGRAMS = rsyslogd$(EXEEXT) $(am__EXEEXT_3)
-bin_PROGRAMS = $(am__EXEEXT_1) $(am__EXEEXT_2)
+sbin_PROGRAMS = rsyslogd$(EXEEXT) $(am__EXEEXT_4)
+bin_PROGRAMS = $(am__EXEEXT_1) $(am__EXEEXT_2) $(am__EXEEXT_3)
 @ENABLE_DIAGTOOLS_TRUE@am__append_1 = rsyslog_diag_hostname msggen zpipe
 @ENABLE_OMMONGODB_TRUE@@ENABLE_USERTOOLS_TRUE@am__append_2 = logctl
 @ENABLE_GUARDTIME_TRUE@@ENABLE_USERTOOLS_TRUE@am__append_3 = rsgtutil
 @ENABLE_GUARDTIME_TRUE@@ENABLE_USERTOOLS_TRUE@am__append_4 = rsgtutil.1
+@ENABLE_LIBGCRYPT_TRUE@@ENABLE_USERTOOLS_TRUE@am__append_5 = rscryutil
+@ENABLE_LIBGCRYPT_TRUE@@ENABLE_USERTOOLS_TRUE@am__append_6 = rscryutil.1
 subdir = tools
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	$(top_srcdir)/depcomp
@@ -74,10 +76,11 @@ CONFIG_CLEAN_VPATH_FILES =
 @ENABLE_OMMONGODB_TRUE@@ENABLE_USERTOOLS_TRUE@am__EXEEXT_1 =  \
 @ENABLE_OMMONGODB_TRUE@@ENABLE_USERTOOLS_TRUE@	logctl$(EXEEXT)
 @ENABLE_GUARDTIME_TRUE@@ENABLE_USERTOOLS_TRUE@am__EXEEXT_2 = rsgtutil$(EXEEXT)
+@ENABLE_LIBGCRYPT_TRUE@@ENABLE_USERTOOLS_TRUE@am__EXEEXT_3 = rscryutil$(EXEEXT)
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(sbindir)" \
 	"$(DESTDIR)$(man1dir)" "$(DESTDIR)$(man5dir)" \
 	"$(DESTDIR)$(man8dir)"
-@ENABLE_DIAGTOOLS_TRUE@am__EXEEXT_3 = rsyslog_diag_hostname$(EXEEXT) \
+@ENABLE_DIAGTOOLS_TRUE@am__EXEEXT_4 = rsyslog_diag_hostname$(EXEEXT) \
 @ENABLE_DIAGTOOLS_TRUE@	msggen$(EXEEXT) zpipe$(EXEEXT)
 PROGRAMS = $(bin_PROGRAMS) $(sbin_PROGRAMS)
 am__logctl_SOURCES_DIST = logctl.c
@@ -93,6 +96,12 @@ am__msggen_SOURCES_DIST = msggen.c
 @ENABLE_DIAGTOOLS_TRUE@am_msggen_OBJECTS = msggen.$(OBJEXT)
 msggen_OBJECTS = $(am_msggen_OBJECTS)
 msggen_LDADD = $(LDADD)
+rscryutil_SOURCES = rscryutil.c
+rscryutil_OBJECTS = rscryutil-rscryutil.$(OBJEXT)
+@ENABLE_LIBGCRYPT_TRUE@@ENABLE_USERTOOLS_TRUE@rscryutil_DEPENDENCIES = ../runtime/libgcry.la
+rscryutil_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(rscryutil_LDFLAGS) $(LDFLAGS) -o $@
 rsgtutil_SOURCES = rsgtutil.c
 rsgtutil_OBJECTS = rsgtutil-rsgtutil.$(OBJEXT)
 @ENABLE_GUARDTIME_TRUE@@ENABLE_USERTOOLS_TRUE@rsgtutil_DEPENDENCIES = ../runtime/librsgt.la \
@@ -157,12 +166,13 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(logctl_SOURCES) $(msggen_SOURCES) rsgtutil.c \
+SOURCES = $(logctl_SOURCES) $(msggen_SOURCES) rscryutil.c rsgtutil.c \
 	$(rsyslog_diag_hostname_SOURCES) $(rsyslogd_SOURCES) \
 	$(zpipe_SOURCES)
 DIST_SOURCES = $(am__logctl_SOURCES_DIST) $(am__msggen_SOURCES_DIST) \
-	rsgtutil.c $(am__rsyslog_diag_hostname_SOURCES_DIST) \
-	$(rsyslogd_SOURCES) $(am__zpipe_SOURCES_DIST)
+	rscryutil.c rsgtutil.c \
+	$(am__rsyslog_diag_hostname_SOURCES_DIST) $(rsyslogd_SOURCES) \
+	$(am__zpipe_SOURCES_DIST)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -239,6 +249,7 @@ GREP = @GREP@
 GSS_LIBS = @GSS_LIBS@
 GUARDTIME_CFLAGS = @GUARDTIME_CFLAGS@
 GUARDTIME_LIBS = @GUARDTIME_LIBS@
+HAVE_LIBGCRYPT_CONFIG = @HAVE_LIBGCRYPT_CONFIG@
 HAVE_MYSQL_CONFIG = @HAVE_MYSQL_CONFIG@
 HAVE_ORACLE_CONFIG = @HAVE_ORACLE_CONFIG@
 HAVE_PGSQL_CONFIG = @HAVE_PGSQL_CONFIG@
@@ -425,8 +436,10 @@ rsyslogd_CPPFLAGS = $(PTHREADS_CFLAGS) $(RSRT_CFLAGS)
 # otherwise dependencies are not properly calculated (resulting in a 
 # potentially incomplete build, a problem we had several times...)
 rsyslogd_LDADD = ../grammar/libgrammar.la ../runtime/librsyslog.la $(ZLIB_LIBS) $(PTHREADS_LIBS) $(RSRT_LIBS) $(SOL_LIBS) $(LIBEE_LIBS) $(LIBLOGNORM_LIBS) $(LIBUUID_LIBS)
-rsyslogd_LDFLAGS = -export-dynamic
-EXTRA_DIST = $(man_MANS) rsgtutil.rst recover_qi.pl $(am__append_4)
+rsyslogd_LDFLAGS = -export-dynamic `libgcrypt-config --libs`
+#rsyslogd_LDFLAGS = -export-dynamic $(LIBGCRYPT_LIBS)
+EXTRA_DIST = $(man_MANS) rsgtutil.rst recover_qi.pl $(am__append_4) \
+	$(am__append_6)
 @ENABLE_DIAGTOOLS_TRUE@rsyslog_diag_hostname_SOURCES = gethostn.c
 @ENABLE_DIAGTOOLS_TRUE@zpipe_SOURCES = zpipe.c
 @ENABLE_DIAGTOOLS_TRUE@zpipe_LDADD = -lz
@@ -434,15 +447,17 @@ EXTRA_DIST = $(man_MANS) rsgtutil.rst recover_qi.pl $(am__append_4)
 @ENABLE_OMMONGODB_TRUE@@ENABLE_USERTOOLS_TRUE@logctl_SOURCES = logctl.c
 @ENABLE_OMMONGODB_TRUE@@ENABLE_USERTOOLS_TRUE@logctl_CPPFLAGS = $(LIBMONGO_CLIENT_CFLAGS)
 @ENABLE_OMMONGODB_TRUE@@ENABLE_USERTOOLS_TRUE@logctl_LDADD = $(LIBMONGO_CLIENT_LIBS)
-#bin_PROGRAMS += logsigner rsgtutil
-#logsigner = logsigner.c
-#logsigner_CPPFLAGS =  $(RSRT_CFLAGS) $(GUARDTIME_CFLAGS)
-#logsigner_LDADD = ../runtime/librsgt.la $(GUARDTIME_LIBS)
 @ENABLE_GUARDTIME_TRUE@@ENABLE_USERTOOLS_TRUE@rsgtutil = rsgtutil.c
 @ENABLE_GUARDTIME_TRUE@@ENABLE_USERTOOLS_TRUE@rsgtutil_CPPFLAGS = $(RSRT_CFLAGS) $(GUARDTIME_CFLAGS)
 @ENABLE_GUARDTIME_TRUE@@ENABLE_USERTOOLS_TRUE@rsgtutil_LDADD = ../runtime/librsgt.la $(GUARDTIME_LIBS)
 @ENABLE_GUARDTIME_TRUE@@ENABLE_USERTOOLS_TRUE@man1_MANS = rsgtutil.1
+@ENABLE_LIBGCRYPT_TRUE@@ENABLE_USERTOOLS_TRUE@man1_MANS = rscryutil.1
 @ENABLE_GUARDTIME_TRUE@@ENABLE_USERTOOLS_TRUE@CLEANFILES = rsgtutil.1
+@ENABLE_LIBGCRYPT_TRUE@@ENABLE_USERTOOLS_TRUE@CLEANFILES = rscryutil.1
+@ENABLE_LIBGCRYPT_TRUE@@ENABLE_USERTOOLS_TRUE@rscryutil = rscryutil.c
+@ENABLE_LIBGCRYPT_TRUE@@ENABLE_USERTOOLS_TRUE@rscryutil_CPPFLAGS = -I../runtime $(RSRT_CFLAGS) $(LIBGCRYPT_CFLAGS)
+@ENABLE_LIBGCRYPT_TRUE@@ENABLE_USERTOOLS_TRUE@rscryutil_LDFLAGS = `libgcrypt-config --libs`
+@ENABLE_LIBGCRYPT_TRUE@@ENABLE_USERTOOLS_TRUE@rscryutil_LDADD = ../runtime/libgcry.la $(LIBGCRYPT_LIBS)
 all: all-am
 
 .SUFFIXES:
@@ -575,6 +590,9 @@ logctl$(EXEEXT): $(logctl_OBJECTS) $(logctl_DEPENDENCIES) $(EXTRA_logctl_DEPENDE
 msggen$(EXEEXT): $(msggen_OBJECTS) $(msggen_DEPENDENCIES) $(EXTRA_msggen_DEPENDENCIES) 
 	@rm -f msggen$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(msggen_OBJECTS) $(msggen_LDADD) $(LIBS)
+rscryutil$(EXEEXT): $(rscryutil_OBJECTS) $(rscryutil_DEPENDENCIES) $(EXTRA_rscryutil_DEPENDENCIES) 
+	@rm -f rscryutil$(EXEEXT)
+	$(AM_V_CCLD)$(rscryutil_LINK) $(rscryutil_OBJECTS) $(rscryutil_LDADD) $(LIBS)
 rsgtutil$(EXEEXT): $(rsgtutil_OBJECTS) $(rsgtutil_DEPENDENCIES) $(EXTRA_rsgtutil_DEPENDENCIES) 
 	@rm -f rsgtutil$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(rsgtutil_OBJECTS) $(rsgtutil_LDADD) $(LIBS)
@@ -597,6 +615,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gethostn.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/logctl-logctl.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/msggen.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rscryutil-rscryutil.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsgtutil-rsgtutil.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-iminternal.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsyslogd-omdiscard.Po@am__quote@
@@ -649,6 +668,20 @@ logctl-logctl.obj: logctl.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='logctl.c' object='logctl-logctl.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(logctl_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o logctl-logctl.obj `if test -f 'logctl.c'; then $(CYGPATH_W) 'logctl.c'; else $(CYGPATH_W) '$(srcdir)/logctl.c'; fi`
+
+rscryutil-rscryutil.o: rscryutil.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscryutil_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rscryutil-rscryutil.o -MD -MP -MF $(DEPDIR)/rscryutil-rscryutil.Tpo -c -o rscryutil-rscryutil.o `test -f 'rscryutil.c' || echo '$(srcdir)/'`rscryutil.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rscryutil-rscryutil.Tpo $(DEPDIR)/rscryutil-rscryutil.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rscryutil.c' object='rscryutil-rscryutil.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscryutil_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rscryutil-rscryutil.o `test -f 'rscryutil.c' || echo '$(srcdir)/'`rscryutil.c
+
+rscryutil-rscryutil.obj: rscryutil.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscryutil_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rscryutil-rscryutil.obj -MD -MP -MF $(DEPDIR)/rscryutil-rscryutil.Tpo -c -o rscryutil-rscryutil.obj `if test -f 'rscryutil.c'; then $(CYGPATH_W) 'rscryutil.c'; else $(CYGPATH_W) '$(srcdir)/rscryutil.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/rscryutil-rscryutil.Tpo $(DEPDIR)/rscryutil-rscryutil.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rscryutil.c' object='rscryutil-rscryutil.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rscryutil_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rscryutil-rscryutil.obj `if test -f 'rscryutil.c'; then $(CYGPATH_W) 'rscryutil.c'; else $(CYGPATH_W) '$(srcdir)/rscryutil.c'; fi`
 
 rsgtutil-rsgtutil.o: rsgtutil.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(rsgtutil_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rsgtutil-rsgtutil.o -MD -MP -MF $(DEPDIR)/rsgtutil-rsgtutil.Tpo -c -o rsgtutil-rsgtutil.o `test -f 'rsgtutil.c' || echo '$(srcdir)/'`rsgtutil.c
@@ -1251,6 +1284,8 @@ uninstall-man: uninstall-man1 uninstall-man5 uninstall-man8
 
 @ENABLE_GUARDTIME_TRUE@@ENABLE_USERTOOLS_TRUE@rsgtutil.1: rsgtutil.rst
 @ENABLE_GUARDTIME_TRUE@@ENABLE_USERTOOLS_TRUE@	$(AM_V_GEN) $(RST2MAN) $< $@
+@ENABLE_LIBGCRYPT_TRUE@@ENABLE_USERTOOLS_TRUE@rscryutil.1: rscryutil.rst
+@ENABLE_LIBGCRYPT_TRUE@@ENABLE_USERTOOLS_TRUE@	$(AM_V_GEN) $(RST2MAN) $< $@
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

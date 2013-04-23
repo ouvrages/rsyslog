@@ -75,7 +75,18 @@ sbin_PROGRAMS =
 # GnuTLS netstream driver
 # 
 @ENABLE_GNUTLS_TRUE@am__append_4 = lmnsd_gtls.la
-@ENABLE_GUARDTIME_TRUE@am__append_5 = lmsig_gt.la
+
+#
+# support library for libgcrypt
+#
+@ENABLE_LIBGCRYPT_TRUE@am__append_5 = libgcry.la
+@ENABLE_LIBGCRYPT_TRUE@am__append_6 = lmcry_gcry.la
+
+#
+# support library for guardtime
+#
+@ENABLE_GUARDTIME_TRUE@am__append_7 = librsgt.la
+@ENABLE_GUARDTIME_TRUE@am__append_8 = lmsig_gt.la
 subdir = runtime
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	$(top_srcdir)/depcomp
@@ -120,15 +131,22 @@ am__uninstall_files_from_dir = { \
   }
 am__installdirs = "$(DESTDIR)$(pkglibdir)" "$(DESTDIR)$(sbindir)"
 LTLIBRARIES = $(noinst_LTLIBRARIES) $(pkglib_LTLIBRARIES)
+libgcry_la_LIBADD =
+am__libgcry_la_SOURCES_DIST = libgcry.c libgcry_common.c libgcry.h
+@ENABLE_LIBGCRYPT_TRUE@am_libgcry_la_OBJECTS = libgcry_la-libgcry.lo \
+@ENABLE_LIBGCRYPT_TRUE@	libgcry_la-libgcry_common.lo
+libgcry_la_OBJECTS = $(am_libgcry_la_OBJECTS)
+AM_V_lt = $(am__v_lt_@AM_V@)
+am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
+am__v_lt_0 = --silent
+am__v_lt_1 = 
+@ENABLE_LIBGCRYPT_TRUE@am_libgcry_la_rpath =
 librsgt_la_LIBADD =
 am__librsgt_la_SOURCES_DIST = librsgt.c librsgt_read.c librsgt.h
 @ENABLE_GUARDTIME_TRUE@am_librsgt_la_OBJECTS = librsgt.lo \
 @ENABLE_GUARDTIME_TRUE@	librsgt_read.lo
 librsgt_la_OBJECTS = $(am_librsgt_la_OBJECTS)
-AM_V_lt = $(am__v_lt_@AM_V@)
-am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
-am__v_lt_0 = --silent
-am__v_lt_1 = 
+@ENABLE_GUARDTIME_TRUE@am_librsgt_la_rpath =
 am__DEPENDENCIES_1 =
 librsyslog_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
@@ -151,6 +169,15 @@ am_librsyslog_la_OBJECTS = librsyslog_la-rsyslog.lo \
 	librsyslog_la-hashtable_itr.lo librsyslog_la-outchannel.lo \
 	librsyslog_la-template.lo
 librsyslog_la_OBJECTS = $(am_librsyslog_la_OBJECTS)
+@ENABLE_LIBGCRYPT_TRUE@lmcry_gcry_la_DEPENDENCIES = libgcry.la
+am__lmcry_gcry_la_SOURCES_DIST = lmcry_gcry.c lmcry_gcry.h
+@ENABLE_LIBGCRYPT_TRUE@am_lmcry_gcry_la_OBJECTS =  \
+@ENABLE_LIBGCRYPT_TRUE@	lmcry_gcry_la-lmcry_gcry.lo
+lmcry_gcry_la_OBJECTS = $(am_lmcry_gcry_la_OBJECTS)
+lmcry_gcry_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(lmcry_gcry_la_LDFLAGS) $(LDFLAGS) -o $@
+@ENABLE_LIBGCRYPT_TRUE@am_lmcry_gcry_la_rpath = -rpath $(pkglibdir)
 lmnet_la_DEPENDENCIES =
 am__lmnet_la_SOURCES_DIST = net.c net.h
 @ENABLE_INET_TRUE@am_lmnet_la_OBJECTS = lmnet_la-net.lo
@@ -267,13 +294,16 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(librsgt_la_SOURCES) $(librsyslog_la_SOURCES) \
+SOURCES = $(libgcry_la_SOURCES) $(librsgt_la_SOURCES) \
+	$(librsyslog_la_SOURCES) $(lmcry_gcry_la_SOURCES) \
 	$(lmnet_la_SOURCES) $(lmnetstrms_la_SOURCES) \
 	$(lmnsd_gtls_la_SOURCES) $(lmnsd_ptcp_la_SOURCES) \
 	$(lmregexp_la_SOURCES) $(lmsig_gt_la_SOURCES) \
 	$(lmstrmsrv_la_SOURCES) $(lmzlibw_la_SOURCES)
-DIST_SOURCES = $(am__librsgt_la_SOURCES_DIST) $(librsyslog_la_SOURCES) \
-	$(am__lmnet_la_SOURCES_DIST) $(am__lmnetstrms_la_SOURCES_DIST) \
+DIST_SOURCES = $(am__libgcry_la_SOURCES_DIST) \
+	$(am__librsgt_la_SOURCES_DIST) $(librsyslog_la_SOURCES) \
+	$(am__lmcry_gcry_la_SOURCES_DIST) $(am__lmnet_la_SOURCES_DIST) \
+	$(am__lmnetstrms_la_SOURCES_DIST) \
 	$(am__lmnsd_gtls_la_SOURCES_DIST) \
 	$(am__lmnsd_ptcp_la_SOURCES_DIST) \
 	$(am__lmregexp_la_SOURCES_DIST) \
@@ -324,6 +354,7 @@ GREP = @GREP@
 GSS_LIBS = @GSS_LIBS@
 GUARDTIME_CFLAGS = @GUARDTIME_CFLAGS@
 GUARDTIME_LIBS = @GUARDTIME_LIBS@
+HAVE_LIBGCRYPT_CONFIG = @HAVE_LIBGCRYPT_CONFIG@
 HAVE_MYSQL_CONFIG = @HAVE_MYSQL_CONFIG@
 HAVE_ORACLE_CONFIG = @HAVE_ORACLE_CONFIG@
 HAVE_PGSQL_CONFIG = @HAVE_PGSQL_CONFIG@
@@ -471,9 +502,9 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 man_MANS = 
-noinst_LTLIBRARIES = librsyslog.la librsgt.la
+noinst_LTLIBRARIES = librsyslog.la $(am__append_5) $(am__append_7)
 pkglib_LTLIBRARIES = $(am__append_1) $(am__append_2) $(am__append_3) \
-	$(am__append_4) $(am__append_5)
+	$(am__append_4) $(am__append_6) $(am__append_8)
 #pkglib_LTLIBRARIES = librsyslog.la
 librsyslog_la_SOURCES = \
 	rsyslog.c \
@@ -489,6 +520,7 @@ librsyslog_la_SOURCES = \
 	im-helper.h \
 	obj-types.h \
 	sigprov.h \
+	cryprov.h \
 	nsd.h \
 	glbl.h \
 	glbl.c \
@@ -563,13 +595,13 @@ librsyslog_la_SOURCES = \
 	../template.c \
 	../template.h
 
-@WITH_MODDIRS_FALSE@librsyslog_la_CPPFLAGS = -DSD_EXPORT_SYMBOLS -D_PATH_MODDIR=\"$(pkglibdir)/\" -I$(top_srcdir) $(PTHREADS_CFLAGS) $(LIBEE_CFLAGS) -I\$(top_srcdir)/tools -I\$(top_srcdir)/grammar
+@WITH_MODDIRS_FALSE@librsyslog_la_CPPFLAGS = -DSD_EXPORT_SYMBOLS -D_PATH_MODDIR=\"$(pkglibdir)/\" -I$(top_srcdir) $(PTHREADS_CFLAGS) $(LIBEE_CFLAGS) $(LIBGCRYPT_CFLAGS) -I\$(top_srcdir)/tools -I\$(top_srcdir)/grammar
 # the files with ../ we need to work on - so that they either become part of the
 # runtime or will no longer be needed. -- rgerhards, 2008-06-13
 #
-@WITH_MODDIRS_TRUE@librsyslog_la_CPPFLAGS = -DSD_EXPORT_SYMBOLS -D_PATH_MODDIR=\"$(pkglibdir)/:$(moddirs)\" $(PTHREADS_CFLAGS) $(LIBEE_CFLAGS) -I\$(top_srcdir)/tools
+@WITH_MODDIRS_TRUE@librsyslog_la_CPPFLAGS = -DSD_EXPORT_SYMBOLS -D_PATH_MODDIR=\"$(pkglibdir)/:$(moddirs)\" $(PTHREADS_CFLAGS) $(LIBEE_CFLAGS) $(LIBGCRYPT_CFLAGS) -I\$(top_srcdir)/tools
 #librsyslog_la_LDFLAGS = -module -avoid-version
-librsyslog_la_LIBADD = $(DL_LIBS) $(RT_LIBS) $(LIBEE_LIBS)
+librsyslog_la_LIBADD = $(DL_LIBS) $(RT_LIBS) $(LIBGCRYPT_LIBS) $(LIBEE_LIBS)
 @ENABLE_REGEXP_TRUE@lmregexp_la_SOURCES = regexp.c regexp.h
 @ENABLE_REGEXP_TRUE@lmregexp_la_CPPFLAGS = $(PTHREADS_CFLAGS) $(RSRT_CFLAGS)
 @ENABLE_REGEXP_TRUE@lmregexp_la_LDFLAGS = -module -avoid-version
@@ -610,10 +642,12 @@ librsyslog_la_LIBADD = $(DL_LIBS) $(RT_LIBS) $(LIBEE_LIBS)
 @ENABLE_GNUTLS_TRUE@lmnsd_gtls_la_CPPFLAGS = $(PTHREADS_CFLAGS) $(RSRT_CFLAGS) $(GNUTLS_CFLAGS)
 @ENABLE_GNUTLS_TRUE@lmnsd_gtls_la_LDFLAGS = -module -avoid-version
 @ENABLE_GNUTLS_TRUE@lmnsd_gtls_la_LIBADD = $(GNUTLS_LIBS)
-
-#
-# support library for guardtime
-#
+@ENABLE_LIBGCRYPT_TRUE@libgcry_la_SOURCES = libgcry.c libgcry_common.c libgcry.h
+@ENABLE_LIBGCRYPT_TRUE@libgcry_la_CPPFLAGS = $(RSRT_CFLAGS) $(LIBGCRYPT_CFLAGS)
+@ENABLE_LIBGCRYPT_TRUE@lmcry_gcry_la_SOURCES = lmcry_gcry.c lmcry_gcry.h
+@ENABLE_LIBGCRYPT_TRUE@lmcry_gcry_la_CPPFLAGS = $(RSRT_CFLAGS) $(LIBGCRYPT_CFLAGS)
+@ENABLE_LIBGCRYPT_TRUE@lmcry_gcry_la_LDFLAGS = -module -avoid-version `libgcrypt-config --libs`
+@ENABLE_LIBGCRYPT_TRUE@lmcry_gcry_la_LIBADD = libgcry.la $(LIBGCRYPT_LIBS)
 @ENABLE_GUARDTIME_TRUE@librsgt_la_SOURCES = librsgt.c librsgt_read.c librsgt.h
 @ENABLE_GUARDTIME_TRUE@lmsig_gt_la_SOURCES = lmsig_gt.c lmsig_gt.h
 @ENABLE_GUARDTIME_TRUE@lmsig_gt_la_CPPFLAGS = $(RSRT_CFLAGS) $(GUARDTIME_CFLAGS)
@@ -698,10 +732,14 @@ clean-pkglibLTLIBRARIES:
 	  echo rm -f $${locs}; \
 	  rm -f $${locs}; \
 	}
+libgcry.la: $(libgcry_la_OBJECTS) $(libgcry_la_DEPENDENCIES) $(EXTRA_libgcry_la_DEPENDENCIES) 
+	$(AM_V_CCLD)$(LINK) $(am_libgcry_la_rpath) $(libgcry_la_OBJECTS) $(libgcry_la_LIBADD) $(LIBS)
 librsgt.la: $(librsgt_la_OBJECTS) $(librsgt_la_DEPENDENCIES) $(EXTRA_librsgt_la_DEPENDENCIES) 
-	$(AM_V_CCLD)$(LINK)  $(librsgt_la_OBJECTS) $(librsgt_la_LIBADD) $(LIBS)
+	$(AM_V_CCLD)$(LINK) $(am_librsgt_la_rpath) $(librsgt_la_OBJECTS) $(librsgt_la_LIBADD) $(LIBS)
 librsyslog.la: $(librsyslog_la_OBJECTS) $(librsyslog_la_DEPENDENCIES) $(EXTRA_librsyslog_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(LINK)  $(librsyslog_la_OBJECTS) $(librsyslog_la_LIBADD) $(LIBS)
+lmcry_gcry.la: $(lmcry_gcry_la_OBJECTS) $(lmcry_gcry_la_DEPENDENCIES) $(EXTRA_lmcry_gcry_la_DEPENDENCIES) 
+	$(AM_V_CCLD)$(lmcry_gcry_la_LINK) $(am_lmcry_gcry_la_rpath) $(lmcry_gcry_la_OBJECTS) $(lmcry_gcry_la_LIBADD) $(LIBS)
 lmnet.la: $(lmnet_la_OBJECTS) $(lmnet_la_DEPENDENCIES) $(EXTRA_lmnet_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(lmnet_la_LINK) $(am_lmnet_la_rpath) $(lmnet_la_OBJECTS) $(lmnet_la_LIBADD) $(LIBS)
 lmnetstrms.la: $(lmnetstrms_la_OBJECTS) $(lmnetstrms_la_DEPENDENCIES) $(EXTRA_lmnetstrms_la_DEPENDENCIES) 
@@ -771,6 +809,8 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgcry_la-libgcry.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgcry_la-libgcry_common.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsgt.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsgt_read.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-action.Plo@am__quote@
@@ -808,6 +848,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-var.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-wti.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librsyslog_la-wtp.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lmcry_gcry_la-lmcry_gcry.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lmnet_la-net.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lmnetstrms_la-netstrm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lmnetstrms_la-netstrms.Plo@am__quote@
@@ -844,6 +885,20 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
+
+libgcry_la-libgcry.lo: libgcry.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libgcry_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libgcry_la-libgcry.lo -MD -MP -MF $(DEPDIR)/libgcry_la-libgcry.Tpo -c -o libgcry_la-libgcry.lo `test -f 'libgcry.c' || echo '$(srcdir)/'`libgcry.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgcry_la-libgcry.Tpo $(DEPDIR)/libgcry_la-libgcry.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='libgcry.c' object='libgcry_la-libgcry.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libgcry_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libgcry_la-libgcry.lo `test -f 'libgcry.c' || echo '$(srcdir)/'`libgcry.c
+
+libgcry_la-libgcry_common.lo: libgcry_common.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libgcry_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libgcry_la-libgcry_common.lo -MD -MP -MF $(DEPDIR)/libgcry_la-libgcry_common.Tpo -c -o libgcry_la-libgcry_common.lo `test -f 'libgcry_common.c' || echo '$(srcdir)/'`libgcry_common.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgcry_la-libgcry_common.Tpo $(DEPDIR)/libgcry_la-libgcry_common.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='libgcry_common.c' object='libgcry_la-libgcry_common.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libgcry_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libgcry_la-libgcry_common.lo `test -f 'libgcry_common.c' || echo '$(srcdir)/'`libgcry_common.c
 
 librsyslog_la-rsyslog.lo: rsyslog.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT librsyslog_la-rsyslog.lo -MD -MP -MF $(DEPDIR)/librsyslog_la-rsyslog.Tpo -c -o librsyslog_la-rsyslog.lo `test -f 'rsyslog.c' || echo '$(srcdir)/'`rsyslog.c
@@ -1089,6 +1144,13 @@ librsyslog_la-template.lo: ../template.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../template.c' object='librsyslog_la-template.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librsyslog_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o librsyslog_la-template.lo `test -f '../template.c' || echo '$(srcdir)/'`../template.c
+
+lmcry_gcry_la-lmcry_gcry.lo: lmcry_gcry.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(lmcry_gcry_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT lmcry_gcry_la-lmcry_gcry.lo -MD -MP -MF $(DEPDIR)/lmcry_gcry_la-lmcry_gcry.Tpo -c -o lmcry_gcry_la-lmcry_gcry.lo `test -f 'lmcry_gcry.c' || echo '$(srcdir)/'`lmcry_gcry.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/lmcry_gcry_la-lmcry_gcry.Tpo $(DEPDIR)/lmcry_gcry_la-lmcry_gcry.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='lmcry_gcry.c' object='lmcry_gcry_la-lmcry_gcry.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(lmcry_gcry_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o lmcry_gcry_la-lmcry_gcry.lo `test -f 'lmcry_gcry.c' || echo '$(srcdir)/'`lmcry_gcry.c
 
 lmnet_la-net.lo: net.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(lmnet_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT lmnet_la-net.lo -MD -MP -MF $(DEPDIR)/lmnet_la-net.Tpo -c -o lmnet_la-net.lo `test -f 'net.c' || echo '$(srcdir)/'`net.c

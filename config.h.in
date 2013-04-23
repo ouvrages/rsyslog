@@ -9,6 +9,9 @@
 /* Indicator that GnuTLS is present */
 #undef ENABLE_GNUTLS
 
+/* Indicator that LIBGCRYPT is present */
+#undef ENABLE_LIBGCRYPT
+
 /* Regular expressions support enabled. */
 #undef FEATURE_REGEXP
 
