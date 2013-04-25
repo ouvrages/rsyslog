@@ -1,4 +1,27 @@
 ---------------------------------------------------------------------------
+Version 7.3.12  [devel] 2013-04-25
+- added doc for omelasticsearch
+  Thanks to Radu Gheorghe for the doc contribution.
+- omelasticsearch: _id field support for bulk operations
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=392
+  Thanks to Jérôme Renard for the idea and patches.
+- max number of templates for plugin use has been increased to five
+- platform compatibility enhancement: solve compile issue with libgcrypt
+  do not use GCRY_CIPHER_MODE_AESWRAP where not available
+- fix compile on Solaris
+  Thanks to Martin Carpenter for the patch.
+- bugfix: off-by-one error in handling local FQDN name (regression)
+  A remporary buffer was allocated one byte too small. Did only
+  affect startup, not actual operations. Came up during routine tests,
+  and can have no effect once the engine runs. Bug was introduced in
+  7.3.11.
+- bugfix: build problems on Solaris
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=436
+- bugfix: block size limit was not properly honored
+- bugfix: potential segfault in guardtime signature provider
+  it could segfault if an error was reported by the GuardTime API, because
+  an invalid free could happen then
+---------------------------------------------------------------------------
 Version 7.3.11  [devel] 2013-04-23
 - added support for encrypting log files
 - omhiredis: added support for redis pipeline support
