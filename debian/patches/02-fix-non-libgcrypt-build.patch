@@ -1,0 +1,63 @@
+From 09e90b6faf917746896a5e6bfd51e9e3e527b459 Mon Sep 17 00:00:00 2001
+From: Michael Biebl <biebl@debian.org>
+Date: Thu, 25 Apr 2013 22:45:00 +0200
+Subject: [PATCH] build: fix build if libgcrypt support is disabled
+
+We don't want to hard-code `libgcrypt-config --libs` at various.
+Also, make sure LIBGCRYPT_CFLAGS and LIBGCRYPT_LIBS are correctly
+substituted.
+
+---
+ configure.ac |    2 ++
+ 1 file changed, 2 insertions(+)
+
+Index: rsyslog/configure.ac
+===================================================================
+--- rsyslog.orig/configure.ac	2013-04-25 23:35:06.891249916 +0200
++++ rsyslog/configure.ac	2013-04-25 23:35:06.887249875 +0200
+@@ -804,6 +804,8 @@
+ 	AC_DEFINE([ENABLE_LIBGCRYPT], [1], [Indicator that LIBGCRYPT is present])
+ fi
+ AM_CONDITIONAL(ENABLE_LIBGCRYPT, test x$enable_libgcrypt = xyes)
++AC_SUBST(LIBGCRYPT_CFLAGS)
++AC_SUBST(LIBGCRYPT_LIBS)
+ 
+ 
+ # support for building the rsyslogd runtime
+Index: rsyslog/runtime/Makefile.am
+===================================================================
+--- rsyslog.orig/runtime/Makefile.am	2013-04-25 23:35:06.891249916 +0200
++++ rsyslog/runtime/Makefile.am	2013-04-25 23:35:06.887249875 +0200
+@@ -185,7 +185,7 @@
+    pkglib_LTLIBRARIES += lmcry_gcry.la
+    lmcry_gcry_la_SOURCES = lmcry_gcry.c lmcry_gcry.h
+    lmcry_gcry_la_CPPFLAGS = $(RSRT_CFLAGS) $(LIBGCRYPT_CFLAGS)
+-   lmcry_gcry_la_LDFLAGS = -module -avoid-version `libgcrypt-config --libs`
++   lmcry_gcry_la_LDFLAGS = -module -avoid-version
+    lmcry_gcry_la_LIBADD = libgcry.la $(LIBGCRYPT_LIBS)
+ endif
+ 
+Index: rsyslog/tools/Makefile.am
+===================================================================
+--- rsyslog.orig/tools/Makefile.am	2013-04-25 23:35:25.027438181 +0200
++++ rsyslog/tools/Makefile.am	2013-04-25 23:36:04.031842749 +0200
+@@ -40,9 +40,8 @@
+ # note: it looks like librsyslog.la must be explicitely given on LDDADD,
+ # otherwise dependencies are not properly calculated (resulting in a 
+ # potentially incomplete build, a problem we had several times...)
+-rsyslogd_LDADD = ../grammar/libgrammar.la ../runtime/librsyslog.la $(ZLIB_LIBS) $(PTHREADS_LIBS) $(RSRT_LIBS) $(SOL_LIBS) $(LIBEE_LIBS) $(LIBLOGNORM_LIBS) $(LIBUUID_LIBS)
+-rsyslogd_LDFLAGS = -export-dynamic `libgcrypt-config --libs`
+-#rsyslogd_LDFLAGS = -export-dynamic $(LIBGCRYPT_LIBS)
++rsyslogd_LDADD = ../grammar/libgrammar.la ../runtime/librsyslog.la $(ZLIB_LIBS) $(PTHREADS_LIBS) $(RSRT_LIBS) $(SOL_LIBS) $(LIBEE_LIBS) $(LIBLOGNORM_LIBS) $(LIBUUID_LIBS) $(LIBGCRYPT_LIBS)
++rsyslogd_LDFLAGS = -export-dynamic
+ 
+ EXTRA_DIST = $(man_MANS) \
+ 	rsgtutil.rst \
+@@ -79,7 +78,6 @@
+ bin_PROGRAMS += rscryutil
+ rscryutil = rscryutil.c
+ rscryutil_CPPFLAGS = -I../runtime $(RSRT_CFLAGS) $(LIBGCRYPT_CFLAGS)
+-rscryutil_LDFLAGS = `libgcrypt-config --libs`
+ rscryutil_LDADD = ../runtime/libgcry.la $(LIBGCRYPT_LIBS)
+ rscryutil.1: rscryutil.rst
+ 	$(AM_V_GEN) $(RST2MAN) $< $@
