@@ -245,7 +245,7 @@ AM_RECURSIVE_TARGETS = $(RECURSIVE_TARGETS:-recursive=) \
 ETAGS = etags
 CTAGS = ctags
 CSCOPE = cscope
-DIST_SUBDIRS = doc runtime grammar compat . plugins/immark \
+DIST_SUBDIRS = doc compat runtime grammar . plugins/immark \
 	plugins/imuxsock plugins/imtcp plugins/imudp plugins/omtesting \
 	tools plugins/imklog plugins/imkmsg plugins/impstats \
 	plugins/imsolaris plugins/omgssapi plugins/imgssapi \
@@ -543,7 +543,7 @@ EXTRA_DIST = \
 
 # tests are added as last element, because tests may need different
 # modules that need to be generated first
-SUBDIRS = doc runtime grammar compat . plugins/immark plugins/imuxsock \
+SUBDIRS = doc compat runtime grammar . plugins/immark plugins/imuxsock \
 	plugins/imtcp plugins/imudp plugins/omtesting $(am__append_3) \
 	$(am__append_4) $(am__append_5) $(am__append_6) \
 	$(am__append_7) $(am__append_8) $(am__append_9) \

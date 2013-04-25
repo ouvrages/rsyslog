@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[7.3.11],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[7.3.12],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -775,7 +775,7 @@ AM_CONDITIONAL(ENABLE_GNUTLS, test x$enable_gnutls = xyes)
 
 # libgcrypt support
 AC_ARG_ENABLE(libgcrypt,
-        [AS_HELP_STRING([--enable-libgcrypt],[Enable libgcrypt support @<:@default=yes@:>@])],
+        [AS_HELP_STRING([--enable-libgcrypt],[Enable log file encryption support (libgcrypt) @<:@default=yes@:>@])],
         [case "${enableval}" in
          yes) enable_libgcrypt="yes" ;;
           no) enable_libgcrypt="no" ;;
@@ -985,7 +985,7 @@ AM_CONDITIONAL(ENABLE_RELP, test x$enable_relp = xyes)
 
 # GuardTime support
 AC_ARG_ENABLE(guardtime,
-        [AS_HELP_STRING([--enable-guardtime],[Enable GuardTime support @<:@default=no@:>@])],
+        [AS_HELP_STRING([--enable-guardtime],[Enable log file signing support (via GuardTime) @<:@default=no@:>@])],
         [case "${enableval}" in
          yes) enable_guardtime="yes" ;;
           no) enable_guardtime="no" ;;
@@ -1456,8 +1456,8 @@ echo "    rsyslogd will be built:                   $enable_rsyslogd"
 echo "    GUI components will be built:             $enable_gui"
 echo "    Unlimited select() support enabled:       $enable_unlimited_select"
 echo "    uuid support enabled:                     $enable_uuid"
-echo "    GuardTime signature support enabled:      $enable_guardtime"
-echo "    libgcrypt support enabled:                $enable_libgcrypt"
+echo "    Log file signing support:                 $enable_guardtime"
+echo "    Log file encryption support:              $enable_libgcrypt"
 echo "    anonymization support enabled:            $enable_mmanon"
 echo
 echo "---{ input plugins }---"
