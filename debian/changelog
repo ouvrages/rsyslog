@@ -1,9 +1,9 @@
-rsyslog (7.3.12-1) UNRELEASED; urgency=low
+rsyslog (7.3.12-1) experimental; urgency=low
 
   * New upstream release.
   * Disable log file encryption support for now.
 
- -- Michael Biebl <biebl@debian.org>  Tue, 23 Apr 2013 13:55:54 +0200
+ -- Michael Biebl <biebl@debian.org>  Thu, 25 Apr 2013 15:14:37 +0200
 
 rsyslog (7.3.10-1) experimental; urgency=low
 
