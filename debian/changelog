@@ -1,9 +1,9 @@
-rsyslog (7.3.12-2) UNRELEASED; urgency=low
+rsyslog (7.3.12-2) experimental; urgency=low
 
   * Fix build when libgcrypt support is disabled to not pick up an unnecessary
     libgcrypt dependency.
 
- -- Michael Biebl <biebl@debian.org>  Thu, 25 Apr 2013 23:42:55 +0200
+ -- Michael Biebl <biebl@debian.org>  Thu, 25 Apr 2013 23:44:03 +0200
 
 rsyslog (7.3.12-1) experimental; urgency=low
 
