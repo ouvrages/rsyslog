@@ -1,6 +1,7 @@
 rsyslog (7.3.12-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * Disable log file encryption support for now.
 
  -- Michael Biebl <biebl@debian.org>  Tue, 23 Apr 2013 13:55:54 +0200
 
