@@ -9,7 +9,8 @@ DEB_HOST_ARCH_OS ?= $(shell dpkg-architecture -qDEB_HOST_ARCH_OS)
 	dh $@ --with autoreconf
 
 ifeq ($(DEB_HOST_ARCH_OS), linux)
-confflags += --enable-imptcp
+confflags += 	--enable-imptcp \
+		--enable-kmsg
 endif
 
 override_dh_auto_configure:
@@ -21,7 +22,6 @@ override_dh_auto_configure:
 		--enable-mail \
 		--enable-imfile \
 		--enable-impstats \
-		--enable-kmsg \
 		--enable-klog \
 		--enable-gssapi-krb5 \
 		--enable-gnutls \
@@ -42,11 +42,19 @@ override_dh_auto_configure:
 
 override_dh_auto_install:
 	dh_auto_install
-	install --mode=644 -D plugins/ommysql/createDB.sql debian/rsyslog-mysql/usr/share/dbconfig-common/data/rsyslog-mysql/install/mysql
-	install --mode=644 -D plugins/ompgsql/createDB.sql debian/rsyslog-pgsql/usr/share/dbconfig-common/data/rsyslog-pgsql/install/pgsql
+	install --mode=644 -D plugins/ommysql/createDB.sql \
+		debian/rsyslog-mysql/usr/share/dbconfig-common/data/rsyslog-mysql/install/mysql
+	install --mode=644 -D plugins/ompgsql/createDB.sql \
+		debian/rsyslog-pgsql/usr/share/dbconfig-common/data/rsyslog-pgsql/install/pgsql
 
 override_dh_install:
 	dh_install -X .la --list-missing
+ifeq ($(DEB_HOST_ARCH_OS), linux)
+	install --mode=644 debian/tmp/usr/lib/rsyslog/imkmsg.so \
+		debian/rsyslog/usr/lib/rsyslog/
+	install --mode=644 debian/tmp/usr/lib/rsyslog/imptcp.so \
+		debian/rsyslog/usr/lib/rsyslog/
+endif
 
 override_dh_compress:
 	dh_compress -X rsyslog-example.conf

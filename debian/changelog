@@ -1,3 +1,9 @@
+rsyslog (7.3.12-3) UNRELEASED; urgency=low
+
+  * Only build and install the imkmsg module on Linux.
+
+ -- Michael Biebl <biebl@debian.org>  Fri, 26 Apr 2013 16:42:36 +0200
+
 rsyslog (7.3.12-2) experimental; urgency=low
 
   * Fix build when libgcrypt support is disabled to not pick up an unnecessary

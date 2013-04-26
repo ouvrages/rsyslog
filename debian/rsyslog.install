@@ -4,9 +4,8 @@ usr/sbin/
 usr/share/man/
 usr/lib/rsyslog/imfile.so
 usr/lib/rsyslog/imklog.so
-usr/lib/rsyslog/imkmsg.so
 usr/lib/rsyslog/immark.so
-usr/lib/rsyslog/imp*.so
+usr/lib/rsyslog/impstats.so
 usr/lib/rsyslog/imtcp.so
 usr/lib/rsyslog/imudp.so
 usr/lib/rsyslog/imuxsock.so
