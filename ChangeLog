@@ -1,4 +1,31 @@
 ---------------------------------------------------------------------------
+Version 7.3.14  [beta] 2013-05-06
+- bugfix: some man pages were not properly installed
+  either rscryutil or rsgtutil man was installed, but not both
+  Thanks to Marius Tomaschewski for the patch.
+- bugfix: potential segfault on startup when builtin module was specified
+  in module() statement.
+  Thanks to Marius Tomaschewski for reporting the bug.
+- bugfix: segfault due to invalid dynafile cache handling
+  Accidently, the old-style cache size parameter was used when the
+  dynafile cache was created in a RainerScript action. If the old-style
+  size was lower than the one actually set, this lead to misadressing
+  when the size was overrun, and that could lead to all kinds of
+  "interesting things", often in segfaults.
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=440
+---------------------------------------------------------------------------
+Version 7.3.13  [beta] 2013-04-29
+- added omrabbitmq module (contributed, untested)
+  Note: this is unsupported and as such was moved immediately into the
+  beta version.
+  Thanks to Vaclav Tomec for providing this module.
+- bugfix: build problem when --enable-encryption was not selected
+  Thanks to Michael Biebl for fixing this.
+- doc bugfix: omfile parameter "VeryRobustZip" was documentas as
+  "VeryReliableZip"
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=437
+  Thanks to Thomas Doll for reporting this.
+---------------------------------------------------------------------------
 Version 7.3.12  [devel] 2013-04-25
 - added doc for omelasticsearch
   Thanks to Radu Gheorghe for the doc contribution.
@@ -261,6 +288,18 @@ Version 7.3.0  [devel] 2012-10-09
 - improved omfile zip writer to increase compression
   This was achieved by somewhat reducing the robustness of the zip archive.
   This is controlled by the new action parameter "VeryReliableZip".
+----------------------------------------------------------------------------
+Version 7.2.8  [v7-stable] 2013-0?-??
+- bugfix: potential segfault on startup when builtin module was specified
+  in module() statement.
+  Thanks to Marius Tomaschewski for reporting the bug.
+- bugfix: segfault due to invalid dynafile cache handling
+  Accidently, the old-style cache size parameter was used when the
+  dynafile cache was created in a RainerScript action. If the old-style
+  size was lower than the one actually set, this lead to misadressing
+  when the size was overrun, and that could lead to all kinds of
+  "interesting things", often in segfaults.
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=440
 ----------------------------------------------------------------------------
 Version 7.2.7  [v7-stable] 2013-04-17
 - rsyslogd startup information is now properly conveyed back to init
