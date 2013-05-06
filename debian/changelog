@@ -1,3 +1,9 @@
+rsyslog (7.3.14-1) UNRELEASED; urgency=low
+
+  * New upstream release.
+
+ -- Michael Biebl <biebl@debian.org>  Mon, 06 May 2013 23:43:11 +0200
+
 rsyslog (7.3.12-3) experimental; urgency=low
 
   * Only build and install the imkmsg module on Linux.
