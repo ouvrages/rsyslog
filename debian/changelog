@@ -1,6 +1,7 @@
 rsyslog (7.3.14-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * Remove 02-fix-non-libgcrypt-build.patch, merged upstream.
 
  -- Michael Biebl <biebl@debian.org>  Mon, 06 May 2013 23:43:11 +0200
 
