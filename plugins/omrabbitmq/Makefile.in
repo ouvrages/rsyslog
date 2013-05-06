@@ -34,7 +34,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-subdir = plugins/pmcisconames
+subdir = plugins/omrabbitmq
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/atomic_operations.m4 \
@@ -77,16 +77,16 @@ am__uninstall_files_from_dir = { \
   }
 am__installdirs = "$(DESTDIR)$(pkglibdir)"
 LTLIBRARIES = $(pkglib_LTLIBRARIES)
-pmcisconames_la_DEPENDENCIES =
-am_pmcisconames_la_OBJECTS = pmcisconames_la-pmcisconames.lo
-pmcisconames_la_OBJECTS = $(am_pmcisconames_la_OBJECTS)
+am__DEPENDENCIES_1 =
+omrabbitmq_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
+am_omrabbitmq_la_OBJECTS = omrabbitmq_la-omrabbitmq.lo
+omrabbitmq_la_OBJECTS = $(am_omrabbitmq_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
-pmcisconames_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
-	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
-	$(AM_CFLAGS) $(CFLAGS) $(pmcisconames_la_LDFLAGS) $(LDFLAGS) \
-	-o $@
+omrabbitmq_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(omrabbitmq_la_LDFLAGS) $(LDFLAGS) -o $@
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -113,8 +113,8 @@ am__v_CCLD_0 = @echo "  CCLD  " $@;
 AM_V_GEN = $(am__v_GEN_@AM_V@)
 am__v_GEN_ = $(am__v_GEN_@AM_DEFAULT_V@)
 am__v_GEN_0 = @echo "  GEN   " $@;
-SOURCES = $(pmcisconames_la_SOURCES)
-DIST_SOURCES = $(pmcisconames_la_SOURCES)
+SOURCES = $(omrabbitmq_la_SOURCES)
+DIST_SOURCES = $(omrabbitmq_la_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -305,11 +305,11 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-pkglib_LTLIBRARIES = pmcisconames.la
-pmcisconames_la_SOURCES = pmcisconames.c
-pmcisconames_la_CPPFLAGS = $(RSRT_CFLAGS) $(PTHREADS_CFLAGS) -I ../../tools
-pmcisconames_la_LDFLAGS = -module -avoid-version
-pmcisconames_la_LIBADD = 
+pkglib_LTLIBRARIES = omrabbitmq.la
+omrabbitmq_la_SOURCES = omrabbitmq.c
+omrabbitmq_la_CPPFLAGS = $(RSRT_CFLAGS) $(PTHREADS_CFLAGS)
+omrabbitmq_la_LDFLAGS = -module -avoid-version
+omrabbitmq_la_LIBADD = $(RABBITMQ_LIBS)
 EXTRA_DIST = 
 all: all-am
 
@@ -324,9 +324,9 @@ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu plugins/pmcisconames/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu plugins/omrabbitmq/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu plugins/pmcisconames/Makefile
+	  $(AUTOMAKE) --gnu plugins/omrabbitmq/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -376,8 +376,8 @@ clean-pkglibLTLIBRARIES:
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
-pmcisconames.la: $(pmcisconames_la_OBJECTS) $(pmcisconames_la_DEPENDENCIES) $(EXTRA_pmcisconames_la_DEPENDENCIES) 
-	$(AM_V_CCLD)$(pmcisconames_la_LINK) -rpath $(pkglibdir) $(pmcisconames_la_OBJECTS) $(pmcisconames_la_LIBADD) $(LIBS)
+omrabbitmq.la: $(omrabbitmq_la_OBJECTS) $(omrabbitmq_la_DEPENDENCIES) $(EXTRA_omrabbitmq_la_DEPENDENCIES) 
+	$(AM_V_CCLD)$(omrabbitmq_la_LINK) -rpath $(pkglibdir) $(omrabbitmq_la_OBJECTS) $(omrabbitmq_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -385,7 +385,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pmcisconames_la-pmcisconames.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/omrabbitmq_la-omrabbitmq.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -408,12 +408,12 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
 
-pmcisconames_la-pmcisconames.lo: pmcisconames.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(pmcisconames_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT pmcisconames_la-pmcisconames.lo -MD -MP -MF $(DEPDIR)/pmcisconames_la-pmcisconames.Tpo -c -o pmcisconames_la-pmcisconames.lo `test -f 'pmcisconames.c' || echo '$(srcdir)/'`pmcisconames.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/pmcisconames_la-pmcisconames.Tpo $(DEPDIR)/pmcisconames_la-pmcisconames.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='pmcisconames.c' object='pmcisconames_la-pmcisconames.lo' libtool=yes @AMDEPBACKSLASH@
+omrabbitmq_la-omrabbitmq.lo: omrabbitmq.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(omrabbitmq_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT omrabbitmq_la-omrabbitmq.lo -MD -MP -MF $(DEPDIR)/omrabbitmq_la-omrabbitmq.Tpo -c -o omrabbitmq_la-omrabbitmq.lo `test -f 'omrabbitmq.c' || echo '$(srcdir)/'`omrabbitmq.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/omrabbitmq_la-omrabbitmq.Tpo $(DEPDIR)/omrabbitmq_la-omrabbitmq.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='omrabbitmq.c' object='omrabbitmq_la-omrabbitmq.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(pmcisconames_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o pmcisconames_la-pmcisconames.lo `test -f 'pmcisconames.c' || echo '$(srcdir)/'`pmcisconames.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(omrabbitmq_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o omrabbitmq_la-omrabbitmq.lo `test -f 'omrabbitmq.c' || echo '$(srcdir)/'`omrabbitmq.c
 
 mostlyclean-libtool:
 	-rm -f *.lo
