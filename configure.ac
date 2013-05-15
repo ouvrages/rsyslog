@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[7.3.14],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[7.3.15],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -28,7 +28,6 @@ fi
 AC_DISABLE_STATIC
 AC_PROG_LIBTOOL
 AC_CANONICAL_HOST
-AC_PATH_PROG([RST2MAN], [rst2man])
 
 PKG_PROG_PKG_CONFIG
 
@@ -823,8 +822,8 @@ if test "x$enable_rsyslogrt" = "xyes"; then
   RSRT_LIBS1="\$(top_builddir)/runtime/librsyslog.la"
 fi
 AM_CONDITIONAL(ENABLE_RSYSLOGRT, test x$enable_rsyslogrt = xyes)
-RSRT_CFLAGS="\$(RSRT_CFLAGS1) \$(LIBESTR_CFLAGS) \$(JSON_C_FLAGS)"
-RSRT_LIBS="\$(RSRT_LIBS1) \$(LIBESTR_LIBS) \$(JSON_C_LIBS)"
+RSRT_CFLAGS="\$(RSRT_CFLAGS1) \$(LIBEE_CFLAGS) \$(LIBESTR_CFLAGS) \$(JSON_C_FLAGS)"
+RSRT_LIBS="\$(RSRT_LIBS1) \$(LIBEE_LIBS) \$(LIBESTR_LIBS) \$(JSON_C_LIBS)"
 AC_SUBST(RSRT_CFLAGS1)
 AC_SUBST(RSRT_LIBS1)
 AC_SUBST(RSRT_CFLAGS)
@@ -999,6 +998,17 @@ if test "x$enable_guardtime" = "xyes"; then
 	PKG_CHECK_MODULES(GUARDTIME, libgt >= 0.3.1)
 fi
 AM_CONDITIONAL(ENABLE_GUARDTIME, test x$enable_guardtime = xyes)
+
+
+# obtain path for rst2man
+if test "x$enable_libgcrypt" = "xyes" || \
+        "x$enable_guardtime" = "xyes"; then
+        AC_PATH_PROG([RST2MAN], [rst2man])
+        if test "x${RST2MAN}" == "x"; then
+            AC_MSG_FAILURE([rst2man not found in PATH])
+        fi
+fi
+
 
 # RFC 3195 support
 AC_ARG_ENABLE(rfc3195,

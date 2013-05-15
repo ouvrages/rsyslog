@@ -415,8 +415,8 @@ rsyslogd_CPPFLAGS = $(PTHREADS_CFLAGS) $(RSRT_CFLAGS)
 # potentially incomplete build, a problem we had several times...)
 rsyslogd_LDADD = ../grammar/libgrammar.la ../runtime/librsyslog.la $(ZLIB_LIBS) $(PTHREADS_LIBS) $(RSRT_LIBS) $(SOL_LIBS) $(LIBEE_LIBS) $(LIBLOGNORM_LIBS) $(LIBUUID_LIBS) $(LIBGCRYPT_LIBS)
 rsyslogd_LDFLAGS = -export-dynamic
-EXTRA_DIST = $(man_MANS) rsgtutil.rst rscryutil.rst recover_qi.pl \
-	$(am__append_6) $(am__append_10)
+EXTRA_DIST = $(man_MANS) rsgtutil.rst rsgtutil.1 rscryutil.rst \
+	rscryutil.1 recover_qi.pl $(am__append_6) $(am__append_10)
 @ENABLE_DIAGTOOLS_TRUE@rsyslog_diag_hostname_SOURCES = gethostn.c
 @ENABLE_DIAGTOOLS_TRUE@zpipe_SOURCES = zpipe.c
 @ENABLE_DIAGTOOLS_TRUE@zpipe_LDADD = -lz
