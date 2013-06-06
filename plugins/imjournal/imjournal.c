@@ -30,6 +30,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <time.h>
+#include <sys/poll.h>
 #include <sys/socket.h>
 #include <errno.h>
 
@@ -44,6 +45,7 @@
 #include "glbl.h"
 #include "prop.h"
 #include "errmsg.h"
+#include "srUtils.h"
 #include "unicode-helper.h"
 #include <systemd/sd-journal.h>
 
@@ -137,6 +139,7 @@ readjournal() {
 	uint64_t timestamp;
 
 	struct json_object *json = NULL;
+	int r;
 
 	/* Information from messages */
 	char *message;
@@ -161,13 +164,6 @@ readjournal() {
 
 	int priority = 0;
 	int facility = 0;
-
-	/* Get next journal message, if there is none, wait a second */
-	if (sd_journal_next(j) == 0) {
-		sleep(1);
-		iRet = RS_RET_OK;
-		goto ret;
-	}
 
 	/* Get message text */
 	if (sd_journal_get_data(j, "MESSAGE", &get, &length) < 0) {
@@ -230,15 +226,15 @@ readjournal() {
 	}
 
 	if (sys_pid) {
-		asprintf(&sys_iden_help, "%s[%s]:", sys_iden, sys_pid);
+		r = asprintf(&sys_iden_help, "%s[%s]:", sys_iden, sys_pid);
 	} else {
-		asprintf(&sys_iden_help, "%s:", sys_iden);
+		r = asprintf(&sys_iden_help, "%s:", sys_iden);
 	}
 
 	free (sys_iden);
 	free (sys_pid);
 
-	if (sys_iden_help == NULL) {
+	if (-1 == r) {
 		iRet = RS_RET_OUT_OF_MEMORY;
 		goto finalize_it;
 	}
@@ -369,17 +365,64 @@ persistJournalState () {
 			fclose(sf);
 			free(cursor);
 		} else {
-			char errmsg[256];
-			rs_strerror_r(errno, errmsg, sizeof(errmsg));
-			dbgprintf("fopen() failed: '%s'\n", errmsg);
+			char errStr[256];
+			rs_strerror_r(errno, errStr, sizeof(errStr));
+			errmsg.LogError(0, RS_RET_FOPEN_FAILURE, "fopen() failed: "
+				"'%s', path: '%s'\n", errStr, cs.stateFile);
 			iRet = RS_RET_FOPEN_FAILURE;
 		}
 	} else {
-		char errmsg[256];
-		rs_strerror_r(-(ret), errmsg, sizeof(errmsg));
-		dbgprintf("sd_journal_get_cursor() failed: '%s'\n", errmsg);
+		char errStr[256];
+		rs_strerror_r(-(ret), errStr, sizeof(errStr));
+		errmsg.LogError(0, RS_RET_ERR, "sd_journal_get_cursor() failed: '%s'\n", errStr);
 		iRet = RS_RET_ERR;
 	}
+	RETiRet;
+}
+
+
+/* Polls the journal for new messages. Similar to sd_journal_wait()
+ * except for the special handling of EINTR.
+ */
+static rsRetVal
+pollJournal()
+{
+	DEFiRet;
+	struct pollfd pollfd;
+	int r;
+
+	pollfd.fd = sd_journal_get_fd(j);
+	pollfd.events = sd_journal_get_events(j);
+	r = poll(&pollfd, 1, -1);
+	if (r == -1) {
+		if (errno == EINTR) {
+			/* EINTR is also received during termination
+			 * so return now to check the term state.
+			 */
+			ABORT_FINALIZE(RS_RET_OK);
+		} else {
+			char errStr[256];
+
+			rs_strerror_r(errno, errStr, sizeof(errStr));
+			errmsg.LogError(0, RS_RET_ERR,
+				"poll() failed: '%s'", errStr);
+			ABORT_FINALIZE(RS_RET_ERR);
+		}
+	}
+
+	assert(r == 1);
+
+	r = sd_journal_process(j);
+	if (r < 0) {
+		char errStr[256];
+
+		rs_strerror_r(errno, errStr, sizeof(errStr));
+		errmsg.LogError(0, RS_RET_ERR,
+			"sd_journal_process() failed: '%s'", errStr);
+		ABORT_FINALIZE(RS_RET_ERR);
+	}
+
+finalize_it:
 	RETiRet;
 }
 
@@ -390,14 +433,24 @@ CODESTARTrunInput
 	 * signalled to do so. This, however, is handled by the framework,
 	 * right into the sleep below.
 	 */
-	int count = 0;
+	if (cs.stateFile[0] != '/') {
+		char *new_stateFile;
 
-	char readCursor[128 + 1];
-	FILE *r_sf;
+		if (-1 == asprintf(&new_stateFile, "%s/%s", (char *)glbl.GetWorkDir(), cs.stateFile)) {
+			errmsg.LogError(0, RS_RET_OUT_OF_MEMORY, "imjournal: asprintf failed\n");
+			ABORT_FINALIZE(RS_RET_OUT_OF_MEMORY);
+		}
+		free (cs.stateFile);
+		cs.stateFile = new_stateFile;
+	}
 
 	/* if state file exists, set cursor to appropriate position */
 	if (access(cs.stateFile, F_OK|R_OK) != -1) {
+		FILE *r_sf;
+
 		if ((r_sf = fopen(cs.stateFile, "rb")) != NULL) {
+			char readCursor[128 + 1];
+
 			if (fscanf(r_sf, "%128s\n", readCursor) != EOF) {
 				if (sd_journal_seek_cursor(j, readCursor) != 0) {
 					errmsg.LogError(0, RS_RET_ERR, "imjournal: "
@@ -420,14 +473,32 @@ CODESTARTrunInput
 	}
 
 	while (glbl.GetGlobalInputTermState() == 0) {
+		int count = 0, r;
+
+		r = sd_journal_next(j);
+		if (r < 0) {
+			char errStr[256];
+
+			rs_strerror_r(errno, errStr, sizeof(errStr));
+			errmsg.LogError(0, RS_RET_ERR,
+				"sd_journal_next() failed: '%s'", errStr);
+			ABORT_FINALIZE(RS_RET_ERR);
+		}
+
+		if (r == 0) {
+			/* No new messages, wait for activity. */
+			CHKiRet(pollJournal());
+			continue;
+		}
+
 		CHKiRet(readjournal());
+		/* TODO: This could use some finer metric. */
 		count++;
 		if (count == cs.iPersistStateInterval) {
 			count = 0;
 			persistJournalState();
 		}
 	}
-	persistJournalState();
 
 finalize_it:
 ENDrunInput
@@ -474,6 +545,7 @@ ENDwillRun
 /* close journal */
 BEGINafterRun
 CODESTARTafterRun
+	persistJournalState();
 	sd_journal_close(j);
 ENDafterRun
 
@@ -530,14 +602,20 @@ finalize_it:
 ENDsetModCnf
 
 
+BEGINisCompatibleWithFeature
+CODESTARTisCompatibleWithFeature
+	if(eFeat == sFEATURENonCancelInputTermination)
+		iRet = RS_RET_OK;
+ENDisCompatibleWithFeature
+
+
 BEGINqueryEtryPt
 CODESTARTqueryEtryPt
 CODEqueryEtryPt_STD_IMOD_QUERIES
 CODEqueryEtryPt_STD_CONF2_QUERIES
 CODEqueryEtryPt_STD_CONF2_setModCnf_QUERIES
+CODEqueryEtryPt_IsCompatibleWithFeature_IF_OMOD_QUERIES
 ENDqueryEtryPt
-
-
 
 
 BEGINmodInit()
