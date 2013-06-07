@@ -1,4 +1,4 @@
-rsyslog (7.4.0-1) UNRELEASED; urgency=low
+rsyslog (7.4.0-1) unstable; urgency=low
 
   * New upstream release.
 
