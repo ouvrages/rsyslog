@@ -6,7 +6,7 @@ include /usr/share/dpkg/buildflags.mk
 DEB_HOST_ARCH_OS ?= $(shell dpkg-architecture -qDEB_HOST_ARCH_OS)
 
 %:
-	dh $@ --with autoreconf
+	dh $@ --with autoreconf,systemd
 
 ifeq ($(DEB_HOST_ARCH_OS), linux)
 confflags += 	--enable-imptcp \
