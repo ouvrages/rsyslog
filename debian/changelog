@@ -1,3 +1,9 @@
+rsyslog (7.4.2-1) UNRELEASED; urgency=low
+
+  * New upstream release.
+
+ -- Michael Biebl <biebl@debian.org>  Sat, 06 Jul 2013 00:13:32 +0200
+
 rsyslog (7.4.1-3) unstable; urgency=low
 
   * Bump Build-Depends on dh-systemd to (>= 1.4) to ensure we have a recent
