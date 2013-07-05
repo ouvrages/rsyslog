@@ -79,7 +79,7 @@ static struct cnfparamdescr actpdescr[] = {
 	{ "target", eCmdHdlrGetWord, 1 },
 	{ "port", eCmdHdlrGetWord, 0 },
 	{ "timeout", eCmdHdlrInt, 0 },
-	{ "template", eCmdHdlrGetWord, 1 }
+	{ "template", eCmdHdlrGetWord, 0 }
 };
 static struct cnfparamblk actpblk =
 	{ CNFPARAMBLK_VERSION,
@@ -179,7 +179,8 @@ CODESTARTnewActInst
 	CHKiRet(doCreateRelpClient(pData));
 
 CODE_STD_FINALIZERnewActInst
-	cnfparamvalsDestruct(pvals, &actpblk);
+	if(pvals != NULL)
+		cnfparamvalsDestruct(pvals, &actpblk);
 ENDnewActInst
 
 BEGINisCompatibleWithFeature
