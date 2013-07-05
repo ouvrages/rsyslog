@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[7.4.1],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[7.4.2],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -1008,7 +1008,7 @@ AC_ARG_ENABLE(cached_man_pages,
 if test "x$enable_cached_man_pages" = "xno"; then
 # obtain path for rst2man
   if test "x$enable_libgcrypt" = "xyes" || \
-        "x$enable_guardtime" = "xyes"; then
+     test "x$enable_guardtime" = "xyes"; then
         AC_PATH_PROG([RST2MAN], [rst2man])
         if test "x${RST2MAN}" == "x"; then
             AC_MSG_FAILURE([rst2man not found in PATH])

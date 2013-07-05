@@ -1,4 +1,35 @@
 ---------------------------------------------------------------------------
+Version 7.4.2  [v7.4-stable] 2013-07-04
+- bugfix: in RFC5425 TLS, multiple wildcards in auth could cause segfault
+- bugfix: RainerScript object required parameters were not properly
+  checked - this clould result to segfaults on startup if parameters
+  were missing.
+- bugfix: double-free in omelasticsearch
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=461
+  a security advisory for this bug is available at:
+     http://www.lsexperts.de/advisories/lse-2013-07-03.txt
+  PLEASE NOTE: This issue only existed if omelasticsearch was used
+  in a non-default configuration, where the "errorfile" parameter
+  was specified. Without that parameter set, the bug could not
+  be triggered.
+  Thanks to Markus Vervier and Marius Ionescu for providing a detailled
+  bug report. Special thanks to Markus for coordinating his security
+  advisory with us.
+- bugfix: omrelp potential segfault at startup on invalid config parameters
+- bugfix: small memory leak when $uptime property was used
+- bugfix: potential segfault on rsyslog termination in imudp
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=456
+- bugfix: lmsig_gt abort on invalid configuration parameters
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=448
+  Thanks to Risto Laanoja for the patch.
+- imtcp: fix typo in "listner" parameter, which is "listener"
+  Currently, both names are accepted.
+- solved build problems on FreeBSD
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=457
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=458
+  Thanks to Christiano for reproting and suggesting patches
+- solved build problems on CENTOS5
+---------------------------------------------------------------------------
 Version 7.4.1  [v7.4-stable] 2013-06-17
 - imjournal: add ratelimiting capability
   The original imjournal code did not support ratelimiting at all. We
