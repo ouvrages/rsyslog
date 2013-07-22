@@ -1,4 +1,20 @@
 ---------------------------------------------------------------------------
+Version 7.4.3  [v7.4-stable] 2013-07-18
+- bugfix: memory leak if disk queues were used and json data present
+- bugfix: CEE/json data was lost during disk queue operation
+- bugfix: potential segfault during startup on invalid config
+  could happen if invalid actions were present, which could lead
+  to improper handling in optimizer.
+- bugfix: 100% CPU utilization when DA queue became full
+- bugfix: omlibdbi did not properly close connection on some errors
+  This happened to errors occuring in Begin/End Transaction entry
+  points.
+- cosmetic bugfix: file name buffer was not freed on disk queue destruction
+  This was an extremely small one-time per run memleak, so nothing of
+  concern. However, it bugs under valgrind and similar memory debuggers.
+- fix build on FreeBSD
+  Thanks to Christiano Rolim for the patch
+---------------------------------------------------------------------------
 Version 7.4.2  [v7.4-stable] 2013-07-04
 - bugfix: in RFC5425 TLS, multiple wildcards in auth could cause segfault
 - bugfix: RainerScript object required parameters were not properly
@@ -8,6 +24,7 @@ Version 7.4.2  [v7.4-stable] 2013-07-04
   closes: http://bugzilla.adiscon.com/show_bug.cgi?id=461
   a security advisory for this bug is available at:
      http://www.lsexperts.de/advisories/lse-2013-07-03.txt
+  CVE: CVE-2013-4758 
   PLEASE NOTE: This issue only existed if omelasticsearch was used
   in a non-default configuration, where the "errorfile" parameter
   was specified. Without that parameter set, the bug could not
