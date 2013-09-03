@@ -183,8 +183,8 @@
 /* Define to 1 if you have the <semaphore.h> header file. */
 #undef HAVE_SEMAPHORE_H
 
-/* Define to 1 if you have the `setid' function. */
-#undef HAVE_SETID
+/* Define to 1 if you have the `setsid' function. */
+#undef HAVE_SETSID
 
 /* Define to 1 if you have the `socket' function. */
 #undef HAVE_SOCKET
