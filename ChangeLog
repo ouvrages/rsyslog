@@ -1,4 +1,45 @@
 ---------------------------------------------------------------------------
+Version 7.4.4  [v7.4-stable] 2013-09-03
+- better error messages in GuardTime signature provider
+  Thanks to Ahto Truu for providing the patch.
+- make rsyslog use the new json-c pkgconfig file if available
+  Thanks to the Gentoo team for the patches.
+- bugfix: imfile parameter "persistStateInterval" was unusable
+  due to a case typo in imfile; work-around was to use legacy config
+  Thanks to Brandon Murphy for reporting this bug.
+- bugfix: TLV16 flag encoding error in signature files from GT provider
+  This fixes a problem where the TLV16 flag was improperly encoded.
+  Unfortunately, existing files already have the bug and may not properly
+  be processed. The fix uses constants from the GuardTime API lib to
+  prevent such problems in the future.
+  Thanks to Ahto Truu for providing the patch.
+- bugfix: slightly malformed SMTP handling in ommail
+- bugfix: segfault in omprog if no template was provided (now dflt is used)
+- bugfix: segfault in ompipe if no template was provided (now dflt is used)
+- bugfix: segfault in omsnmp if no template was provided (now dflt is used)
+- bugfix: some omsnmp optional config params were flagged as mandatory
+- bugfix: segfault in omelasticsearch when resuming queued messages
+  after restarting Elasticsearch
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=464
+- bugfix: imtcp addtlframedelimiter could not be set to zero
+  Thanks to Chris Norton for alerting us.
+- doc bugfix: remove no-longer existing omtemplate from developer doc
+  was specifically mentioned as a sample for creating new plugins
+  Thanks to Yannick Brosseau for alerting us of this problem.
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=473
+---------------------------------------------------------------------------
+Version 7.4.3  [v7.4-stable] 2013-07-18
+- bugfix: queue file size was not correctly processed
+  this could lead to using one queue file per message for sizes >2GiB
+  Thanks to Tomas Heinrich for the patch.
+- bugfix: $QHOUR/$HHOUR were always "00" or "01"
+  regression some time between v5 and here
+  Thanks to forum user rjmcinty for reporting this bug
+- bugfix: testbench tool chkseq did improperly report invalid file
+  This happened when permitted duplicate values existed in the very
+  last lines, right before end-of-file.
+  Thanks to Radu Gheorghe for reporting this bug.
+---------------------------------------------------------------------------
 Version 7.4.3  [v7.4-stable] 2013-07-18
 - bugfix: memory leak if disk queues were used and json data present
 - bugfix: CEE/json data was lost during disk queue operation
@@ -1472,6 +1513,9 @@ expected that interfaces, even new ones, break during the initial
   [ported from v4]
 ---------------------------------------------------------------------------
 Version 5.10.2  [V5-STABLE], 201?-??-??
+- bugfix: queue file size was not correctly processed
+  this could lead to using one queue file per message for sizes >2GiB
+  Thanks to Tomas Heinrich for the patch.
 - updated systemd files to match current systemd source
 - bugfix: spurios error messages from imuxsock about (non-error) EAGAIN
   Thanks to Marius Tomaschewski for the patch.
