@@ -7,6 +7,7 @@ rsyslog (7.4.8-1) UNRELEASED; urgency=medium
     - Tighten liblognorm-dev to (<< 1.0.0).
     - Replace libjson0-dev with libjson-c-dev, we no longer need the
       transitional package.
+  * Bump Standards-Version to 3.9.5. No further changes.
 
   [ Daniel Pocock ]
   * Make template parameter not mandatory in mongodb output plugin. Patch
