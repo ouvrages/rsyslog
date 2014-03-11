@@ -1,4 +1,4 @@
-rsyslog (7.4.8-1) UNRELEASED; urgency=medium
+rsyslog (7.4.8-1) unstable; urgency=medium
 
   [ Michael Biebl ]
   * New upstream release.
@@ -15,7 +15,7 @@ rsyslog (7.4.8-1) UNRELEASED; urgency=medium
   * Ensure JSON templates are NUL terminated. Patch cherry-picked from
     upstream Git.
 
- -- Michael Biebl <biebl@debian.org>  Tue, 11 Mar 2014 19:04:26 +0100
+ -- Michael Biebl <biebl@debian.org>  Tue, 11 Mar 2014 19:52:49 +0100
 
 rsyslog (7.4.4-1) unstable; urgency=low
 
