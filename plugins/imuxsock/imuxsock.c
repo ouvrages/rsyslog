@@ -159,11 +159,11 @@ static int startIndexUxLocalSockets; /* process fd from that index on (used to
 static int nfd = 1; /* number of Unix sockets open / read-only after startup */
 static int sd_fds = 0;			/* number of systemd activated sockets */
 
-/* config vars for legacy config system */
 #define DFLT_bCreatePath 0
 #define DFLT_ratelimitInterval 0
 #define DFLT_ratelimitBurst 200
 #define DFLT_ratelimitSeverity 1			/* do not rate-limit emergency messages */
+/* config vars for the legacy config system */
 static struct configSettings_s {
 	int bOmitLocalLogging;
 	uchar *pLogSockName;
@@ -188,6 +188,7 @@ static struct configSettings_s {
 	int bParseTrusted;		/* parse trusted properties */
 } cs;
 
+/* config vars for the v2 config system (rsyslog v6+) */
 struct instanceConf_s {
 	uchar *sockName;
 	uchar *pLogHostName;		/* host name to use with this socket */
@@ -401,7 +402,7 @@ addListner(instanceConf_t *inst)
 		listeners[nfd].flags = inst->bIgnoreTimestamp ? IGNDATE : NOFLAG;
 		listeners[nfd].bCreatePath = inst->bCreatePath;
 		listeners[nfd].sockName = ustrdup(inst->sockName);
-		listeners[nfd].bUseCreds = (inst->bDiscardOwnMsgs || inst->bWritePid || inst->ratelimitInterval || inst->bAnnotate) ? 1 : 0;
+		listeners[nfd].bUseCreds = (inst->bDiscardOwnMsgs || inst->bWritePid || inst->ratelimitInterval || inst->bAnnotate || inst->bUseSysTimeStamp) ? 1 : 0;
 		listeners[nfd].bAnnotate = inst->bAnnotate;
 		listeners[nfd].bParseTrusted = inst->bParseTrusted;
 		listeners[nfd].bDiscardOwnMsgs = inst->bDiscardOwnMsgs;
@@ -992,7 +993,7 @@ static rsRetVal readSocket(lstn_t *pLstn)
 	if(iRcvd > 0) {
 		cred = NULL;
 		ts = NULL;
-		if(pLstn->bUseCreds || pLstn->bUseSysTimeStamp) {
+		if(pLstn->bUseCreds) {
 			for(cm = CMSG_FIRSTHDR(&msgh); cm; cm = CMSG_NXTHDR(&msgh, cm)) {
 #				if HAVE_SCM_CREDENTIALS
 				if(   pLstn->bUseCreds
@@ -1062,7 +1063,7 @@ activateListeners()
 	listeners[0].ratelimitInterval = runModConf->ratelimitIntervalSysSock;
 	listeners[0].ratelimitBurst = runModConf->ratelimitBurstSysSock;
 	listeners[0].ratelimitSev = runModConf->ratelimitSeveritySysSock;
-	listeners[0].bUseCreds = (runModConf->bWritePidSysSock || runModConf->ratelimitIntervalSysSock || runModConf->bAnnotateSysSock || runModConf->bDiscardOwnMsgs) ? 1 : 0;
+	listeners[0].bUseCreds = (runModConf->bWritePidSysSock || runModConf->ratelimitIntervalSysSock || runModConf->bAnnotateSysSock || runModConf->bDiscardOwnMsgs || runModConf->bUseSysTimeStamp) ? 1 : 0;
 	listeners[0].bWritePid = runModConf->bWritePidSysSock;
 	listeners[0].bAnnotate = runModConf->bAnnotateSysSock;
 	listeners[0].bParseTrusted = runModConf->bParseTrusted;
@@ -1256,11 +1257,14 @@ BEGINendCnfLoad
 CODESTARTendCnfLoad
 	if(!loadModConf->configSetViaV2Method) {
 		/* persist module-specific settings from legacy config system */
+		/* these are used to initialize the system log socket (listeners[0]) */
 		loadModConf->bOmitLocalLogging = cs.bOmitLocalLogging;
 		loadModConf->pLogSockName = cs.pLogSockName;
 		loadModConf->bIgnoreTimestamp = cs.bIgnoreTimestampSysSock;
+		loadModConf->bUseSysTimeStamp = cs.bUseSysTimeStampSysSock;
 		loadModConf->bUseFlowCtl = cs.bUseFlowCtlSysSock;
 		loadModConf->bAnnotateSysSock = cs.bAnnotateSysSock;
+		loadModConf->bWritePidSysSock = cs.bWritePidSysSock;
 		loadModConf->bParseTrusted = cs.bParseTrusted;
 		loadModConf->ratelimitIntervalSysSock = cs.ratelimitIntervalSysSock;
 		loadModConf->ratelimitBurstSysSock = cs.ratelimitBurstSysSock;

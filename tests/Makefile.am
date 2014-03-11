@@ -6,6 +6,7 @@ TESTS = $(TESTRUNS)
 
 if ENABLE_IMDIAG
 TESTS +=  \
+	stop-localvar.sh \
 	arrayqueue.sh \
 	da-mainmsg-q.sh \
 	validation-run.sh \
@@ -53,7 +54,7 @@ TESTS +=  \
 	imuxsock_ccmiddle_root.sh \
 	udp-msgreduc-vg.sh \
 	udp-msgreduc-orgmsg-vg.sh \
-	queue-persist.sh 
+	queue-persist.sh \
 	discard-rptdmsg.sh \
 	discard-allmark.sh \
 	discard.sh \
@@ -289,6 +290,8 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/rscript_stop.conf \
 	   rscript_stop2.sh \
 	   testsuites/rscript_stop2.conf \
+	   stop-localvar.sh \
+	   testsuites/stop-localvar.conf \
 	   rscript_prifilt.sh \
 	   testsuites/rscript_prifilt.conf \
 	   rscript_optimizer1.sh \

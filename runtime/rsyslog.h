@@ -3,7 +3,7 @@
  *
  * Begun 2005-09-15 RGerhards
  *
- * Copyright (C) 2005-2008 by Rainer Gerhards and Adiscon GmbH
+ * Copyright (C) 2005-2013 by Rainer Gerhards and Adiscon GmbH
  *
  * This file is part of the rsyslog runtime library.
  *
@@ -413,6 +413,9 @@ enum rsRetVal_				/** return value. All methods return this if not specified oth
 	RS_RET_CRY_INVLD_ALGO = -2326,/**< user specified invalid (unkonwn) crypto algorithm */
 	RS_RET_CRY_INVLD_MODE = -2327,/**< user specified invalid (unkonwn) crypto mode */
 	RS_RET_QUEUE_DISK_NO_FN = -2328,/**< disk queue configured, but filename not set */
+	RS_RET_CA_CERT_MISSING = -2329,/**< a CA cert is missing where one is required (e.g. TLS) */
+	RS_RET_CERT_MISSING = -2330,/**< a cert is missing where one is required (e.g. TLS) */
+	RS_RET_CERTKEY_MISSING = -2331,/**< a cert (private) key is missing where one is required (e.g. TLS) */
 
 	/* RainerScript error messages (range 1000.. 1999) */
 	RS_RET_SYSVAR_NOT_FOUND = 1001, /**< system variable could not be found (maybe misspelled) */

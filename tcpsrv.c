@@ -948,6 +948,8 @@ finalize_it:
 	if(iRet != RS_RET_OK) {
 		if(pThis->pNS != NULL)
 			netstrms.Destruct(&pThis->pNS);
+		errmsg.LogError(0, iRet, "tcpsrv could not create listener (inputname: '%s')",
+				(pThis->pszInputName == NULL) ? (uchar*)"*UNSET*" : pThis->pszInputName);
 	}
 	RETiRet;
 }
@@ -1384,8 +1386,6 @@ stopWorkerPool(void)
 		pthread_cond_destroy(&wrkrInfo[i].run);
 	}
 	pthread_cond_destroy(&wrkrIdle);
-	pthread_mutex_destroy(&wrkrMut);
-
 }
 
 
@@ -1393,10 +1393,14 @@ stopWorkerPool(void)
 
 BEGINmodExit
 CODESTARTmodExit
-	stopWorkerPool();
+	if(bWrkrRunning) {
+		stopWorkerPool();
+		bWrkrRunning = 0;
+	}
 	/* de-init in reverse order! */
 	tcpsrvClassExit();
 	tcps_sessClassExit();
+	pthread_mutex_destroy(&wrkrMut);
 ENDmodExit
 
 

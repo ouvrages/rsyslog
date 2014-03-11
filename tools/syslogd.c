@@ -436,15 +436,31 @@ submitMsgWithDfltRatelimiter(msg_t *pMsg)
  * to log a message orginating from the syslogd itself.
  */
 rsRetVal
-logmsgInternal(int iErr, int pri, uchar *msg, int flags)
+logmsgInternal(int iErr, int pri, const uchar *const msg, int flags)
 {
 	uchar pszTag[33];
+	size_t lenMsg;
+	unsigned i;
+	char *bufModMsg = NULL; /* buffer for modified message, should we need to modify */
 	msg_t *pMsg;
 	DEFiRet;
 
+	/* we first do a path the remove control characters that may have accidently
+	 * introduced (program error!). This costs performance, but we do not expect
+	 * to be called very frequently in any case ;) -- rgerhards, 2013-12-19.
+	 */
+	lenMsg = ustrlen(msg);
+	for(i = 0 ; i < lenMsg ; ++i) {
+		if(msg[i] < 0x20 || msg[i] == 0x7f) {
+			if(bufModMsg == NULL) {
+				CHKmalloc(bufModMsg = strdup((char*) msg));
+			}
+			bufModMsg[i] = ' ';
+		}
+	}
 	CHKiRet(msgConstruct(&pMsg));
 	MsgSetInputName(pMsg, pInternalInputName);
-	MsgSetRawMsgWOSize(pMsg, (char*)msg);
+	MsgSetRawMsg(pMsg, (bufModMsg == NULL) ? (char*)msg : bufModMsg, lenMsg);
 	MsgSetHOSTNAME(pMsg, glbl.GetLocalHostName(), ustrlen(glbl.GetLocalHostName()));
 	MsgSetRcvFrom(pMsg, glbl.GetLocalHostNameProp());
 	MsgSetRcvFromIP(pMsg, glbl.GetLocalHostIP());
@@ -474,7 +490,7 @@ logmsgInternal(int iErr, int pri, uchar *msg, int flags)
 	 */
 	if(((Debug == DEBUG_FULL || !doFork) && ourConf->globals.bErrMsgToStderr) || iConfigVerify) {
 		if(LOG_PRI(pri) == LOG_ERR)
-			fprintf(stderr, "rsyslogd: %s\n", msg);
+			fprintf(stderr, "rsyslogd: %s\n", (bufModMsg == NULL) ? (char*)msg : bufModMsg);
 	}
 
 	if(bHaveMainQueue == 0) { /* not yet in queued mode */
@@ -484,9 +500,9 @@ logmsgInternal(int iErr, int pri, uchar *msg, int flags)
 		 * message to the queue engine.
 		 */
 		ratelimitAddMsg(internalMsg_ratelimiter, NULL, pMsg);
-		//submitMsgWithDfltRatelimiter(pMsg);
 	}
 finalize_it:
+	free(bufModMsg);
 	RETiRet;
 }
 
