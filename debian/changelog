@@ -1,6 +1,13 @@
 rsyslog (7.4.8-1) UNRELEASED; urgency=medium
 
+  [ Michael Biebl ]
   * New upstream release.
+
+  [ Daniel Pocock ]
+  * Make template parameter not mandatory in mongodb output plugin. Patch
+    cherry-picked from upstream Git. (Closes: #740869, #721277)
+  * Ensure JSON templates are NUL terminated. Patch cherry-picked from
+    upstream Git.
 
  -- Michael Biebl <biebl@debian.org>  Tue, 11 Mar 2014 19:04:26 +0100
 
