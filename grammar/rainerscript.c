@@ -1259,7 +1259,7 @@ doFunc_re_extract(struct cnffunc *func, struct var *ret, void* usrptr)
 	str = (char*) var2CString(&r[0], &bMustFree);
 	matchnbr = (short) var2Number(&r[2], NULL);
 	submatchnbr = (size_t) var2Number(&r[3], NULL);
-	if(submatchnbr > sizeof(pmatch)/sizeof(regmatch_t)) {
+	if(submatchnbr >= sizeof(pmatch)/sizeof(regmatch_t)) {
 		DBGPRINTF("re_extract() submatch %d is too large\n", submatchnbr);
 		bHadNoMatch = 1;
 		goto finalize_it;
@@ -1307,15 +1307,19 @@ doFunc_re_extract(struct cnffunc *func, struct var *ret, void* usrptr)
 					iLenBuf);
 	}
 
+finalize_it:
 	if(bMustFree) free(str);
 	if(r[0].datatype == 'S') es_deleteStr(r[0].d.estr);
 	if(r[2].datatype == 'S') es_deleteStr(r[2].d.estr);
 	if(r[3].datatype == 'S') es_deleteStr(r[3].d.estr);
-finalize_it:
+
 	if(bHadNoMatch) {
 		cnfexprEval(func->expr[4], &r[4], usrptr);
 		estr = var2String(&r[4], &bMustFree);
-		if(r[4].datatype == 'S') es_deleteStr(r[4].d.estr);
+		/* Note that we do NOT free the string that was returned/created
+		 * for r[4]. We pass it to the caller, which in turn frees it.
+		 * This saves us doing one unnecessary memory alloc & write.
+		 */
 	}
 	ret->datatype = 'S';
 	ret->d.estr = estr;
@@ -1355,6 +1359,7 @@ doFuncCall(struct cnffunc *func, struct var *ret, void* usrptr)
 			estr = var2String(&r[0], &bMustFree);
 			ret->d.n = es_strlen(estr);
 			if(bMustFree) es_deleteStr(estr);
+			if(r[0].datatype == 'S') es_deleteStr(r[0].d.estr);
 		}
 		ret->datatype = 'N';
 		break;
@@ -2274,7 +2279,8 @@ cnfstmtPrintOnly(struct cnfstmt *stmt, int indent, sbool subtree)
 		break;
 	case S_CALL:
 		cstr = es_str2cstr(stmt->d.s_call.name, NULL);
-		doIndent(indent); dbgprintf("CALL [%s]\n", cstr);
+		doIndent(indent); dbgprintf("CALL [%s, queue:%d]\n", cstr,
+			stmt->d.s_call.ruleset == NULL ? 0 : 1);
 		free(cstr);
 		break;
 	case S_ACT:
@@ -2567,14 +2573,15 @@ struct cnfstmt *
 cnfstmtNewPROPFILT(char *propfilt, struct cnfstmt *t_then)
 {
 	struct cnfstmt* cnfstmt;
-	rsRetVal lRet;
 	if((cnfstmt = cnfstmtNew(S_PROPFILT)) != NULL) {
 		cnfstmt->printable = (uchar*)propfilt;
 		cnfstmt->d.s_propfilt.t_then = t_then;
 		cnfstmt->d.s_propfilt.propName = NULL;
 		cnfstmt->d.s_propfilt.regex_cache = NULL;
 		cnfstmt->d.s_propfilt.pCSCompValue = NULL;
-		lRet = DecodePropFilter((uchar*)propfilt, cnfstmt);
+		if(DecodePropFilter((uchar*)propfilt, cnfstmt) != RS_RET_OK) {
+			cnfstmt->nodetype = S_NOP; /* disable action! */
+		}
 	}
 	return cnfstmt;
 }
@@ -2730,6 +2737,9 @@ cnfexprOptimize_CMP_severity_facility(struct cnfexpr *expr)
 {
 	struct cnffunc *func;
 
+	if(expr->l->nodetype != 'V')
+		FINALIZE;
+
 	if(!strcmp("$syslogseverity", ((struct cnfvar*)expr->l)->name)) {
 		if(expr->r->nodetype == 'N') {
 			int sev = (int) ((struct cnfnumval*)expr->r)->val;
@@ -2759,6 +2769,7 @@ cnfexprOptimize_CMP_severity_facility(struct cnfexpr *expr)
 			}
 		}
 	}
+finalize_it:
 	return expr;
 }
 
@@ -2779,7 +2790,7 @@ cnfexprOptimize_CMP_var(struct cnfexpr *expr)
 				parser_errmsg("invalid facility '%s', expression will always "
 					      "evaluate to FALSE", cstr);
 			} else {
-				/* we can acutally optimize! */
+				/* we can actually optimize! */
 				DBGPRINTF("optimizer: change comparison OP to FUNC prifilt()\n");
 				func = cnffuncNew_prifilt(fac);
 				if(expr->nodetype == CMP_NE)
@@ -2858,7 +2869,7 @@ cnfexprOptimize_AND_OR(struct cnfexpr *expr)
 static inline void
 cnfexprOptimize_CMPEQ_arr(struct cnfarray *arr)
 {
-	DBGPRINTF("optimizer: sorting array for CMP_EQ/NEQ comparison\n");
+	DBGPRINTF("optimizer: sorting array of %d members for CMP_EQ/NEQ comparison\n", arr->nmemb);
 	qsort(arr->arr, arr->nmemb, sizeof(es_str_t*), qs_arrcmp);
 }
 
@@ -2920,10 +2931,14 @@ cnfexprOptimize(struct cnfexpr *expr)
 				expr->r = exprswap;
 			}
 		}
+		if(expr->r->nodetype == 'A') {
+			cnfexprOptimize_CMPEQ_arr((struct cnfarray *)expr->r);
+		}
+		/* This should be evaluated last because it may change expr
+		 * to a function.
+		 */
 		if(expr->l->nodetype == 'V') {
 			expr = cnfexprOptimize_CMP_var(expr);
-		} else if(expr->r->nodetype == 'A') {
-			cnfexprOptimize_CMPEQ_arr((struct cnfarray *)expr->r);
 		}
 		break;
 	case CMP_LE:
@@ -3100,8 +3115,14 @@ cnfstmtOptimizeCall(struct cnfstmt *stmt)
 		stmt->nodetype = S_NOP;
 		goto done;
 	}
-	DBGPRINTF("CALL obtained ruleset ptr %p for ruleset %s\n", pRuleset, rsName);
-	stmt->d.s_call.stmt = pRuleset->root;
+	DBGPRINTF("CALL obtained ruleset ptr %p for ruleset %s [hasQueue:%d]\n",
+		  pRuleset, rsName, rulesetHasQueue(pRuleset));
+	if(rulesetHasQueue(pRuleset)) {
+		stmt->d.s_call.ruleset = pRuleset;
+	} else {
+		stmt->d.s_call.ruleset = NULL;
+		stmt->d.s_call.stmt = pRuleset->root;
+	}
 done:
 	free(rsName);
 	return;

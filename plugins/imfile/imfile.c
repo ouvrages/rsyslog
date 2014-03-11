@@ -473,7 +473,7 @@ CODESTARTnewInpInst
 		} else if(!strcmp(inppblk.descr[i].name, "severity")) {
 			inst->iSeverity = pvals[i].val.d.n;
 		} else if(!strcmp(inppblk.descr[i].name, "facility")) {
-			inst->iSeverity = pvals[i].val.d.n;
+			inst->iFacility = pvals[i].val.d.n;
 		} else if(!strcmp(inppblk.descr[i].name, "readmode")) {
 			inst->readMode = pvals[i].val.d.n;
 		} else if(!strcmp(inppblk.descr[i].name, "maxlinesatonce")) {
@@ -832,8 +832,8 @@ resetConfigVariables(uchar __attribute__((unused)) *pp, void __attribute__((unus
 	cs.pszFileName = NULL;
 	free(cs.pszFileTag);
 	cs.pszFileTag = NULL;
-	free(cs.pszFileTag);
-	cs.pszFileTag = NULL;
+	free(cs.pszStateFile);
+	cs.pszStateFile = NULL;
 
 	/* set defaults... */
 	cs.iPollInterval = DFLT_PollInterval;

@@ -1,4 +1,134 @@
 ---------------------------------------------------------------------------
+Version 7.4.8  [v7.4-stable] 2014-01-08
+- rsgtutil provides better error messages on unfinished signature blocks
+- bugfix: guard against control characters in internal (error) messages
+  Thanks to Ahto Truu for alerting us.
+- bugfix: immark did emit messages under kern.=info instead of syslog.=info
+  Note that his can potentially break exisiting configurations that
+  rely on immark sending as kern.=info. Unfortunately, we cannot leave
+  this unfixed as we never should emit messages under the kern facility.
+---------------------------------------------------------------------------
+Version 7.4.7  [v7.4-stable] 2013-12-10
+- bugfix: limiting queue disk space did not work properly
+  * queue.maxdiskspace actually initializes queue.maxfilesize
+  * total size of queue files was not checked against
+    queue.maxdiskspace for disk assisted queues.
+  Thanks to Karol Jurak for the patch.
+- bugfix: linux kernel-like ratelimiter did not work properly with all
+  inputs (for example, it did not work with imdup). The reason was that
+  the PRI value was used, but that needed parsing of the message, which
+  was done too late.
+- bugfix: disk queues created files in wrong working directory
+  if the $WorkDirectory was changed multiple times, all queues only
+  used the last value set.
+- bugfix: legacy directive $ActionQueueWorkerThreads was not honored
+- bugfix: segfault on startup when certain script constructs are used
+  e.g. "if not $msg ..."
+- bugfix: imuxsock: UseSysTimeStamp config parameter did not work correctly
+  Thanks to Tomas Heinrich for alerting us and provinding a solution
+  suggestion.
+- bugfix: $SystemLogUseSysTimeStamp/$SystemLogUsePIDFromSystem did not work
+  Thanks to Tomas Heinrich for the patch.
+- improved checking of queue config parameters on startup
+- bugfix: call to ruleset with async queue did not use the queue
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=443
+- bugfix: if imtcp is loaded and no listeners are configured (which is
+  uncommon), rsyslog crashes during shutdown.
+---------------------------------------------------------------------------
+Version 7.4.6  [v7.4-stable] 2013-10-31
+- bugfix: potential abort during HUP
+  This could happen when one of imklog, imzmq3, imkmsg, impstats,
+  imjournal, or imuxsock were under heavy load during a HUP.
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=489
+  Thanks to Guy Rozendorn for reporting the problem and Peval Levhshin for
+  his analysis.
+- bugfix: imtcp flowControl parameter incorrectly defaulted to "off"
+  This could cause message loss on systems under heavy load and was
+  a change-of-behaviour to previous version. This is a regression
+  most probably introduced in 5.9.0 (but did not try hard to find the
+  exact point of its introduction).
+- now requires libestr 0.1.9 as earlier versions lead to problems with
+  number handling in RainerScript
+- bugfix: memory leak in strlen() RainerScript function
+  Thanks to Gregoire Seux for reportig this bug.
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=486
+- bugfix: buffer overrun if re_extract function was called for submatch 50
+  Thanks to Pavel Levshin for reporting the problem and its location.
+- bugfix: memleak in re_extract() function
+  Thanks to Pavel Levshin for reporting this problem.
+- bugfix: potential abort in RainerScript optimizer
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=488
+  Thanks to Thomas Doll for reporting the problem and Pavel Levshin for
+  fixing it.
+- bugfix: memory leak in omhiredis
+  Thanks to Pavel Levshin for the fix
+- bugfix: segfault if variable was assigned to non-container subtree
+  Thanks to Pavel Levshin for the fix
+---------------------------------------------------------------------------
+Version 7.4.5  [v7.4-stable] 2013-10-22
+- mmanon: removed the check for specific "terminator characters" after 
+  last octet. As it turned out, this didn't work in practice as there
+  was an enormous set of potential terminator chars -- so removing
+  them was the best thing to do. Note that this may change behaviour of
+  existing installations. Yet, we still consider this an important
+  bugfix, that should be applied to the stable branch.
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=477
+  Thanks to Muri Cicanor for initiating the discussion
+- now requires libestr 0.1.8 as early versions had a nasty bug in
+  string comparisons
+- omelasticsearch: add failed.httprequests stats counter
+- bugfix: invalid property filter was not properly disabled in ruleset
+  Note that this bugfix introduces a very slight memory leak, which is
+  cosmetic, as it just holds data until termination that is no longer
+  needed. It is just the part of the config that was invalid. We will
+  "fix" this "issue" in the devel version first, as the fix is a bit
+  too intrusive to do without hard need in the stable version.
+- bugfix: segfault if re_extract() function was used and no match found
+- bugfix: potential misadressing on startup if property-filter was used
+  This could happen if the property name was longer than 127 chars, a case
+  that would not happen in practice.
+- bugfix: omelasticsearch: correct failed.http stats counter
+- bugfix: omelasticsearch: did not correctly initialize stats counters
+- bugfix: omelasticsearch: failed.es counter was only maintained in bulk mode
+  This usually did not lead to any problems, because they are in static
+  memory, which is initialized to zero by the OS when the plugin is
+  loaded. But it may cause problems especially on systems that do not
+  support atomic instructions - in this case the associated mutexes also
+  did not get properly initialized.
+- bugfix: mmanon did not detect all IP addresses in rewrite mode
+  The problem occured if two IPs were close to each other and the first one
+  was shrunk.
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=485
+  Thanks to micah-at-riseup.net for reporting this bug
+- bugfix: mmanon sometimes used invalid replacement char in simple mode
+  depending on configuration sequence, the replacement character was set
+  to 's' instead of the correct value. Most importantly, it was set to
+  's' if simple mode was selected and no replacement char set.
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=484
+  Thanks to micah-at-riseup.net for reporting this bug
+- bugfix: memory leak in mmnormalize
+- bugfix: array-based ==/!= comparisions lead to invalid results
+  This was a regression introduced in 7.3.5 bei the PRI optimizer
+- bugfix: omprog blocked signals to executed programs
+  The made it impossible to send signals to programs executed via
+  omprog.
+  Thanks to Risto Vaarandi for the analysis and a patch.
+- bugfix: doc: imuxsock legacy param $SystemLogSocketParseTrusted was
+  misspelled
+  Thanks to David Lang for alerting us
+- bugfix: imfile "facility" input parameter improperly handled
+  caused facility not to be set, and severity to be overwritten with
+  the facility value.
+  Thanks to forum user dmunny for reporting this bug.
+- bugfix: small memory leak in imfile when $ResetConfigVariables was used
+  Thanks to Grégory Nuyttens for reporting this bug and providig a fix
+- bugfix: segfault on startup if TLS was used but no CA cert set
+- bugfix: segfault on startup if TCP TLS was used but no cert or key set
+- bugfix: some more build problems with newer json-c versions
+  Thanks to Michael Biebl for mentioning the problem.
+- bugfix: build system: libgcrypt.h needed even if libgrcypt was disabled
+  Thanks to Jonny Törnbom for reporting this problem
+---------------------------------------------------------------------------
 Version 7.4.4  [v7.4-stable] 2013-09-03
 - better error messages in GuardTime signature provider
   Thanks to Ahto Truu for providing the patch.

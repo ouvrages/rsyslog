@@ -24,6 +24,13 @@ settings, this impact may be noticable (for high-load environments).
 <p>The rsyslog website has an updated overview of available
 <a href="http://rsyslog.com/rsyslog-statistic-counter/">rsyslog statistic counters</a>.
 </p>
+<p><b>Note that there is a
+<a href="http://www.rsyslog.com/impstats-analyzer/">rsyslog statistics
+online analyzer</a> available.</b> It can be given a impstats-generated file and
+will return problems it detects. Note that the analyzer cannot replace a
+human in getting things right, but it is expected to be a good aid in starting
+to understand and gain information from the pstats logs.
+<7p>
 <p><b>Module Confguration Parameters</b>:</p>
 <p>This module supports module parameters, only.
 <ul>
@@ -81,6 +88,12 @@ If set to on, stats messages are emitted as structured cee-enhanced syslog. If
 set to off, legacy format is used (which is compatible with pre v6-rsyslog).
 </li>
 </ul>
+<p><b>See Also</b>
+<ul>
+<li><a href="http://www.rsyslog.com/rsyslog-statistic-counter/">rsyslog statistics counter</a></li>
+<li><a href="http://www.rsyslog.com/impstats-delayed-or-lost/">impstats delayed or lost</a> - cause and cure
+</ul>
+</p>
 <b>Caveats/Known Bugs:</b>
 <ul>
 <li>This module MUST be loaded right at the top of rsyslog.conf, otherwise 

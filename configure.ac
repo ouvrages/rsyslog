@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[7.4.4],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[7.4.8],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -32,7 +32,7 @@ AC_CANONICAL_HOST
 PKG_PROG_PKG_CONFIG
 
 # modules we require
-PKG_CHECK_MODULES(LIBESTR, libestr >= 0.1.5)
+PKG_CHECK_MODULES(LIBESTR, libestr >= 0.1.9)
 PKG_CHECK_MODULES([JSON_C], [json],, [
 	PKG_CHECK_MODULES([JSON_C], [json-c])
 ])
@@ -920,7 +920,7 @@ AC_ARG_ENABLE(mmnormalize,
 )
 if test "x$enable_mmnormalize" = "xyes"; then
 	PKG_CHECK_MODULES(LIBEE, libee >= 0.4.0)
-	PKG_CHECK_MODULES(LIBLOGNORM, lognorm >= 0.3.1)
+	PKG_CHECK_MODULES(LIBLOGNORM, lognorm >= 0.3.1 lognorm < 1.0.0)
 fi
 AM_CONDITIONAL(ENABLE_MMNORMALIZE, test x$enable_mmnormalize = xyes)
 

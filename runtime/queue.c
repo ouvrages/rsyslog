@@ -12,7 +12,7 @@
  * function names - this makes it really hard to read and does not provide much
  * benefit, at least I (now) think so...
  *
- * Copyright 2008-2011 Rainer Gerhards and Adiscon GmbH.
+ * Copyright 2008-2013 Rainer Gerhards and Adiscon GmbH.
  *
  * This file is part of the rsyslog runtime library.
  *
@@ -87,6 +87,7 @@ static rsRetVal qDestructDirect(qqueue_t __attribute__((unused)) *pThis);
 static rsRetVal qConstructDirect(qqueue_t __attribute__((unused)) *pThis);
 static rsRetVal qDelDirect(qqueue_t __attribute__((unused)) *pThis);
 static rsRetVal qDestructDisk(qqueue_t *pThis);
+rsRetVal qqueueSetSpoolDir(qqueue_t *pThis, uchar *pszSpoolDir, int lenSpoolDir);
 
 /* some constants for queuePersist () */
 #define QUEUE_CHECKPOINT	1
@@ -256,7 +257,7 @@ qqueueDbgPrint(qqueue_t *pThis)
 		(pThis->pszFilePrefix == NULL) ? "[NONE]" : (char*)pThis->pszFilePrefix);
 	dbgoprint((obj_t*) pThis, "queue.size: %d\n", pThis->iMaxQueueSize);
 	dbgoprint((obj_t*) pThis, "queue.dequeuebatchsize: %d\n", pThis->iDeqBatchSize);
-	dbgoprint((obj_t*) pThis, "queue.maxdiskspace: %lld\n", pThis->iMaxFileSize);
+	dbgoprint((obj_t*) pThis, "queue.maxdiskspace: %lld\n", pThis->sizeOnDiskMax);
 	dbgoprint((obj_t*) pThis, "queue.highwatermark: %d\n", pThis->iHighWtrMrk);
 	dbgoprint((obj_t*) pThis, "queue.lowwatermark: %d\n", pThis->iLowWtrMrk);
 	dbgoprint((obj_t*) pThis, "queue.fulldelaymark: %d\n", pThis->iFullDlyMrk);
@@ -418,6 +419,7 @@ StartDA(qqueue_t *pThis)
 	CHKiRet(qqueueSetiDeqSlowdown(pThis->pqDA, pThis->iDeqSlowdown));
 	CHKiRet(qqueueSetMaxFileSize(pThis->pqDA, pThis->iMaxFileSize));
 	CHKiRet(qqueueSetFilePrefix(pThis->pqDA, pThis->pszFilePrefix, pThis->lenFilePrefix));
+	CHKiRet(qqueueSetSpoolDir(pThis->pqDA, pThis->pszSpoolDir, pThis->lenSpoolDir));
 	CHKiRet(qqueueSetiPersistUpdCnt(pThis->pqDA, pThis->iPersistUpdCnt));
 	CHKiRet(qqueueSetbSyncQueueFiles(pThis->pqDA, pThis->bSyncQueueFiles));
 	CHKiRet(qqueueSettoActShutdown(pThis->pqDA, pThis->toActShutdown));
@@ -731,7 +733,7 @@ qqueueLoadPersStrmInfoFixup(strm_t *pStrm, qqueue_t __attribute__((unused)) *pTh
 	DEFiRet;
 	ISOBJ_TYPE_assert(pStrm, strm);
 	ISOBJ_TYPE_assert(pThis, qqueue);
-	CHKiRet(strm.SetDir(pStrm, glbl.GetWorkDir(), strlen((char*)glbl.GetWorkDir())));
+	CHKiRet(strm.SetDir(pStrm, pThis->pszSpoolDir, pThis->lenSpoolDir));
 finalize_it:
 	RETiRet;
 }
@@ -830,7 +832,7 @@ static rsRetVal qConstructDisk(qqueue_t *pThis)
 	} else {
 		CHKiRet(strm.Construct(&pThis->tVars.disk.pWrite));
 		CHKiRet(strm.SetbSync(pThis->tVars.disk.pWrite, pThis->bSyncQueueFiles));
-		CHKiRet(strm.SetDir(pThis->tVars.disk.pWrite, glbl.GetWorkDir(), strlen((char*)glbl.GetWorkDir())));
+		CHKiRet(strm.SetDir(pThis->tVars.disk.pWrite, pThis->pszSpoolDir, pThis->lenSpoolDir));
 		CHKiRet(strm.SetiMaxFiles(pThis->tVars.disk.pWrite, 10000000));
 		CHKiRet(strm.SettOperationsMode(pThis->tVars.disk.pWrite, STREAMMODE_WRITE));
 		CHKiRet(strm.SetsType(pThis->tVars.disk.pWrite, STREAMTYPE_FILE_CIRCULAR));
@@ -838,7 +840,7 @@ static rsRetVal qConstructDisk(qqueue_t *pThis)
 
 		CHKiRet(strm.Construct(&pThis->tVars.disk.pReadDeq));
 		CHKiRet(strm.SetbDeleteOnClose(pThis->tVars.disk.pReadDeq, 0));
-		CHKiRet(strm.SetDir(pThis->tVars.disk.pReadDeq, glbl.GetWorkDir(), strlen((char*)glbl.GetWorkDir())));
+		CHKiRet(strm.SetDir(pThis->tVars.disk.pReadDeq, pThis->pszSpoolDir, pThis->lenSpoolDir));
 		CHKiRet(strm.SetiMaxFiles(pThis->tVars.disk.pReadDeq, 10000000));
 		CHKiRet(strm.SettOperationsMode(pThis->tVars.disk.pReadDeq, STREAMMODE_READ));
 		CHKiRet(strm.SetsType(pThis->tVars.disk.pReadDeq, STREAMTYPE_FILE_CIRCULAR));
@@ -847,7 +849,7 @@ static rsRetVal qConstructDisk(qqueue_t *pThis)
 		CHKiRet(strm.Construct(&pThis->tVars.disk.pReadDel));
 		CHKiRet(strm.SetbSync(pThis->tVars.disk.pReadDel, pThis->bSyncQueueFiles));
 		CHKiRet(strm.SetbDeleteOnClose(pThis->tVars.disk.pReadDel, 1));
-		CHKiRet(strm.SetDir(pThis->tVars.disk.pReadDel, glbl.GetWorkDir(), strlen((char*)glbl.GetWorkDir())));
+		CHKiRet(strm.SetDir(pThis->tVars.disk.pReadDel, pThis->pszSpoolDir, pThis->lenSpoolDir));
 		CHKiRet(strm.SetiMaxFiles(pThis->tVars.disk.pReadDel, 10000000));
 		CHKiRet(strm.SettOperationsMode(pThis->tVars.disk.pReadDel, STREAMMODE_READ));
 		CHKiRet(strm.SetsType(pThis->tVars.disk.pReadDel, STREAMTYPE_FILE_CIRCULAR));
@@ -1302,6 +1304,7 @@ rsRetVal qqueueConstruct(qqueue_t **ppThis, queueType_t qType, int iWorkerThread
 {
 	DEFiRet;
 	qqueue_t *pThis;
+	const uchar *const workDir = glblGetWorkDirRaw();
 
 	ASSERT(ppThis != NULL);
 	ASSERT(pConsumer != NULL);
@@ -1311,13 +1314,15 @@ rsRetVal qqueueConstruct(qqueue_t **ppThis, queueType_t qType, int iWorkerThread
 
 	/* we have an object, so let's fill the properties */
 	objConstructSetObjInfo(pThis);
-	if((pThis->pszSpoolDir = (uchar*) strdup((char*)glbl.GetWorkDir())) == NULL)
-		ABORT_FINALIZE(RS_RET_OUT_OF_MEMORY);
 
+	if(workDir != NULL) {
+		if((pThis->pszSpoolDir = ustrdup(workDir)) == NULL)
+			ABORT_FINALIZE(RS_RET_OUT_OF_MEMORY);
+		pThis->lenSpoolDir = ustrlen(pThis->pszSpoolDir);
+	}
 	/* set some water marks so that we have useful defaults if none are set specifically */
 	pThis->iFullDlyMrk  = -1;
 	pThis->iLightDlyMrk = -1;
-	pThis->lenSpoolDir = ustrlen(pThis->pszSpoolDir);
 	pThis->iMaxFileSize = 1024 * 1024; /* default is 1 MiB */
 	pThis->iQueueSize = 0;
 	pThis->nLogDeq = 0;
@@ -2039,6 +2044,16 @@ qqueueStart(qqueue_t *pThis) /* this is the ConstructionFinalizer */
 
 	ASSERT(pThis != NULL);
 
+	dbgoprint((obj_t*) pThis, "starting queue\n");
+
+	if(pThis->pszSpoolDir == NULL) {
+		/* note: we need to pick the path so late as we do not have
+		 *       the workdir during early config load
+		 */
+		if((pThis->pszSpoolDir = (uchar*) strdup((char*)glbl.GetWorkDir())) == NULL)
+			ABORT_FINALIZE(RS_RET_OUT_OF_MEMORY);
+		pThis->lenSpoolDir = ustrlen(pThis->pszSpoolDir);
+	}
 	/* set type-specific handlers and other very type-specific things
 	 * (we can not totally hide it...)
 	 */
@@ -2070,7 +2085,7 @@ qqueueStart(qqueue_t *pThis) /* this is the ConstructionFinalizer */
 			pThis->iNumWorkerThreads = 1; /* we need exactly one worker */
 			/* pre-construct file name for .qi file */
 			pThis->lenQIFNam = snprintf((char*)pszQIFNam, sizeof(pszQIFNam) / sizeof(uchar),
-				"%s/%s.qi", (char*) glbl.GetWorkDir(), (char*)pThis->pszFilePrefix);
+				"%s/%s.qi", (char*) pThis->pszSpoolDir, (char*)pThis->pszFilePrefix);
 			pThis->pszQIFNam = ustrdup(pszQIFNam);
 			DBGOPRINT((obj_t*) pThis, ".qi file name is '%s', len %d\n", pThis->pszQIFNam,
 				(int) pThis->lenQIFNam);
@@ -2084,16 +2099,25 @@ qqueueStart(qqueue_t *pThis) /* this is the ConstructionFinalizer */
 			break;
 	}
 
-	if(pThis->iFullDlyMrk == -1)
-		pThis->iFullDlyMrk  = pThis->iMaxQueueSize
-			- (pThis->iMaxQueueSize / 100) *  3; /* default 97% */
-	if(pThis->iLightDlyMrk == -1)
-		pThis->iLightDlyMrk = pThis->iMaxQueueSize
-			- (pThis->iMaxQueueSize / 100) * 30; /* default 70% */
+	if(pThis->iMaxQueueSize < 100
+	   && (pThis->qType == QUEUETYPE_LINKEDLIST || pThis->qType == QUEUETYPE_FIXED_ARRAY)) {
+		errmsg.LogError(0, RS_RET_OK_WARN, "Note: queue.size=\"%d\" is very "
+			"low and can lead to unpredictable results. See also "
+			"http://www.rsyslog.com/lower-bound-for-queue-sizes/",
+			pThis->iMaxQueueSize);
+	}
 
 	/* we need to do a quick check if our water marks are set plausible. If not,
-	 * we correct the most important shortcomings. TODO: do that!!!! -- rgerhards, 2008-03-14
+	 * we correct the most important shortcomings.
 	 */
+	if(pThis->iFullDlyMrk == -1 || pThis->iFullDlyMrk > pThis->iMaxQueueSize)
+		pThis->iFullDlyMrk  = pThis->iMaxQueueSize
+			- (pThis->iMaxQueueSize / 100) *  3; /* default 97% */
+	if(pThis->iLightDlyMrk == -1 || pThis->iLightDlyMrk > pThis->iMaxQueueSize)
+		pThis->iLightDlyMrk = pThis->iMaxQueueSize
+			- (pThis->iMaxQueueSize / 100) * 30; /* default 70% */
+	if(pThis->iMaxQueueSize > 0 && pThis->iDeqBatchSize > pThis->iMaxQueueSize)
+		pThis->iDeqBatchSize = pThis->iMaxQueueSize;
 
 	/* finalize some initializations that could not yet be done because it is
 	 * influenced by properties which might have been set after queueConstruct ()
@@ -2126,9 +2150,9 @@ qqueueStart(qqueue_t *pThis) /* this is the ConstructionFinalizer */
 			pThis->iFullDlyMrk = wrk;
 	}
 
-	DBGOPRINT((obj_t*) pThis, "type %d, enq-only %d, disk assisted %d, maxFileSz %lld, maxQSize %d, lqsize %d, pqsize %d, child %d, "
+	DBGOPRINT((obj_t*) pThis, "type %d, enq-only %d, disk assisted %d, spoolDir '%s', maxFileSz %lld, maxQSize %d, lqsize %d, pqsize %d, child %d, "
 				  "full delay %d, light delay %d, deq batch size %d starting, high wtrrmrk %d, low wtrmrk %d\n",
-		  pThis->qType, pThis->bEnqOnly, pThis->bIsDA, pThis->iMaxFileSize, pThis->iMaxQueueSize,
+		  pThis->qType, pThis->bEnqOnly, pThis->bIsDA, pThis->pszSpoolDir, pThis->iMaxFileSize, pThis->iMaxQueueSize,
 		  getLogicalQueueSize(pThis), getPhysicalQueueSize(pThis),
 		  pThis->pqParent == NULL ? 0 : 1, pThis->iFullDlyMrk, pThis->iLightDlyMrk,
 		  pThis->iDeqBatchSize, pThis->iHighWtrMrk, pThis->iLowWtrMrk);
@@ -2433,6 +2457,24 @@ CODESTARTobjDestruct(qqueue)
 ENDobjDestruct(qqueue)
 
 
+/* set the queue's spool directory. The directory MUST NOT be NULL.
+ * The passed-in string is duplicated. So if the caller does not need
+ * it any longer, it must free it.
+ */
+rsRetVal
+qqueueSetSpoolDir(qqueue_t *pThis, uchar *pszSpoolDir, int lenSpoolDir)
+{
+	DEFiRet;
+
+	free(pThis->pszSpoolDir);
+	CHKmalloc(pThis->pszSpoolDir = ustrdup(pszSpoolDir));
+	pThis->lenSpoolDir = lenSpoolDir;
+
+finalize_it:
+	RETiRet;
+}
+
+
 /* set the queue's file prefix
  * The passed-in string is duplicated. So if the caller does not need
  * it any longer, it must free it.
@@ -2564,7 +2606,7 @@ doEnqSingleObj(qqueue_t *pThis, flowControl_t flowCtlType, msg_t *pMsg)
 	 * the queue to become ready or drop the new message. -- rgerhards, 2008-03-14
 	 */
 	while(   (pThis->iMaxQueueSize > 0 && pThis->iQueueSize >= pThis->iMaxQueueSize)
-	      || (pThis->qType == QUEUETYPE_DISK && pThis->sizeOnDiskMax != 0
+	      || ((pThis->qType == QUEUETYPE_DISK || pThis->bIsDA) && pThis->sizeOnDiskMax != 0
 	      	  && pThis->tVars.disk.sizeOnDisk > pThis->sizeOnDiskMax)) {
 		STATSCOUNTER_INC(pThis->ctrFull, pThis->mutCtrFull);
 		if(pThis->toEnq == 0 || pThis->bEnqOnly) {
@@ -2753,7 +2795,7 @@ qqueueApplyCnfParam(qqueue_t *pThis, struct cnfparamvals *pvals)
 		} else if(!strcmp(pblk.descr[i].name, "queue.dequeuebatchsize")) {
 			pThis->iDeqBatchSize = pvals[i].val.d.n;
 		} else if(!strcmp(pblk.descr[i].name, "queue.maxdiskspace")) {
-			pThis->iMaxFileSize = pvals[i].val.d.n;
+			pThis->sizeOnDiskMax = pvals[i].val.d.n;
 		} else if(!strcmp(pblk.descr[i].name, "queue.highwatermark")) {
 			pThis->iHighWtrMrk = pvals[i].val.d.n;
 		} else if(!strcmp(pblk.descr[i].name, "queue.lowwatermark")) {
@@ -2826,6 +2868,7 @@ DEFpropSetMeth(qqueue, iFullDlyMrk, int)
 DEFpropSetMeth(qqueue, iDiscardSeverity, int)
 DEFpropSetMeth(qqueue, iLightDlyMrk, int)
 DEFpropSetMeth(qqueue, bIsDA, int)
+DEFpropSetMeth(qqueue, iNumWorkerThreads, int)
 DEFpropSetMeth(qqueue, iMinMsgsPerWrkr, int)
 DEFpropSetMeth(qqueue, bSaveOnShutdown, int)
 DEFpropSetMeth(qqueue, pAction, action_t*)

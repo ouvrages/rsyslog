@@ -51,6 +51,7 @@ host_triplet = @host@
 @ENABLE_TESTBENCH_TRUE@	$(am__append_13)
 #TESTS = $(TESTRUNS) cfg.sh
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_1 = \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	stop-localvar.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	arrayqueue.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	da-mainmsg-q.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	validation-run.sh \
@@ -98,7 +99,31 @@ host_triplet = @host@
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	imuxsock_ccmiddle_root.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	udp-msgreduc-vg.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	udp-msgreduc-orgmsg-vg.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	queue-persist.sh 
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	queue-persist.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	discard-rptdmsg.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	discard-allmark.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	discard.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-async.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-double.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-basic.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-rptd.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-no-rptd.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-no-basic.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rcvr_fail_restore.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_contains.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_field.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_stop.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_stop2.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_prifilt.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_optimizer1.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_ruleset_call.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	cee_simple.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	cee_diskqueue.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	incltest.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	incltest_dir.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	incltest_dir_wildcard.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	incltest_dir_empty_wildcard.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	linkedlistqueue.sh
 
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@am__append_2 = \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@	discard-rptdmsg-vg.sh \
@@ -561,6 +586,8 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/rscript_stop.conf \
 	   rscript_stop2.sh \
 	   testsuites/rscript_stop2.conf \
+	   stop-localvar.sh \
+	   testsuites/stop-localvar.conf \
 	   rscript_prifilt.sh \
 	   testsuites/rscript_prifilt.conf \
 	   rscript_optimizer1.sh \
@@ -1257,30 +1284,6 @@ uninstall-am:
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
 	tags uninstall uninstall-am
 
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	discard-rptdmsg.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	discard-allmark.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	discard.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-async.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-double.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-basic.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-rptd.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-no-rptd.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	failover-no-basic.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rcvr_fail_restore.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_contains.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_field.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_stop.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_stop2.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_prifilt.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_optimizer1.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_ruleset_call.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	cee_simple.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	cee_diskqueue.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	incltest.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	incltest_dir.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	incltest_dir_wildcard.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	incltest_dir_empty_wildcard.sh \
-@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	linkedlistqueue.sh
 @ENABLE_GNUTLS_TRUE@@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@	 manytcp-too-few-tls-vg.sh 
 
 # rtinit tests disabled for the moment - also questionable if they
