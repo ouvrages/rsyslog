@@ -2,6 +2,11 @@ rsyslog (7.4.8-1) UNRELEASED; urgency=medium
 
   [ Michael Biebl ]
   * New upstream release.
+  * Update Build-Depends:
+    - Bump libestr-dev to (>= 0.1.9).
+    - Tighten liblognorm-dev to (<< 1.0.0).
+    - Replace libjson0-dev with libjson-c-dev, we no longer need the
+      transitional package.
 
   [ Daniel Pocock ]
   * Make template parameter not mandatory in mongodb output plugin. Patch
