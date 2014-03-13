@@ -7,7 +7,6 @@
 #include <regex.h>
 #include "typedefs.h"
 
-
 #define	LOG_NFACILITIES	24	/* current number of syslog facilities */
 #define CNFFUNC_MAX_ARGS 32
 	/**< maximum number of arguments that any function can have (among
@@ -25,6 +24,8 @@ enum cnfobjType {
 	CNFOBJ_TPL,
 	CNFOBJ_PROPERTY,
 	CNFOBJ_CONSTANT,
+	CNFOBJ_MAINQ,
+	CNFOBJ_LOOKUP_TABLE,
 	CNFOBJ_INVALID = 0
 };
 
@@ -55,6 +56,11 @@ cnfobjType2str(enum cnfobjType ot)
 		break;
 	case CNFOBJ_CONSTANT:
 		return "constant";
+		break;
+	case CNFOBJ_MAINQ:
+		return "main_queue";
+	case CNFOBJ_LOOKUP_TABLE:
+		return "lookup_table";
 		break;
 	default:return "error: invalid cnfobjType";
 	}
@@ -177,8 +183,7 @@ struct cnfstmt {
 			regex_t *regex_cache;/* cache for compiled REs, if used */
 			struct cstr_s *pCSCompValue;/* value to "compare" against */
 			sbool isNegated;
-			uintTiny propID;/* ID of the requested property */
-			es_str_t *propName;/* name of property for CEE-based filters */
+			msgPropDescr_t prop; /* requested property */
 			struct cnfstmt *t_then;
 			struct cnfstmt *t_else;
 		} s_propfilt;
@@ -205,6 +210,7 @@ struct cnfstringval {
 struct cnfvar {
 	unsigned nodetype;
 	char *name;
+	msgPropDescr_t prop;
 };
 
 struct cnfarray {
@@ -230,7 +236,9 @@ enum cnffuncid {
 	CNFFUNC_RE_MATCH,
 	CNFFUNC_RE_EXTRACT,
 	CNFFUNC_FIELD,
-	CNFFUNC_PRIFILT
+	CNFFUNC_PRIFILT,
+	CNFFUNC_LOOKUP,
+	CNFFUNC_EXEC_TEMPLATE
 };
 
 struct cnffunc {
@@ -303,7 +311,7 @@ void cnfobjDestruct(struct cnfobj *o);
 void cnfobjPrint(struct cnfobj *o);
 struct cnfexpr* cnfexprNew(unsigned nodetype, struct cnfexpr *l, struct cnfexpr *r);
 void cnfexprPrint(struct cnfexpr *expr, int indent);
-void cnfexprEval(struct cnfexpr *expr, struct var *ret, void *pusr);
+void cnfexprEval(const struct cnfexpr *const expr, struct var *ret, void *pusr);
 int cnfexprEvalBool(struct cnfexpr *expr, void *usrptr);
 void cnfexprDestruct(struct cnfexpr *expr);
 struct cnfnumval* cnfnumvalNew(long long val);

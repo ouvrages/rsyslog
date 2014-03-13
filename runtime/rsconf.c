@@ -2,7 +2,7 @@
  *
  * Module begun 2011-04-19 by Rainer Gerhards
  *
- * Copyright 2011-2012 Adiscon GmbH.
+ * Copyright 2011-2013 Adiscon GmbH.
  *
  * This file is part of the rsyslog runtime library.
  *
@@ -83,7 +83,7 @@ rsconf_t *runConf = NULL;/* the currently running config */
 rsconf_t *loadConf = NULL;/* the config currently being loaded (no concurrent config load supported!) */
 
 /* hardcoded standard templates (used for defaults) */
-static uchar template_DebugFormat[] = "\"Debug line with all properties:\nFROMHOST: '%FROMHOST%', fromhost-ip: '%fromhost-ip%', HOSTNAME: '%HOSTNAME%', PRI: %PRI%,\nsyslogtag '%syslogtag%', programname: '%programname%', APP-NAME: '%APP-NAME%', PROCID: '%PROCID%', MSGID: '%MSGID%',\nTIMESTAMP: '%TIMESTAMP%', STRUCTURED-DATA: '%STRUCTURED-DATA%',\nmsg: '%msg%'\nescaped msg: '%msg:::drop-cc%'\ninputname: %inputname% rawmsg: '%rawmsg%'\n\n\"";
+static uchar template_DebugFormat[] = "\"Debug line with all properties:\nFROMHOST: '%FROMHOST%', fromhost-ip: '%fromhost-ip%', HOSTNAME: '%HOSTNAME%', PRI: %PRI%,\nsyslogtag '%syslogtag%', programname: '%programname%', APP-NAME: '%APP-NAME%', PROCID: '%PROCID%', MSGID: '%MSGID%',\nTIMESTAMP: '%TIMESTAMP%', STRUCTURED-DATA: '%STRUCTURED-DATA%',\nmsg: '%msg%'\nescaped msg: '%msg:::drop-cc%'\ninputname: %inputname% rawmsg: '%rawmsg%'\n$!:%$!%\n$.:%$.%\n$/:%$/%\n\n\"";
 static uchar template_SyslogProtocol23Format[] = "\"<%PRI%>1 %TIMESTAMP:::date-rfc3339% %HOSTNAME% %APP-NAME% %PROCID% %MSGID% %STRUCTURED-DATA% %msg%\n\"";
 static uchar template_TraditionalFileFormat[] = "=RSYSLOG_TraditionalFileFormat";
 static uchar template_FileFormat[] = "=RSYSLOG_FileFormat";
@@ -124,15 +124,16 @@ BEGINobjConstruct(rsconf) /* be sure to specify the object type also in END macr
 	pThis->templates.last = NULL;
 	pThis->templates.lastStatic = NULL;
 	pThis->actions.nbrActions = 0;
+	lookupInitCnf(&pThis->lu_tabs);
 	CHKiRet(llInit(&pThis->rulesets.llRulesets, rulesetDestructForLinkedList,
 			rulesetKeyDestruct, strcasecmp));
 	/* queue params */
-	pThis->globals.mainQ.iMainMsgQueueSize = 10000;
-	pThis->globals.mainQ.iMainMsgQHighWtrMark = 8000;
-	pThis->globals.mainQ.iMainMsgQLowWtrMark = 2000;
-	pThis->globals.mainQ.iMainMsgQDiscardMark = 9800;
+	pThis->globals.mainQ.iMainMsgQueueSize = 100000;
+	pThis->globals.mainQ.iMainMsgQHighWtrMark = 80000;
+	pThis->globals.mainQ.iMainMsgQLowWtrMark = 20000;
+	pThis->globals.mainQ.iMainMsgQDiscardMark = 98000;
 	pThis->globals.mainQ.iMainMsgQDiscardSeverity = 8;
-	pThis->globals.mainQ.iMainMsgQueueNumWorkers = 1;
+	pThis->globals.mainQ.iMainMsgQueueNumWorkers = 2;
 	pThis->globals.mainQ.MainMsgQueType = QUEUETYPE_FIXED_ARRAY;
 	pThis->globals.mainQ.pszMainMsgQFName = NULL;
 	pThis->globals.mainQ.iMainMsgQueMaxFileSize = 1024*1024;
@@ -142,10 +143,10 @@ BEGINobjConstruct(rsconf) /* be sure to specify the object type also in END macr
 	pThis->globals.mainQ.iMainMsgQtoActShutdown = 1000;
 	pThis->globals.mainQ.iMainMsgQtoEnq = 2000;
 	pThis->globals.mainQ.iMainMsgQtoWrkShutdown = 60000;
-	pThis->globals.mainQ.iMainMsgQWrkMinMsgs = 100;
+	pThis->globals.mainQ.iMainMsgQWrkMinMsgs = 40000;
 	pThis->globals.mainQ.iMainMsgQDeqSlowdown = 0;
 	pThis->globals.mainQ.iMainMsgQueMaxDiskSpace = 0;
-	pThis->globals.mainQ.iMainMsgQueDeqBatchSize = 32;
+	pThis->globals.mainQ.iMainMsgQueDeqBatchSize = 256;
 	pThis->globals.mainQ.bMainMsgQSaveOnShutdown = 1;
 	pThis->globals.mainQ.iMainMsgQueueDeqtWinFromHr = 0;
 	pThis->globals.mainQ.iMainMsgQueueDeqtWinToHr = 25;
@@ -253,92 +254,6 @@ CODESTARTobjDebugPrint(rsconf)
 ENDobjDebugPrint(rsconf)
 
 
-/* This function returns the current date in different
- * variants. It is used to construct the $NOW series of
- * system properties. The returned buffer must be freed
- * by the caller when no longer needed. If the function
- * can not allocate memory, it returns a NULL pointer.
- * TODO: this was taken from msg.c and we should consolidate it with the code
- * there. This is especially important when we increase the number of system
- * variables (what we definitely want to do).
- */
-typedef enum ENOWType { NOW_NOW, NOW_YEAR, NOW_MONTH, NOW_DAY, NOW_HOUR, NOW_MINUTE } eNOWType;
-static rsRetVal
-getNOW(eNOWType eNow, es_str_t **estr)
-{
-	DEFiRet;
-	uchar szBuf[16];
-	struct syslogTime t;
-	es_size_t len;
-
-	datetime.getCurrTime(&t, NULL);
-	switch(eNow) {
-	case NOW_NOW:
-		len = snprintf((char*) szBuf, sizeof(szBuf)/sizeof(uchar),
-			   	"%4.4d-%2.2d-%2.2d", t.year, t.month, t.day);
-		break;
-	case NOW_YEAR:
-		len = snprintf((char*) szBuf, sizeof(szBuf)/sizeof(uchar), "%4.4d", t.year);
-		break;
-	case NOW_MONTH:
-		len = snprintf((char*) szBuf, sizeof(szBuf)/sizeof(uchar), "%2.2d", t.month);
-		break;
-	case NOW_DAY:
-		len = snprintf((char*) szBuf, sizeof(szBuf)/sizeof(uchar), "%2.2d", t.day);
-		break;
-	case NOW_HOUR:
-		len = snprintf((char*) szBuf, sizeof(szBuf)/sizeof(uchar), "%2.2d", t.hour);
-		break;
-	case NOW_MINUTE:
-		len = snprintf((char*) szBuf, sizeof(szBuf)/sizeof(uchar), "%2.2d", t.minute);
-		break;
-	default:
-		len = snprintf((char*) szBuf, sizeof(szBuf)/sizeof(uchar), "*invld eNow*");
-		break;
-	}
-
-	/* now create a string object out of it and hand that over to the var */
-	*estr = es_newStrFromCStr((char*)szBuf, len);
-
-	RETiRet;
-}
-
-
-
-static inline es_str_t *
-getSysVar(char *name)
-{
-	es_str_t *estr = NULL;
-	rsRetVal iRet = RS_RET_OK;
-
-	if(!strcmp(name, "now")) {
-		CHKiRet(getNOW(NOW_NOW, &estr));
-	} else if(!strcmp(name, "year")) {
-		CHKiRet(getNOW(NOW_YEAR, &estr));
-	} else if(!strcmp(name, "month")) {
-		CHKiRet(getNOW(NOW_MONTH, &estr));
-	} else if(!strcmp(name, "day")) {
-		CHKiRet(getNOW(NOW_DAY, &estr));
-	} else if(!strcmp(name, "hour")) {
-		CHKiRet(getNOW(NOW_HOUR, &estr));
-	} else if(!strcmp(name, "minute")) {
-		CHKiRet(getNOW(NOW_MINUTE, &estr));
-	} else if(!strcmp(name, "myhostname")) {
-		char *hn = (char*)glbl.GetLocalHostName();
-		estr = es_newStrFromCStr(hn, strlen(hn));
-	} else {
-		ABORT_FINALIZE(RS_RET_SYSVAR_NOT_FOUND);
-	}
-finalize_it:
-	if(iRet != RS_RET_OK) {
-		dbgprintf("getSysVar error iRet %d\n", iRet);
-		if(estr == NULL)
-			estr = es_newStrFromCStr("*ERROR*", sizeof("*ERROR*") - 1);
-	}
-	return estr;
-}
-
-
 /* Process input() objects */
 rsRetVal
 inputProcessCnf(struct cnfobj *o)
@@ -377,6 +292,21 @@ finalize_it:
 extern int yylineno;
 
 void
+parser_warnmsg(char *fmt, ...)
+{
+	va_list ap;
+	char errBuf[1024];
+
+	va_start(ap, fmt);
+	if(vsnprintf(errBuf, sizeof(errBuf), fmt, ap) == sizeof(errBuf))
+		errBuf[sizeof(errBuf)-1] = '\0';
+	errmsg.LogError(0, RS_RET_CONF_PARSE_WARNING,
+			"warning during parsing file %s, on or before line %d: %s",
+			cnfcurrfn, yylineno, errBuf);
+	va_end(ap);
+}
+
+void
 parser_errmsg(char *fmt, ...)
 {
 	va_list ap;
@@ -399,6 +329,7 @@ yyerror(char *s)
 }
 void cnfDoObj(struct cnfobj *o)
 {
+	int bDestructObj = 1;
 	int bChkUnuse = 1;
 
 	dbgprintf("cnf:global:obj: ");
@@ -407,11 +338,18 @@ void cnfDoObj(struct cnfobj *o)
 	case CNFOBJ_GLOBAL:
 		glblProcessCnf(o);
 		break;
+	case CNFOBJ_MAINQ:
+		glblProcessMainQCnf(o);
+		bDestructObj = 0;
+		break;
 	case CNFOBJ_MODULE:
 		modulesProcessCnf(o);
 		break;
 	case CNFOBJ_INPUT:
 		inputProcessCnf(o);
+		break;
+	case CNFOBJ_LOOKUP_TABLE:
+		lookupProcessCnf(o);
 		break;
 	case CNFOBJ_TPL:
 		if(tplProcessCnf(o) != RS_RET_OK)
@@ -430,9 +368,11 @@ void cnfDoObj(struct cnfobj *o)
 			 o->objType);
 		break;
 	}
-	if(bChkUnuse)
-		nvlstChkUnused(o->nvlst);
-	cnfobjDestruct(o);
+	if(bDestructObj) {
+		if(bChkUnuse)
+			nvlstChkUnused(o->nvlst);
+		cnfobjDestruct(o);
+	 }
 }
 
 void cnfDoScript(struct cnfstmt *script)
@@ -467,30 +407,6 @@ void cnfDoBSDHost(char *ln)
 			"see http://www.rsyslog.com/g/BSD for details and a "
 			"solution (Block '%s')", ln);
 	free(ln);
-}
-
-es_str_t*
-cnfGetVar(char *name, void *usrptr)
-{
-	es_str_t *estr;
-	if(name[0] == '$') {
-		if(name[1] == '$')
-			estr = getSysVar(name+2);
-		else if(name[1] == '!')
-			estr = msgGetCEEVarNew((msg_t*) usrptr, name+2);
-		else
-			estr = msgGetMsgVarNew((msg_t*) usrptr, (uchar*)name+1);
-	} else { /* if this happens, we have a program logic error */
-		estr = es_newStrFromCStr("err: var must start with $",
-				  strlen("err: var must start with $"));
-	}
-	if(Debug) {
-		char *s;
-		s = es_str2cstr(estr, NULL);
-		dbgprintf("rainerscript: var '%s': '%s'\n", name, s);
-		free(s);
-	}
-	return estr;
 }
 /*------------------------------ end interface to flex/bison parser ------------------------------*/
 
@@ -758,9 +674,14 @@ startInputModules(void)
 static inline rsRetVal
 activateMainQueue()
 {
+	struct cnfobj *mainqCnfObj;
 	DEFiRet;
+
+	mainqCnfObj = glbl.GetmainqCnfObj();
+	DBGPRINTF("activateMainQueue: mainq cnf obj ptr is %p\n", mainqCnfObj);
 	/* create message queue */
-	CHKiRet_Hdlr(createMainQueue(&pMsgQueue, UCHAR_CONSTANT("main Q"), NULL)) {
+	CHKiRet_Hdlr(createMainQueue(&pMsgQueue, UCHAR_CONSTANT("main Q"),
+		    		(mainqCnfObj == NULL) ? NULL : mainqCnfObj->nvlst)) {
 		/* no queue is fatal, we need to give up in that case... */
 		fprintf(stderr, "fatal error %d: could not create message queue - rsyslogd can not run!\n", iRet);
 		FINALIZE;
@@ -769,6 +690,7 @@ activateMainQueue()
 	bHaveMainQueue = (ourConf->globals.mainQ.MainMsgQueType == QUEUETYPE_DIRECT) ? 0 : 1;
 	DBGPRINTF("Main processing queue is initialized and running\n");
 finalize_it:
+	glblDestructMainqCnfObj();
 	RETiRet;
 }
 

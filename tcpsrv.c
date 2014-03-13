@@ -134,6 +134,7 @@ addNewLstnPort(tcpsrv_t *pThis, uchar *pszPort, int bSuppOctetFram)
 	/* create entry */
 	CHKmalloc(pEntry = MALLOC(sizeof(tcpLstnPortList_t)));
 	CHKmalloc(pEntry->pszPort = ustrdup(pszPort));
+	strcpy((char*)pEntry->dfltTZ, (char*)pThis->dfltTZ);
 	pEntry->pSrv = pThis;
 	pEntry->pRuleset = pThis->pRuleset;
 	pEntry->bSuppOctetFram = bSuppOctetFram;
@@ -157,7 +158,7 @@ addNewLstnPort(tcpsrv_t *pThis, uchar *pszPort, int bSuppOctetFram)
 	ratelimitSetThreadSafe(pEntry->ratelimiter);
 	STATSCOUNTER_INIT(pEntry->ctrSubmit, pEntry->mutCtrSubmit);
 	CHKiRet(statsobj.AddCounter(pEntry->stats, UCHAR_CONSTANT("submitted"),
-		ctrType_IntCtr, &(pEntry->ctrSubmit)));
+		ctrType_IntCtr, CTR_FLAG_RESETTABLE, &(pEntry->ctrSubmit)));
 	CHKiRet(statsobj.ConstructFinalize(pEntry->stats));
 
 finalize_it:
@@ -743,7 +744,8 @@ RunSelect(tcpsrv_t *pThis, nsd_epworkset_t workset[], size_t sizeWorkset)
 	pthread_cleanup_push(RunCancelCleanup, (void*) &pSel);
 	while(1) {
 		CHKiRet(nssel.Construct(&pSel));
-		// TODO: set driver
+		if(pThis->pszDrvrName != NULL)
+			CHKiRet(nssel.SetDrvrName(pSel, pThis->pszDrvrName));
 		CHKiRet(nssel.ConstructFinalize(pSel));
 
 		/* Add the TCP listen sockets to the list of read descriptors. */
@@ -859,7 +861,8 @@ Run(tcpsrv_t *pThis)
 	 * to prevent us from leaking anything. -- rgerhards, 20080-04-24
 	 */
 	if((localRet = nspoll.Construct(&pPoll)) == RS_RET_OK) {
-		// TODO: set driver
+		if(pThis->pszDrvrName != NULL)
+			CHKiRet(nspoll.SetDrvrName(pPoll, pThis->pszDrvrName));
 		localRet = nspoll.ConstructFinalize(pPoll);
 	}
 	if(localRet != RS_RET_OK) {
@@ -916,9 +919,11 @@ BEGINobjConstruct(tcpsrv) /* be sure to specify the object type also in END macr
 	pThis->addtlFrameDelim = TCPSRV_NO_ADDTL_DELIMITER;
 	pThis->bDisableLFDelim = 0;
 	pThis->OnMsgReceive = NULL;
+	pThis->dfltTZ[0] = '\0';
 	pThis->ratelimitInterval = 0;
 	pThis->ratelimitBurst = 10000;
 	pThis->bUseFlowControl = 1;
+	pThis->pszDrvrName = NULL;
 ENDobjConstruct(tcpsrv)
 
 
@@ -931,12 +936,13 @@ tcpsrvConstructFinalize(tcpsrv_t *pThis)
 
 	/* prepare network stream subsystem */
 	CHKiRet(netstrms.Construct(&pThis->pNS));
+	if(pThis->pszDrvrName != NULL)
+		CHKiRet(netstrms.SetDrvrName(pThis->pNS, pThis->pszDrvrName));
 	CHKiRet(netstrms.SetDrvrMode(pThis->pNS, pThis->iDrvrMode));
 	if(pThis->pszDrvrAuthMode != NULL)
 		CHKiRet(netstrms.SetDrvrAuthMode(pThis->pNS, pThis->pszDrvrAuthMode));
 	if(pThis->pPermPeers != NULL)
 		CHKiRet(netstrms.SetDrvrPermPeers(pThis->pNS, pThis->pPermPeers));
-	// TODO: set driver!
 	CHKiRet(netstrms.ConstructFinalize(pThis->pNS));
 
 	/* set up listeners */
@@ -965,6 +971,7 @@ CODESTARTobjDestruct(tcpsrv)
 
 	if(pThis->pNS != NULL)
 		netstrms.Destruct(&pThis->pNS);
+	free(pThis->pszDrvrName);
 	free(pThis->pszDrvrAuthMode);
 	free(pThis->ppLstn);
 	free(pThis->ppLstnPort);
@@ -1109,6 +1116,15 @@ SetAddtlFrameDelim(tcpsrv_t *pThis, int iDelim)
 }
 
 
+static rsRetVal
+SetDfltTZ(tcpsrv_t *pThis, uchar *tz)
+{
+	DEFiRet;
+	ISOBJ_TYPE_assert(pThis, tcpsrv);
+	strcpy((char*)pThis->dfltTZ, (char*)tz);
+	RETiRet;
+}
+
 /* Set the input name to use -- rgerhards, 2008-12-10 */
 static rsRetVal
 SetInputName(tcpsrv_t *pThis, uchar *name)
@@ -1173,6 +1189,16 @@ SetDrvrMode(tcpsrv_t *pThis, int iMode)
 	RETiRet;
 }
 
+static rsRetVal
+SetDrvrName(tcpsrv_t *pThis, uchar *name)
+{
+	DEFiRet;
+	ISOBJ_TYPE_assert(pThis, tcpsrv);
+	free(pThis->pszDrvrName);
+	CHKmalloc(pThis->pszDrvrName = ustrdup(name));
+finalize_it:
+	RETiRet;
+}
 
 /* set the driver authentication mode -- rgerhards, 2008-05-19 */
 static rsRetVal
@@ -1268,6 +1294,7 @@ CODESTARTobjQueryInterface(tcpsrv)
 	pIf->SetKeepAlive = SetKeepAlive;
 	pIf->SetUsrP = SetUsrP;
 	pIf->SetInputName = SetInputName;
+	pIf->SetDfltTZ = SetDfltTZ;
 	pIf->SetAddtlFrameDelim = SetAddtlFrameDelim;
 	pIf->SetbDisableLFDelim = SetbDisableLFDelim;
 	pIf->SetSessMax = SetSessMax;
@@ -1275,6 +1302,7 @@ CODESTARTobjQueryInterface(tcpsrv)
 	pIf->SetLstnMax = SetLstnMax;
 	pIf->SetDrvrMode = SetDrvrMode;
 	pIf->SetDrvrAuthMode = SetDrvrAuthMode;
+	pIf->SetDrvrName = SetDrvrName;
 	pIf->SetDrvrPermPeers = SetDrvrPermPeers;
 	pIf->SetCBIsPermittedHost = SetCBIsPermittedHost;
 	pIf->SetCBOpenLstnSocks = SetCBOpenLstnSocks;

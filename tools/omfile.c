@@ -155,7 +155,6 @@ typedef struct _instanceData {
 	uchar 	*cryprovName;	/* crypto provider */
 	uchar 	*cryprovNameFull;/* full internal crypto provider name */
 	void	*cryprovData;	/* opaque data ptr for provider use */
-	void 	*cryprovFileData;/* opaque data ptr for file instance */
 	cryprov_if_t cryprov;	/* ptr to crypto provider interface */
 	sbool	useCryprov;	/* quicker than checkig ptr (1 vs 8 bytes!) */
 	int	iCurrElt;	/* currently active cache element (-1 = none) */
@@ -207,6 +206,8 @@ uchar	*pszFileDfltTplName; /* name of the default template to use */
 struct modConfData_s {
 	rsconf_t *pConf;	/* our overall config object */
 	uchar 	*tplName;	/* default template */
+	int fCreateMode; /* default mode to use when creating files */
+	int fDirCreateMode; /* default mode to use when creating files */
 };
 
 static modConfData_t *loadModConf = NULL;/* modConf ptr to use for the current load process */
@@ -216,6 +217,8 @@ static modConfData_t *runModConf = NULL;/* modConf ptr to use for the current ex
 /* module-global parameters */
 static struct cnfparamdescr modpdescr[] = {
 	{ "template", eCmdHdlrGetWord, 0 },
+	{ "dircreatemode", eCmdHdlrFileCreateMode, 0 },
+	{ "filecreatemode", eCmdHdlrFileCreateMode, 0 }
 };
 static struct cnfparamblk modpblk =
 	{ CNFPARAMBLK_VERSION,
@@ -233,9 +236,13 @@ static struct cnfparamdescr actpdescr[] = {
 	{ "flushontxend", eCmdHdlrBinary, 0 }, /* legacy: omfileflushontxend */
 	{ "iobuffersize", eCmdHdlrSize, 0 }, /* legacy: omfileiobuffersize */
 	{ "dirowner", eCmdHdlrUID, 0 }, /* legacy: dirowner */
+	{ "dirownernum", eCmdHdlrInt, 0 }, /* legacy: dirownernum */
 	{ "dirgroup", eCmdHdlrGID, 0 }, /* legacy: dirgroup */
+	{ "dirgroupnum", eCmdHdlrInt, 0 }, /* legacy: dirgroupnum */
 	{ "fileowner", eCmdHdlrUID, 0 }, /* legacy: fileowner */
+	{ "fileownernum", eCmdHdlrInt, 0 }, /* legacy: fileownernum */
 	{ "filegroup", eCmdHdlrGID, 0 }, /* legacy: filegroup */
+	{ "filegroupnum", eCmdHdlrInt, 0 }, /* legacy: filegroupnum */
 	{ "dircreatemode", eCmdHdlrFileCreateMode, 0 }, /* legacy: dircreatemode */
 	{ "filecreatemode", eCmdHdlrFileCreateMode, 0 }, /* legacy: filecreatemode */
 	{ "failonchownfailure", eCmdHdlrBinary, 0 }, /* legacy: failonchownfailure */
@@ -798,7 +805,7 @@ writeFile(uchar **ppString, unsigned iMsgOpts, instanceData *pData)
 		if(pData->pStrm == NULL) {
 			CHKiRet(prepareFile(pData, pData->fname));
 			if(pData->pStrm == NULL) {
-				errmsg.LogError(0, RS_RET_NO_FILE_ACCESS, "Could no open output file '%s'", pData->fname);
+				errmsg.LogError(0, RS_RET_NO_FILE_ACCESS, "Could not open output file '%s'", pData->fname);
 			}
 		}
 	}
@@ -815,6 +822,8 @@ CODESTARTbeginCnfLoad
 	loadModConf = pModConf;
 	pModConf->pConf = pConf;
 	pModConf->tplName = NULL;
+	pModConf->fCreateMode = 0644;
+	pModConf->fDirCreateMode = 0700;
 ENDbeginCnfLoad
 
 BEGINsetModCnf
@@ -843,6 +852,10 @@ CODESTARTsetModCnf
 						"was already set via legacy directive - may lead to inconsistent "
 						"results.");
 			}
+		} else if(!strcmp(modpblk.descr[i].name, "dircreatemode")) {
+			loadModConf->fDirCreateMode = (int) pvals[i].val.d.n;
+		} else if(!strcmp(modpblk.descr[i].name, "filecreatemode")) {
+			loadModConf->fCreateMode = (int) pvals[i].val.d.n;
 		} else {
 			dbgprintf("omfile: program error, non-handled "
 			  "param '%s' in beginCnfLoad\n", modpblk.descr[i].name);
@@ -959,8 +972,8 @@ setInstParamDefaults(instanceData *pData)
 	pData->dirGID = -1;
 	pData->bFailOnChown = 1;
 	pData->iDynaFileCacheSize = 10;
-	pData->fCreateMode = 0644;
-	pData->fDirCreateMode = 0700;
+	pData->fCreateMode = loadModConf->fCreateMode;
+	pData->fDirCreateMode = loadModConf->fDirCreateMode;
 	pData->bCreateDirs = 1;
 	pData->bSyncFile = 0;
 	pData->iZipLevel = 0;
@@ -993,19 +1006,19 @@ setupInstStatsCtrs(instanceData *pData)
 	CHKiRet(statsobj.SetName(pData->stats, ctrName));
 	STATSCOUNTER_INIT(pData->ctrRequests, pData->mutCtrRequests);
 	CHKiRet(statsobj.AddCounter(pData->stats, UCHAR_CONSTANT("requests"),
-		ctrType_IntCtr, &(pData->ctrRequests)));
+		ctrType_IntCtr, CTR_FLAG_RESETTABLE, &(pData->ctrRequests)));
 	STATSCOUNTER_INIT(pData->ctrLevel0, pData->mutCtrLevel0);
 	CHKiRet(statsobj.AddCounter(pData->stats, UCHAR_CONSTANT("level0"),
-		ctrType_IntCtr, &(pData->ctrLevel0)));
+		ctrType_IntCtr, CTR_FLAG_RESETTABLE, &(pData->ctrLevel0)));
 	STATSCOUNTER_INIT(pData->ctrMiss, pData->mutCtrMiss);
 	CHKiRet(statsobj.AddCounter(pData->stats, UCHAR_CONSTANT("missed"),
-		ctrType_IntCtr, &(pData->ctrMiss)));
+		ctrType_IntCtr, CTR_FLAG_RESETTABLE, &(pData->ctrMiss)));
 	STATSCOUNTER_INIT(pData->ctrEvict, pData->mutCtrEvict);
 	CHKiRet(statsobj.AddCounter(pData->stats, UCHAR_CONSTANT("evicted"),
-		ctrType_IntCtr, &(pData->ctrEvict)));
+		ctrType_IntCtr, CTR_FLAG_RESETTABLE, &(pData->ctrEvict)));
 	STATSCOUNTER_INIT(pData->ctrMax, pData->mutCtrMax);
 	CHKiRet(statsobj.AddCounter(pData->stats, UCHAR_CONSTANT("maxused"),
-		ctrType_IntCtr, &(pData->ctrMax)));
+		ctrType_IntCtr, CTR_FLAG_RESETTABLE, &(pData->ctrMax)));
 	CHKiRet(statsobj.ConstructFinalize(pData->stats));
 
 finalize_it:
@@ -1089,7 +1102,7 @@ initCryprov(instanceData *pData, struct nvlst *lst)
 				szDrvrName);
 		ABORT_FINALIZE(RS_RET_CRYPROV_ERR);
 	}
-	CHKiRet(pData->cryprov.SetCnfParam(pData->cryprovData, lst));
+	CHKiRet(pData->cryprov.SetCnfParam(pData->cryprovData, lst, CRYPROV_PARAMTYPE_REGULAR));
 
 	dbgprintf("loaded crypto provider %s, data instance at %p\n",
 		  szDrvrName, pData->cryprovData);
@@ -1139,11 +1152,19 @@ CODESTARTnewActInst
 			pData->iIOBufSize = (int) pvals[i].val.d.n;
 		} else if(!strcmp(actpblk.descr[i].name, "dirowner")) {
 			pData->dirUID = (int) pvals[i].val.d.n;
+		} else if(!strcmp(actpblk.descr[i].name, "dirownernum")) {
+			pData->dirUID = (int) pvals[i].val.d.n;
 		} else if(!strcmp(actpblk.descr[i].name, "dirgroup")) {
+			pData->dirGID = (int) pvals[i].val.d.n;
+		} else if(!strcmp(actpblk.descr[i].name, "dirgroupnum")) {
 			pData->dirGID = (int) pvals[i].val.d.n;
 		} else if(!strcmp(actpblk.descr[i].name, "fileowner")) {
 			pData->fileUID = (int) pvals[i].val.d.n;
+		} else if(!strcmp(actpblk.descr[i].name, "fileownernum")) {
+			pData->fileUID = (int) pvals[i].val.d.n;
 		} else if(!strcmp(actpblk.descr[i].name, "filegroup")) {
+			pData->fileGID = (int) pvals[i].val.d.n;
+		} else if(!strcmp(actpblk.descr[i].name, "filegroupnum")) {
 			pData->fileGID = (int) pvals[i].val.d.n;
 		} else if(!strcmp(actpblk.descr[i].name, "dircreatemode")) {
 			pData->fDirCreateMode = (int) pvals[i].val.d.n;
@@ -1377,9 +1398,13 @@ INITLegCnfVars
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"omfileflushontxend", 0, eCmdHdlrBinary, NULL, &cs.bFlushOnTXEnd, STD_LOADABLE_MODULE_ID));
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"omfileiobuffersize", 0, eCmdHdlrSize, NULL, &cs.iIOBufSize, STD_LOADABLE_MODULE_ID));
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"dirowner", 0, eCmdHdlrUID, NULL, &cs.dirUID, STD_LOADABLE_MODULE_ID));
+	CHKiRet(omsdRegCFSLineHdlr((uchar *)"dirownernum", 0, eCmdHdlrInt, NULL, &cs.dirUID, STD_LOADABLE_MODULE_ID));
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"dirgroup", 0, eCmdHdlrGID, NULL, &cs.dirGID, STD_LOADABLE_MODULE_ID));
+	CHKiRet(omsdRegCFSLineHdlr((uchar *)"dirgroupnum", 0, eCmdHdlrInt, NULL, &cs.dirGID, STD_LOADABLE_MODULE_ID));
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"fileowner", 0, eCmdHdlrUID, NULL, &cs.fileUID, STD_LOADABLE_MODULE_ID));
+	CHKiRet(omsdRegCFSLineHdlr((uchar *)"fileownernum", 0, eCmdHdlrInt, NULL, &cs.fileUID, STD_LOADABLE_MODULE_ID));
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"filegroup", 0, eCmdHdlrGID, NULL, &cs.fileGID, STD_LOADABLE_MODULE_ID));
+	CHKiRet(omsdRegCFSLineHdlr((uchar *)"filegroupnum", 0, eCmdHdlrInt, NULL, &cs.fileGID, STD_LOADABLE_MODULE_ID));
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"dircreatemode", 0, eCmdHdlrFileCreateMode, NULL, &cs.fDirCreateMode, STD_LOADABLE_MODULE_ID));
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"filecreatemode", 0, eCmdHdlrFileCreateMode, NULL, &cs.fCreateMode, STD_LOADABLE_MODULE_ID));
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"createdirs", 0, eCmdHdlrBinary, NULL, &cs.bCreateDirs, STD_LOADABLE_MODULE_ID));

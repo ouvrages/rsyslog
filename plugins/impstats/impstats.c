@@ -1,7 +1,7 @@
 /* impstats.c
  * A module to periodically output statistics gathered by rsyslog.
  *
- * Copyright 2010-2012 Adiscon GmbH.
+ * Copyright 2010-2013 Adiscon GmbH.
  *
  * This file is part of rsyslog.
  *
@@ -32,6 +32,9 @@
 #if defined(__FreeBSD__)
 #include <sys/stat.h>
 #endif
+#include <errno.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 #include "dirty.h"
 #include "cfsysline.h"
@@ -43,6 +46,7 @@
 #include "glbl.h"
 #include "statsobj.h"
 #include "prop.h"
+#include "ruleset.h"
 
 MODULE_TYPE_INPUT
 MODULE_TYPE_NOKEEP
@@ -59,6 +63,7 @@ DEFobjCurrIf(glbl)
 DEFobjCurrIf(prop)
 DEFobjCurrIf(statsobj)
 DEFobjCurrIf(errmsg)
+DEFobjCurrIf(ruleset)
 
 typedef struct configSettings_s {
 	int iStatsInterval;
@@ -74,10 +79,13 @@ struct modConfData_s {
 	int iFacility;
 	int iSeverity;
 	int logfd; /* fd if logging to file, or -1 if closed */
+	ruleset_t *pBindRuleset;	/* ruleset to bind listener to (use system default if unspecified) */
 	statsFmtType_t statsFmt;
 	sbool bLogToSyslog;
+	sbool bResetCtrs;
 	char *logfile;
 	sbool configSetViaV2Method;
+	uchar *pszBindRuleset;		/* name of ruleset to bind to */
 };
 static modConfData_t *loadModConf = NULL;/* modConf ptr to use for the current load process */
 static modConfData_t *runModConf = NULL;/* modConf ptr to use for the current load process */
@@ -92,14 +100,29 @@ static struct cnfparamdescr modpdescr[] = {
 	{ "facility", eCmdHdlrInt, 0 },
 	{ "severity", eCmdHdlrInt, 0 },
 	{ "log.syslog", eCmdHdlrBinary, 0 },
+	{ "resetcounters", eCmdHdlrBinary, 0 },
 	{ "log.file", eCmdHdlrGetWord, 0 },
-	{ "format", eCmdHdlrGetWord, 0 }
+	{ "format", eCmdHdlrGetWord, 0 },
+	{ "ruleset", eCmdHdlrString, 0 }
 };
 static struct cnfparamblk modpblk =
 	{ CNFPARAMBLK_VERSION,
 	  sizeof(modpdescr)/sizeof(struct cnfparamdescr),
 	  modpdescr
 	};
+
+
+/* resource use stats counters */
+static intctr_t st_ru_utime;
+static intctr_t st_ru_stime;
+static int st_ru_maxrss;
+static int st_ru_minflt;
+static int st_ru_majflt;
+static int st_ru_inblock;
+static int st_ru_oublock;
+static int st_ru_nvcsw;
+static int st_ru_nivcsw;
+static statsobj_t *statsobj_resources;
 
 BEGINmodExit
 CODESTARTmodExit
@@ -109,6 +132,7 @@ CODESTARTmodExit
 	objRelease(prop, CORE_COMPONENT);
 	objRelease(errmsg, CORE_COMPONENT);
 	objRelease(statsobj, CORE_COMPONENT);
+	objRelease(ruleset, CORE_COMPONENT);
 ENDmodExit
 
 
@@ -144,6 +168,7 @@ doSubmitMsg(uchar *line)
 	MsgSetRcvFrom(pMsg, glbl.GetLocalHostNameProp());
 	MsgSetRcvFromIP(pMsg, glbl.GetLocalHostIP());
 	MsgSetMSGoffs(pMsg, 0);
+	MsgSetRuleset(pMsg, runModConf->pBindRuleset);
 	MsgSetTAG(pMsg, UCHAR_CONSTANT("rsyslogd-pstats:"), sizeof("rsyslogd-pstats:") - 1);
 	pMsg->iFacility = runModConf->iFacility;
 	pMsg->iSeverity = runModConf->iSeverity;
@@ -222,7 +247,23 @@ doStatsLine(void __attribute__((unused)) *usrptr, cstr_t *cstr)
 static inline void
 generateStatsMsgs(void)
 {
-	statsobj.GetAllStatsLines(doStatsLine, NULL, runModConf->statsFmt);
+	struct rusage ru;
+	int r;
+	r = getrusage(RUSAGE_SELF, &ru);
+	if(r != 0) {
+		dbgprintf("impstats: getrusage() failed with error %d, zeroing out\n", errno);
+		memset(&ru, 0, sizeof(ru));
+	}
+	st_ru_utime = ru.ru_utime.tv_sec * 1000000 + ru.ru_utime.tv_usec;
+	st_ru_stime = ru.ru_stime.tv_sec * 1000000 + ru.ru_stime.tv_usec;
+	st_ru_maxrss = ru.ru_maxrss;
+	st_ru_minflt = ru.ru_minflt;
+	st_ru_majflt = ru.ru_majflt;
+	st_ru_inblock = ru.ru_inblock;
+	st_ru_oublock = ru.ru_oublock;
+	st_ru_nvcsw = ru.ru_nvcsw;
+	st_ru_nivcsw = ru.ru_nivcsw;
+	statsobj.GetAllStatsLines(doStatsLine, NULL, runModConf->statsFmt, runModConf->bResetCtrs);
 }
 
 
@@ -238,7 +279,9 @@ CODESTARTbeginCnfLoad
 	loadModConf->statsFmt = statsFmt_Legacy;
 	loadModConf->logfd = -1;
 	loadModConf->logfile = NULL;
+	loadModConf->pszBindRuleset = NULL;
 	loadModConf->bLogToSyslog = 1;
+	loadModConf->bResetCtrs = 0;
 	bLegacyCnfModGlobalsPermitted = 1;
 	/* init legacy config vars */
 	initConfigSettings();
@@ -273,6 +316,8 @@ CODESTARTsetModCnf
 			loadModConf->iSeverity = (int) pvals[i].val.d.n;
 		} else if(!strcmp(modpblk.descr[i].name, "log.syslog")) {
 			loadModConf->bLogToSyslog = (sbool) pvals[i].val.d.n;
+		} else if(!strcmp(modpblk.descr[i].name, "resetcounters")) {
+			loadModConf->bResetCtrs = (sbool) pvals[i].val.d.n;
 		} else if(!strcmp(modpblk.descr[i].name, "log.file")) {
 			loadModConf->logfile = es_str2cstr(pvals[i].val.d.estr, NULL);
 		} else if(!strcmp(modpblk.descr[i].name, "format")) {
@@ -288,6 +333,8 @@ CODESTARTsetModCnf
 						mode);
 			}
 			free(mode);
+		} else if(!strcmp(modpblk.descr[i].name, "ruleset")) {
+			loadModConf->pszBindRuleset = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
 		} else {
 			dbgprintf("impstats: program error, non-handled "
 			  "param '%s' in beginCnfLoad\n", modpblk.descr[i].name);
@@ -321,6 +368,32 @@ CODESTARTendCnfLoad
 ENDendCnfLoad
 
 
+/* we need our special version of checkRuleset(), as we do not have any instances */
+static inline rsRetVal
+checkRuleset(modConfData_t *modConf)
+{
+	ruleset_t *pRuleset;
+	rsRetVal localRet;
+	DEFiRet;
+
+	modConf->pBindRuleset = NULL;	/* assume default ruleset */
+dbgprintf("DDDD: impstats ruleset %s\n", modConf->pszBindRuleset);
+
+	if(modConf->pszBindRuleset == NULL)
+		FINALIZE;
+
+	localRet = ruleset.GetRuleset(modConf->pConf, &pRuleset, modConf->pszBindRuleset);
+	if(localRet == RS_RET_NOT_FOUND) {
+		errmsg.LogError(0, NO_ERRCODE, "impstats: ruleset '%s' not found - "
+				"using default ruleset instead", modConf->pszBindRuleset);
+	}
+	CHKiRet(localRet);
+	modConf->pBindRuleset = pRuleset;
+finalize_it:
+dbgprintf("DDDD: impstats ruleset ptr %p\n", modConf->pBindRuleset);
+	RETiRet;
+}
+
 BEGINcheckCnf
 CODESTARTcheckCnf
 	if(pModConf->iStatsInterval == 0) {
@@ -328,6 +401,7 @@ CODESTARTcheckCnf
 				"default of %d seconds", DEFAULT_STATS_PERIOD);
 		pModConf->iStatsInterval = DEFAULT_STATS_PERIOD;
 	}
+	iRet = checkRuleset(pModConf);
 ENDcheckCnf
 
 
@@ -335,15 +409,41 @@ BEGINactivateCnf
 	rsRetVal localRet;
 CODESTARTactivateCnf
 	runModConf = pModConf;
-	DBGPRINTF("impstats: stats interval %d seconds, logToSyslog %d, logFile %s\n",
-		  runModConf->iStatsInterval, runModConf->bLogToSyslog,
+	DBGPRINTF("impstats: stats interval %d seconds, reset %d, logToSyslog %d, logFile %s\n",
+		  runModConf->iStatsInterval, runModConf->bResetCtrs, runModConf->bLogToSyslog,
 		  runModConf->logfile == NULL ? "deactivated" : (char*)runModConf->logfile);
 	localRet = statsobj.EnableStats();
 	if(localRet != RS_RET_OK) {
 		errmsg.LogError(0, localRet, "impstats: error enabling statistics gathering");
 		ABORT_FINALIZE(RS_RET_NO_RUN);
 	}
+	/* initialize our own counters */
+	CHKiRet(statsobj.Construct(&statsobj_resources));
+	CHKiRet(statsobj.SetName(statsobj_resources, (uchar*)"resource-usage"));
+	CHKiRet(statsobj.AddCounter(statsobj_resources, UCHAR_CONSTANT("utime"),
+		ctrType_IntCtr, CTR_FLAG_NONE, &st_ru_utime));
+	CHKiRet(statsobj.AddCounter(statsobj_resources, UCHAR_CONSTANT("stime"),
+		ctrType_IntCtr, CTR_FLAG_NONE, &st_ru_stime));
+	CHKiRet(statsobj.AddCounter(statsobj_resources, UCHAR_CONSTANT("maxrss"),
+		ctrType_Int, CTR_FLAG_NONE, &st_ru_maxrss));
+	CHKiRet(statsobj.AddCounter(statsobj_resources, UCHAR_CONSTANT("minflt"),
+		ctrType_Int, CTR_FLAG_NONE, &st_ru_minflt));
+	CHKiRet(statsobj.AddCounter(statsobj_resources, UCHAR_CONSTANT("majflt"),
+		ctrType_Int, CTR_FLAG_NONE, &st_ru_majflt));
+	CHKiRet(statsobj.AddCounter(statsobj_resources, UCHAR_CONSTANT("inblock"),
+		ctrType_Int, CTR_FLAG_NONE, &st_ru_inblock));
+	CHKiRet(statsobj.AddCounter(statsobj_resources, UCHAR_CONSTANT("oublock"),
+		ctrType_Int, CTR_FLAG_NONE, &st_ru_oublock));
+	CHKiRet(statsobj.AddCounter(statsobj_resources, UCHAR_CONSTANT("nvcsw"),
+		ctrType_Int, CTR_FLAG_NONE, &st_ru_nvcsw));
+	CHKiRet(statsobj.AddCounter(statsobj_resources, UCHAR_CONSTANT("nivcsw"),
+		ctrType_Int, CTR_FLAG_NONE, &st_ru_nivcsw));
+	CHKiRet(statsobj.ConstructFinalize(statsobj_resources));
 finalize_it:
+	if(iRet != RS_RET_OK) {
+		errmsg.LogError(0, iRet, "impstats: error activating module");
+		iRet = RS_RET_NO_RUN;
+	}
 ENDactivateCnf
 
 
@@ -359,14 +459,12 @@ BEGINrunInput
 CODESTARTrunInput
 	/* this is an endless loop - it is terminated when the thread is
 	 * signalled to do so. This, however, is handled by the framework,
-	 * right into the sleep below.
+	 * right into the sleep below. Note that we DELIBERATLY output
+	 * final set of stats counters on termination request. Depending
+	 * on configuration, they may not make it to the final destination...
 	 */
-	while(1) {
+	while(glbl.GetGlobalInputTermState() == 0) {
 		srSleep(runModConf->iStatsInterval, 0); /* seconds, micro seconds */
-
-		if(glbl.GetGlobalInputTermState() == 1)
-			break; /* terminate input! */
-
 		DBGPRINTF("impstats: woke up, generating messages\n");
 		generateStatsMsgs();
 	}
@@ -408,6 +506,7 @@ CODEmodInit_QueryRegCFSLineHdlr
 	CHKiRet(objUse(prop, CORE_COMPONENT));
 	CHKiRet(objUse(errmsg, CORE_COMPONENT));
 	CHKiRet(objUse(statsobj, CORE_COMPONENT));
+	CHKiRet(objUse(ruleset, CORE_COMPONENT));
 	/* the pstatsinverval is an alias to support a previous screwed-up syntax... */
 	CHKiRet(regCfSysLineHdlr2((uchar *)"pstatsinterval", 0, eCmdHdlrInt, NULL, &cs.iStatsInterval, STD_LOADABLE_MODULE_ID, &bLegacyCnfModGlobalsPermitted));
 	CHKiRet(regCfSysLineHdlr2((uchar *)"pstatinterval", 0, eCmdHdlrInt, NULL, &cs.iStatsInterval, STD_LOADABLE_MODULE_ID, &bLegacyCnfModGlobalsPermitted));

@@ -4,7 +4,7 @@
  *
  * File begun on 2008-03-13 by RGerhards
  *
- * Copyright 2008-2012 Adiscon GmbH.
+ * Copyright 2008-2013 Adiscon GmbH.
  *
  * This file is part of rsyslog.
  *
@@ -47,6 +47,7 @@
 #include "prop.h"
 #include "ruleset.h"
 #include "glbl.h"
+#include "statsobj.h"
 
 MODULE_TYPE_INPUT
 MODULE_TYPE_NOKEEP
@@ -59,6 +60,7 @@ DEFobjCurrIf(prop)
 DEFobjCurrIf(errmsg)
 DEFobjCurrIf(ruleset)
 DEFobjCurrIf(glbl)
+DEFobjCurrIf(statsobj)
 
 /* forward definitions */
 static rsRetVal resetConfigVariables(uchar __attribute__((unused)) *pp, void __attribute__((unused)) *pVal);
@@ -74,7 +76,31 @@ static struct configSettings_s {
 
 struct instanceConf_s {
 	uchar *pszBindPort;		/* port to bind to */
+	sbool bEnableTLS;
+	sbool bEnableTLSZip;
+	int dhBits;
+	uchar *pristring;		/* GnuTLS priority string (NULL if not to be provided) */
+	uchar *authmode;		/* TLS auth mode */
+	uchar *caCertFile;
+	uchar *myCertFile;
+	uchar *myPrivKeyFile;
+	struct {
+		int nmemb;
+		uchar **name;
+	} permittedPeers;
+
 	struct instanceConf_s *next;
+	/* with librelp, this module does not have any own specific session
+	 * or listener active data item. As a "work-around", we keep some
+	 * data items inside the configuration object. To keep things
+	 * decently clean, we put them all into their dedicated struct. So
+	 * it is easy to judge what is actual configuration and what is
+	 * dynamic runtime data. -- rgerhards, 2013-06-18
+	 */
+	struct {
+		statsobj_t *stats;	/* listener stats */
+		STATSCOUNTER_DEF(ctrSubmit, mutCtrSubmit)
+	} data;
 };
 
 
@@ -88,9 +114,28 @@ struct modConfData_s {
 static modConfData_t *loadModConf = NULL;/* modConf ptr to use for the current load process */
 static modConfData_t *runModConf = NULL;/* modConf ptr to use for the current load process */
 
+/* module-global parameters */
+static struct cnfparamdescr modpdescr[] = {
+	{ "ruleset", eCmdHdlrGetWord, 0 },
+};
+static struct cnfparamblk modpblk =
+	{ CNFPARAMBLK_VERSION,
+	  sizeof(modpdescr)/sizeof(struct cnfparamdescr),
+	  modpdescr
+	};
+
 /* input instance parameters */
 static struct cnfparamdescr inppdescr[] = {
-	{ "port", eCmdHdlrString, CNFPARAM_REQUIRED }
+	{ "port", eCmdHdlrString, CNFPARAM_REQUIRED },
+	{ "tls", eCmdHdlrBinary, 0 },
+	{ "tls.permittedpeer", eCmdHdlrArray, 0 },
+	{ "tls.authmode", eCmdHdlrString, 0 },
+	{ "tls.dhbits", eCmdHdlrInt, 0 },
+	{ "tls.prioritystring", eCmdHdlrString, 0 },
+	{ "tls.cacert", eCmdHdlrString, 0 },
+	{ "tls.mycert", eCmdHdlrString, 0 },
+	{ "tls.myprivkey", eCmdHdlrString, 0 },
+	{ "tls.compression", eCmdHdlrBinary, 0 }
 };
 static struct cnfparamblk inppblk =
 	{ CNFPARAMBLK_VERSION,
@@ -101,6 +146,30 @@ static struct cnfparamblk inppblk =
 
 
 /* ------------------------------ callbacks ------------------------------ */
+
+static void
+onErr(void *pUsr, char *objinfo, char* errmesg, __attribute__((unused)) relpRetVal errcode)
+{
+	instanceConf_t *inst = (instanceConf_t*) pUsr;
+	errmsg.LogError(0, RS_RET_RELP_AUTH_FAIL, "imrelp[%s]: error '%s', object "
+			" '%s' - input may not work as intended",
+			inst->pszBindPort, errmesg, objinfo);
+}
+
+static void
+onGenericErr(char *objinfo, char* errmesg, __attribute__((unused)) relpRetVal errcode)
+{
+	errmsg.LogError(0, RS_RET_RELP_ERR, "imrelp: librelp error '%s', object "
+			" '%s' - input may not work as intended", errmesg, objinfo);
+}
+
+static void
+onAuthErr(void *pUsr, char *authinfo, char* errmesg, __attribute__((unused)) relpRetVal errcode)
+{
+	instanceConf_t *inst = (instanceConf_t*) pUsr;
+	errmsg.LogError(0, RS_RET_RELP_AUTH_FAIL, "imrelp[%s]: authentication error '%s', peer "
+			"is '%s'", inst->pszBindPort, errmesg, authinfo);
+}
 
 /* callback for receiving syslog messages. This function is invoked from the
  * RELP engine when a syslog message arrived. It must return a relpRetVal,
@@ -113,10 +182,11 @@ static struct cnfparamblk inppblk =
  * we will only see the hostname (twice). -- rgerhards, 2009-10-14
  */
 static relpRetVal
-onSyslogRcv(uchar *pHostname, uchar *pIP, uchar *msg, size_t lenMsg)
+onSyslogRcv(void *pUsr, uchar *pHostname, uchar *pIP, uchar *msg, size_t lenMsg)
 {
 	prop_t *pProp = NULL;
 	msg_t *pMsg;
+	instanceConf_t *inst = (instanceConf_t*) pUsr;
 	DEFiRet;
 
 	CHKiRet(msgConstruct(&pMsg));
@@ -134,6 +204,7 @@ onSyslogRcv(uchar *pHostname, uchar *pIP, uchar *msg, size_t lenMsg)
 	CHKiRet(MsgSetRcvFromIPStr(pMsg, pIP, ustrlen(pIP), &pProp));
 	CHKiRet(prop.Destruct(&pProp));
 	CHKiRet(submitMsg2(pMsg));
+	STATSCOUNTER_INC(inst->data.ctrSubmit, inst->data.mutCtrSubmit);
 
 finalize_it:
 
@@ -155,6 +226,15 @@ createInstance(instanceConf_t **pinst)
 	inst->next = NULL;
 
 	inst->pszBindPort = NULL;
+	inst->bEnableTLS = 0;
+	inst->bEnableTLSZip = 0;
+	inst->dhBits = 0;
+	inst->pristring = NULL;
+	inst->authmode = NULL;
+	inst->permittedPeers.nmemb = 0;
+	inst->caCertFile = NULL;
+	inst->myCertFile = NULL;
+	inst->myPrivKeyFile = NULL;
 
 	/* node created, let's add to config */
 	if(loadModConf->tail == NULL) {
@@ -179,7 +259,7 @@ std_checkRuleset_genErrMsg(modConfData_t *modConf, __attribute__((unused)) insta
 }
 
 
-/* This function is called when a new listener instace shall be added to 
+/* This function is called when a new listener instance shall be added to 
  * the current config object via the legacy config system. It just shuffles
  * all parameters to the listener in-memory instance.
  * rgerhards, 2011-05-04
@@ -204,19 +284,79 @@ finalize_it:
 static rsRetVal
 addListner(modConfData_t __attribute__((unused)) *modConf, instanceConf_t *inst)
 {
+	relpSrv_t *pSrv;
+	int relpRet;
+	uchar statname[64];
+	int i;
 	DEFiRet;
 	if(pRelpEngine == NULL) {
 		CHKiRet(relpEngineConstruct(&pRelpEngine));
 		CHKiRet(relpEngineSetDbgprint(pRelpEngine, dbgprintf));
 		CHKiRet(relpEngineSetFamily(pRelpEngine, glbl.GetDefPFFamily()));
 		CHKiRet(relpEngineSetEnableCmd(pRelpEngine, (uchar*) "syslog", eRelpCmdState_Required));
-		CHKiRet(relpEngineSetSyslogRcv(pRelpEngine, onSyslogRcv));
+		CHKiRet(relpEngineSetSyslogRcv2(pRelpEngine, onSyslogRcv));
+		CHKiRet(relpEngineSetOnErr(pRelpEngine, onErr));
+		CHKiRet(relpEngineSetOnGenericErr(pRelpEngine, onGenericErr));
+		CHKiRet(relpEngineSetOnAuthErr(pRelpEngine, onAuthErr));
 		if (!glbl.GetDisableDNS()) {
 			CHKiRet(relpEngineSetDnsLookupMode(pRelpEngine, 1));
 		}
 	}
 
-	CHKiRet(relpEngineAddListner(pRelpEngine, inst->pszBindPort));
+	CHKiRet(relpEngineListnerConstruct(pRelpEngine, &pSrv));
+	CHKiRet(relpSrvSetLstnPort(pSrv, inst->pszBindPort));
+	/* support statistics gathering */
+	CHKiRet(statsobj.Construct(&(inst->data.stats)));
+	snprintf((char*)statname, sizeof(statname), "imrelp(%s)",
+		inst->pszBindPort);
+	statname[sizeof(statname)-1] = '\0'; /* just to be on the save side... */
+	CHKiRet(statsobj.SetName(inst->data.stats, statname));
+	STATSCOUNTER_INIT(inst->data.ctrSubmit, inst->data.mutCtrSubmit);
+	CHKiRet(statsobj.AddCounter(inst->data.stats, UCHAR_CONSTANT("submitted"),
+		ctrType_IntCtr, CTR_FLAG_RESETTABLE, &(inst->data.ctrSubmit)));
+	CHKiRet(statsobj.ConstructFinalize(inst->data.stats));
+	/* end stats counters */
+	relpSrvSetUsrPtr(pSrv, inst);
+	if(inst->bEnableTLS) {
+		relpRet = relpSrvEnableTLS(pSrv);
+		if(relpRet == RELP_RET_ERR_NO_TLS) {
+			errmsg.LogError(0, RS_RET_RELP_NO_TLS,
+					"imrelp: could not activate relp TLS, librelp "
+					"does not support it!");
+			ABORT_FINALIZE(RS_RET_RELP_NO_TLS);
+		} else if(relpRet != RELP_RET_OK) {
+			errmsg.LogError(0, RS_RET_RELP_ERR,
+					"imrelp: could not activate relp TLS, code %d", relpRet);
+			ABORT_FINALIZE(RS_RET_RELP_ERR);
+		}
+		if(inst->bEnableTLSZip) {
+			relpSrvEnableTLSZip(pSrv);
+		}
+		if(inst->dhBits) {
+			relpSrvSetDHBits(pSrv, inst->dhBits);
+		}
+		relpSrvSetGnuTLSPriString(pSrv, (char*)inst->pristring);
+		if(relpSrvSetAuthMode(pSrv, (char*)inst->authmode) != RELP_RET_OK) {
+			errmsg.LogError(0, RS_RET_RELP_ERR,
+					"imrelp: invalid auth mode '%s'", inst->authmode);
+			ABORT_FINALIZE(RS_RET_RELP_ERR);
+		}
+		if(relpSrvSetCACert(pSrv, (char*) inst->caCertFile) != RELP_RET_OK)
+			ABORT_FINALIZE(RS_RET_RELP_ERR);
+		if(relpSrvSetOwnCert(pSrv, (char*) inst->myCertFile) != RELP_RET_OK)
+			ABORT_FINALIZE(RS_RET_RELP_ERR);
+		if(relpSrvSetPrivKey(pSrv, (char*) inst->myPrivKeyFile) != RELP_RET_OK)
+			ABORT_FINALIZE(RS_RET_RELP_ERR);
+		for(i = 0 ; i <  inst->permittedPeers.nmemb ; ++i) {
+			relpSrvAddPermittedPeer(pSrv, (char*)inst->permittedPeers.name[i]);
+		}
+	}
+	relpRet = relpEngineListnerConstructFinalize(pRelpEngine, pSrv);
+	if(relpRet != RELP_RET_OK) {
+		errmsg.LogError(0, RS_RET_RELP_ERR,
+				"imrelp: could not activate relp listner, code %d", relpRet);
+		ABORT_FINALIZE(RS_RET_RELP_ERR);
+	}
 
 finalize_it:
 	RETiRet;
@@ -226,7 +366,7 @@ finalize_it:
 BEGINnewInpInst
 	struct cnfparamvals *pvals;
 	instanceConf_t *inst;
-	int i;
+	int i,j;
 CODESTARTnewInpInst
 	DBGPRINTF("newInpInst (imrelp)\n");
 
@@ -249,6 +389,29 @@ CODESTARTnewInpInst
 			continue;
 		if(!strcmp(inppblk.descr[i].name, "port")) {
 			inst->pszBindPort = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
+		} else if(!strcmp(inppblk.descr[i].name, "tls")) {
+			inst->bEnableTLS = (unsigned) pvals[i].val.d.n;
+		} else if(!strcmp(inppblk.descr[i].name, "tls.dhbits")) {
+			inst->dhBits = (unsigned) pvals[i].val.d.n;
+		} else if(!strcmp(inppblk.descr[i].name, "tls.prioritystring")) {
+			inst->pristring = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
+		} else if(!strcmp(inppblk.descr[i].name, "tls.authmode")) {
+			inst->authmode = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
+		} else if(!strcmp(inppblk.descr[i].name, "tls.compression")) {
+			inst->bEnableTLSZip = (unsigned) pvals[i].val.d.n;
+		} else if(!strcmp(inppblk.descr[i].name, "tls.cacert")) {
+			inst->caCertFile = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
+		} else if(!strcmp(inppblk.descr[i].name, "tls.mycert")) {
+			inst->myCertFile = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
+		} else if(!strcmp(inppblk.descr[i].name, "tls.myprivkey")) {
+			inst->myPrivKeyFile = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
+		} else if(!strcmp(inppblk.descr[i].name, "tls.permittedpeer")) {
+			inst->permittedPeers.nmemb = pvals[i].val.d.ar->nmemb;
+			CHKmalloc(inst->permittedPeers.name =
+				malloc(sizeof(uchar*) * inst->permittedPeers.nmemb));
+			for(j = 0 ; j <  pvals[i].val.d.ar->nmemb ; ++j) {
+				inst->permittedPeers.name[j] = (uchar*)es_str2cstr(pvals[i].val.d.ar->arr[j], NULL);
+			}
 		} else {
 			dbgprintf("imrelp: program error, non-handled "
 			  "param '%s'\n", inppblk.descr[i].name);
@@ -264,19 +427,58 @@ BEGINbeginCnfLoad
 CODESTARTbeginCnfLoad
 	loadModConf = pModConf;
 	pModConf->pConf = pConf;
+	pModConf->pszBindRuleset = NULL;
+	pModConf->pBindRuleset = NULL;
 	/* init legacy config variables */
 	cs.pszBindRuleset = NULL;
 ENDbeginCnfLoad
 
 
+BEGINsetModCnf
+	struct cnfparamvals *pvals = NULL;
+	int i;
+CODESTARTsetModCnf
+	pvals = nvlstGetParams(lst, &modpblk, NULL);
+	if(pvals == NULL) {
+		errmsg.LogError(0, RS_RET_MISSING_CNFPARAMS, "error processing module "
+				"config parameters [module(...)]");
+		ABORT_FINALIZE(RS_RET_MISSING_CNFPARAMS);
+	}
+
+	if(Debug) {
+		dbgprintf("module (global) param blk for imrelp:\n");
+		cnfparamsPrint(&modpblk, pvals);
+	}
+
+	for(i = 0 ; i < modpblk.nParams ; ++i) {
+		if(!pvals[i].bUsed)
+			continue;
+		if(!strcmp(modpblk.descr[i].name, "ruleset")) {
+			loadModConf->pszBindRuleset = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
+		} else {
+			dbgprintf("imrelp: program error, non-handled "
+			  "param '%s' in beginCnfLoad\n", modpblk.descr[i].name);
+		}
+	}
+finalize_it:
+	if(pvals != NULL)
+		cnfparamvalsDestruct(pvals, &modpblk);
+ENDsetModCnf
+
 BEGINendCnfLoad
 CODESTARTendCnfLoad
-	if((cs.pszBindRuleset == NULL) || (cs.pszBindRuleset[0] == '\0')) {
-		loadModConf->pszBindRuleset = NULL;
+	if(loadModConf->pszBindRuleset == NULL) {
+		if((cs.pszBindRuleset == NULL) || (cs.pszBindRuleset[0] == '\0')) {
+			loadModConf->pszBindRuleset = NULL;
+		} else {
+			CHKmalloc(loadModConf->pszBindRuleset = ustrdup(cs.pszBindRuleset));
+		}
 	} else {
-		CHKmalloc(loadModConf->pszBindRuleset = ustrdup(cs.pszBindRuleset));
+		if((cs.pszBindRuleset != NULL) && (cs.pszBindRuleset[0] != '\0')) {
+			errmsg.LogError(0, RS_RET_DUP_PARAM, "imrelp: warning: ruleset "
+					"set via legacy directive ignored");
+		}
 	}
-	loadModConf->pBindRuleset = NULL;
 finalize_it:
 	free(cs.pszBindRuleset);
 	loadModConf = NULL; /* done loading */
@@ -293,6 +495,7 @@ CODESTARTcheckCnf
 	if(pModConf->pszBindRuleset == NULL) {
 		pModConf->pBindRuleset = NULL;
 	} else {
+		DBGPRINTF("imrelp: using ruleset '%s'\n", pModConf->pszBindRuleset);
 		localRet = ruleset.GetRuleset(pModConf->pConf, &pRuleset, pModConf->pszBindRuleset);
 		if(localRet == RS_RET_NOT_FOUND) {
 			std_checkRuleset_genErrMsg(pModConf, NULL);
@@ -323,13 +526,21 @@ ENDactivateCnf
 
 BEGINfreeCnf
 	instanceConf_t *inst, *del;
+	int i;
 CODESTARTfreeCnf
 	for(inst = pModConf->root ; inst != NULL ; ) {
 		free(inst->pszBindPort);
+		free(inst->pristring);
+		free(inst->authmode);
+		statsobj.Destruct(&(inst->data.stats));
+		for(i = 0 ; i <  inst->permittedPeers.nmemb ; ++i) {
+			free(inst->permittedPeers.name[i]);
+		}
 		del = inst;
 		inst = inst->next;
 		free(del);
 	}
+	free(pModConf->pszBindRuleset);
 ENDfreeCnf
 
 /* This is used to terminate the plugin. Note that the signal handler blocks
@@ -390,6 +601,7 @@ CODESTARTmodExit
 		prop.Destruct(&pInputName);
 
 	/* release objects we used */
+	objRelease(statsobj, CORE_COMPONENT);
 	objRelease(ruleset, CORE_COMPONENT);
 	objRelease(glbl, CORE_COMPONENT);
 	objRelease(prop, CORE_COMPONENT);
@@ -420,6 +632,7 @@ CODEqueryEtryPt_STD_IMOD_QUERIES
 CODEqueryEtryPt_STD_CONF2_QUERIES
 CODEqueryEtryPt_STD_CONF2_PREPRIVDROP_QUERIES
 CODEqueryEtryPt_STD_CONF2_IMOD_QUERIES
+CODEqueryEtryPt_STD_CONF2_setModCnf_QUERIES
 CODEqueryEtryPt_IsCompatibleWithFeature_IF_OMOD_QUERIES
 ENDqueryEtryPt
 
@@ -435,6 +648,7 @@ CODEmodInit_QueryRegCFSLineHdlr
 	CHKiRet(objUse(errmsg, CORE_COMPONENT));
 	CHKiRet(objUse(net, LM_NET_FILENAME));
 	CHKiRet(objUse(ruleset, CORE_COMPONENT));
+	CHKiRet(objUse(statsobj, CORE_COMPONENT));
 
 	/* register config file handlers */
 	CHKiRet(omsdRegCFSLineHdlr((uchar *)"inputrelpserverbindruleset", 0, eCmdHdlrGetWord,

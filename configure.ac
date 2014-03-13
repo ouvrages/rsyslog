@@ -2,8 +2,8 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[7.4.8],[rsyslog@lists.adiscon.com])
-AM_INIT_AUTOMAKE
+AC_INIT([rsyslog],[7.6.1],[rsyslog@lists.adiscon.com])
+AM_INIT_AUTOMAKE([subdir-objects])
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
@@ -33,9 +33,14 @@ PKG_PROG_PKG_CONFIG
 
 # modules we require
 PKG_CHECK_MODULES(LIBESTR, libestr >= 0.1.9)
+PKG_CHECK_MODULES(LIBLOGGING_STDLOG, liblogging-stdlog >= 1.0.1)
 PKG_CHECK_MODULES([JSON_C], [json],, [
 	PKG_CHECK_MODULES([JSON_C], [json-c])
 ])
+
+# if int64 is supported, use it
+AC_CHECK_LIB(json-c, json_object_new_object,,)
+AC_CHECK_FUNCS(json_object_new_int64,,)
 
 case "${host}" in
   *-*-linux*)
@@ -121,7 +126,7 @@ AC_TYPE_SIGNAL
 AC_FUNC_STAT
 AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS([flock basename alarm clock_gettime gethostbyname gethostname gettimeofday localtime_r memset mkdir regcomp select setsid socket strcasecmp strchr strdup strerror strndup strnlen strrchr strstr strtol strtoul uname ttyname_r getline malloc_trim prctl epoll_create epoll_create1 fdatasync syscall lseek64])
+AC_CHECK_FUNCS([flock recvmmsg basename alarm clock_gettime gethostbyname gethostname gettimeofday localtime_r memset mkdir regcomp select setsid socket strcasecmp strchr strdup strerror strndup strnlen strrchr strstr strtol strtoul uname ttyname_r getline malloc_trim prctl epoll_create epoll_create1 fdatasync syscall lseek64])
 
 # getifaddrs is in libc (mostly) or in libsocket (eg Solaris 11) or not defined (eg Solaris 10)
 AC_SEARCH_LIBS([getifaddrs], [socket], [AC_DEFINE(HAVE_GETIFADDRS, [1], [set define])])
@@ -152,6 +157,14 @@ AC_TRY_COMPILE([
 	AC_DEFINE(MAXHOSTNAMELEN, 1024, [Define with a value if your <sys/param.h> does not define MAXHOSTNAMELEN])
 	AC_MSG_RESULT(no; defined as 64)
 )
+
+# Check for __builtin_expect()
+AC_MSG_CHECKING([for __builtin_expect()])
+AC_LINK_IFELSE([AC_LANG_PROGRAM(, return __builtin_expect(main != 0, 1))],
+               [AC_DEFINE(HAVE_BUILTIN_EXPECT, 1,
+                          Define to 1 if compiler supports __builtin_expect)
+                AC_MSG_RESULT([yes])],
+               [AC_MSG_RESULT([no])])
 
 # check for availability of atomic operations
 RS_ATOMIC_OPERATIONS
@@ -964,6 +977,89 @@ AC_ARG_ENABLE(mmanon,
 AM_CONDITIONAL(ENABLE_MMANON, test x$enable_mmanon = xyes)
 
 
+# mmutf8fix
+AC_ARG_ENABLE(mmutf8fix,
+        [AS_HELP_STRING([--enable-mmutf8fix],[Enable building mmutf8fix support @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_mmutf8fix="yes" ;;
+          no) enable_mmutf8fix="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-mmutf8fix) ;;
+         esac],
+        [enable_mmutf8fix=no]
+)
+AM_CONDITIONAL(ENABLE_MMUTF8FIX, test x$enable_mmutf8fix = xyes)
+
+
+# mmcount
+AC_ARG_ENABLE(mmcount,
+        [AS_HELP_STRING([--enable-mmcount],[Enable message counting @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_mmcount="yes" ;;
+          no) enable_mmcount="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-mmcount) ;;
+         esac],
+        [enable_mmcount=no]
+)
+AM_CONDITIONAL(ENABLE_MMCOUNT, test x$enable_mmcount = xyes)
+
+
+# mmsequence
+AC_ARG_ENABLE(mmsequence,
+        [AS_HELP_STRING([--enable-mmsequence],[Enable sequence generator @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_mmsequence="yes" ;;
+          no) enable_mmsequence="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-mmsequence) ;;
+         esac],
+        [enable_mmsequence=no]
+)
+AM_CONDITIONAL(ENABLE_MMSEQUENCE, test x$enable_mmsequence = xyes)
+
+
+# mmfields
+AC_ARG_ENABLE(mmfields,
+        [AS_HELP_STRING([--enable-mmfields],[Enable building mmfields support @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_mmfields="yes" ;;
+          no) enable_mmfields="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-mmfields) ;;
+         esac],
+        [enable_mmfields=no]
+)
+AM_CONDITIONAL(ENABLE_MMFIELDS, test x$enable_mmfields = xyes)
+
+# mmpstrucdata
+AC_ARG_ENABLE(mmpstrucdata,
+        [AS_HELP_STRING([--enable-mmpstrucdata],[Enable building mmpstrucdata support @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_mmpstrucdata="yes" ;;
+          no) enable_mmpstrucdata="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-mmpstrucdata) ;;
+         esac],
+        [enable_mmpstrucdata=no]
+)
+AM_CONDITIONAL(ENABLE_MMPSTRUCDATA, test x$enable_mmpstrucdata = xyes)
+
+
+# mmrfc5424addhmac
+AC_ARG_ENABLE(mmrfc5424addhmac,
+        [AS_HELP_STRING([--enable-mmrfc5424addhmac],[Enable building mmrfc5424addhmac support @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_mmrfc5424addhmac="yes" ;;
+          no) enable_mmrfc5424addhmac="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-mmrfc5424addhmac) ;;
+         esac],
+        [enable_mmrfc5424addhmac=no]
+)
+if test "x$enable_mmrfc5424addhmac" = "xyes"; then
+	PKG_CHECK_MODULES(OPENSSL, openssl >= 0.9.7)
+#AC_CHECK_LIB([crypto],[CRYPTO_new_ex_data], [], [AC_MSG_ERROR([OpenSSL libraries required])])
+#AC_CHECK_LIB([ssl],[SSL_library_init], [], [AC_MSG_ERROR([OpenSSL libraries required])])
+#AC_CHECK_HEADERS([openssl/crypto.h openssl/x509.h openssl/pem.h openssl/ssl.h openssl/err.h],[],[AC_MSG_ERROR([OpenSSL headers required])])
+fi
+AM_CONDITIONAL(ENABLE_MMRFC5424ADDHMAC, test x$enable_mmrfc5424addhmac = xyes)
+
+
 # RELP support
 AC_ARG_ENABLE(relp,
         [AS_HELP_STRING([--enable-relp],[Enable RELP support @<:@default=no@:>@])],
@@ -975,7 +1071,7 @@ AC_ARG_ENABLE(relp,
         [enable_relp=no]
 )
 if test "x$enable_relp" = "xyes"; then
-	PKG_CHECK_MODULES(RELP, relp >= 1.0.3)
+	PKG_CHECK_MODULES(RELP, relp >= 1.2.3)
 fi
 AM_CONDITIONAL(ENABLE_RELP, test x$enable_relp = xyes)
 
@@ -1031,7 +1127,7 @@ AC_ARG_ENABLE(rfc3195,
         [enable_rfc3195=no]
 )
 if test "x$enable_rfc3195" = "xyes"; then
-	PKG_CHECK_MODULES(LIBLOGGING, liblogging >= 0.7.1)
+	PKG_CHECK_MODULES(LIBLOGGING, liblogging-rfc3195 >= 1.0.1)
 fi
 AM_CONDITIONAL(ENABLE_RFC3195, test x$enable_rfc3195 = xyes)
 
@@ -1480,6 +1576,12 @@ AC_CONFIG_FILES([Makefile \
 		plugins/mmjsonparse/Makefile \
 		plugins/mmaudit/Makefile \
 		plugins/mmanon/Makefile \
+		plugins/mmutf8fix/Makefile \
+		plugins/mmcount/Makefile \
+		plugins/mmsequence/Makefile \
+		plugins/mmfields/Makefile \
+		plugins/mmpstrucdata/Makefile \
+		plugins/mmrfc5424addhmac/Makefile \
 		plugins/omelasticsearch/Makefile \
 		plugins/sm_cust_bindcdr/Makefile \
 		plugins/mmsnmptrapd/Makefile \
@@ -1503,6 +1605,8 @@ echo "    uuid support enabled:                     $enable_uuid"
 echo "    Log file signing support:                 $enable_guardtime"
 echo "    Log file encryption support:              $enable_libgcrypt"
 echo "    anonymization support enabled:            $enable_mmanon"
+echo "    message counting support enabled:         $enable_mmcount"
+echo "    mmfields enabled:                         $enable_mmfields"
 echo
 echo "---{ input plugins }---"
 echo "    Klog functionality enabled:               $enable_klog ($os_type)"
@@ -1541,6 +1645,10 @@ echo "    mmnormalize module will be compiled:      $enable_mmnormalize"
 echo "    mmjsonparse module will be compiled:      $enable_mmjsonparse"
 echo "    mmjaduit module will be compiled:         $enable_mmaudit"
 echo "    mmsnmptrapd module will be compiled:      $enable_mmsnmptrapd"
+echo "    mmutf8fix enabled:                        $enable_mmutf8fix"
+echo "    mmrfc5424addhmac enabled:                 $enable_mmrfc5424addhmac"
+echo "    mmpstrucdata enabled:                     $enable_mmpstrucdata"
+echo "    mmsequence enabled:                       $enable_mmsequence"
 echo
 echo "---{ strgen modules }---"
 echo "    sm_cust_bindcdr module will be compiled:  $enable_sm_cust_bindcdr"

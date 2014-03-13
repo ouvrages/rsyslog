@@ -1,4 +1,353 @@
 ---------------------------------------------------------------------------
+Version 7.6.1 [v7.6-stable] 2014-03-13
+- added "action.reportSuspension" action parameter
+  This now permits to control handling on a per-action basis rather to
+  the previous "global setting only".
+- "action resumed" message now also specifies module type
+  which makes troubleshooting a bit easier. Note that we cannot output all
+  the config details (like destination etc) as this would require much more
+  elaborate code changes, which we at least do not like to do in the
+  stable version.
+- better and more consistent action naming, action queues now always 
+  contain the word "queue" after the action name
+- add support for "tls-less" librelp
+  we now require librelp 1.2.3, as we need the new error code definition
+  See also: https://github.com/rsyslog/librelp/issues/1
+- build system improvements
+  * autoconf subdir option
+  * support for newer json-c packages
+  Thanks to Michael Biebl for the patches.
+- imjournal enhancements:
+  * log entries with empty message field are no longer ignored
+  * invalid facility and severity values are replaced by defaults
+  * new config parameters to set default facility and severity
+  Thanks to Tomas Heinrich for implementing this
+- bugfix: ompipe did resume itself even when it was still in error
+  See: https://github.com/rsyslog/rsyslog/issues/35
+  Thanks to github user schplat for reporting
+- bugfix: "action xxx suspended" did report incorrect error code
+- bugfix: ommongodb's template parameter was mandatory but should have
+  been optional
+  Thanks to Alain for the analysis and the patch.
+- bugfix: only partial doc was put into distribution tarball
+  Thanks to Michael Biebl for alerting us.
+  see also: https://github.com/rsyslog/rsyslog/issues/31
+- bugfix: async ruleset did process already-deleted messages
+  Thanks to John Novotny for the patch.
+---------------------------------------------------------------------------
+Version 7.6.0 [v7.6-stable] 2014-02-12
+This starts a new stable branch based on 7.5.8 plus the following changes:
+- bugfix: imuxsock input parameters were not accepted
+  due to copy&paste error. Thanks to Andy Goldstein for the fix.
+- added ProcessInternalMessages global system parameter
+  This permits to inject rsyslog status messages into *another* main
+  syslogd or the journal.
+- new dependency: liblogging-stdlog (for submitting to external logger)
+- bugfix: json templates are improperly created
+  Strings miss the terminating NUL character, which obviously can lead
+  to all sorts of problems.
+  See also: https://github.com/rsyslog/rsyslog/issues/27
+  Thanks to Alain for the analysis and the patch.
+- ompgsql bugfix: improper handling of auto-backgrounding mode 
+  If rsyslog was set to auto-background itself (default code behaviour, but
+  many distros now turn it off for good reason), ompgsql could not
+  properly connect. This could even lead to a segfault. The core reason
+  was that a PG session handle was kept open over a fork, something that
+  is explicitely forbidden in the PG API.
+  Thanks to Alain for the analysis and the patch.
+---------------------------------------------------------------------------
+Version 7.5.8 [v7-release candidate] 2014-01-09
+- add exec_template() RainerScript function
+- add debug.onShutdown and debug.logFile global paramters
+  These enebale the new "debug on shutdown" mode, which can be used to
+  track hard to find problems that occur during system shutdown.
+- Add directives for numerically specifying GIDs/UIDs
+  The already present directives (FileOwner, FileGroup, DirOwner,
+  DirGroup) translate names to numerical IDs, which depends on the user
+  information being available during rsyslog's startup. This can fail if
+  the information is obtained over a network or from a service such as
+  SSSD. The new directives provide a way to specify the numerical IDs
+  directly and bypass the lookup.
+  Thanks to Tomas Heinrich for the patch.
+- actions now report if they suspend and resume themselves
+  this is by default on and controllable by the action.reportSuspension
+  global parameter
+- bugfix: omelasticsearch fail.es stats counter was improperly maintained
+- bugfix: mmrfc5424addhmac: "key" parameter was not properly processed
+- add new impstats action counters:
+  * suspended
+  * suspended.duration
+  * resumed
+---------------------------------------------------------------------------
+Version 7.5.7 [v7-devel] 2013-11-25
+- queue defaults have changed
+  * high water mark is now dynamically 90% of queue size
+  * low water makr is now dynamically 70% of queue size
+  * queue.discardMark is now dynamically 98% of queue size
+  * queue.workerThreadMinimumMessage set to queue.size / num workers
+  For queues with very low queue.maxSize (< 100), "emergency" defaults
+  will be used.
+- worker thread pool handling has been improved
+  Among others, permits pool to actually shrink (was quite hard with
+  previous implementation. This will also improve performance and/or
+  lower system overhead on busy systems.
+  Thanks to Pavel Levshin for the enhancement.
+- bugfix: mmpstrucdata generated inaccessible properties
+- bugfix: RainerScript optimizer did not optimize PRI filters
+  things like "if $syslogfacility-text == "local3"" were not converted
+  to PRIFILT. This was a regression introduced in 7.5.6.
+- bugfix: legacy directive $ActionQueueWorkerThreads was not honored
+- bugfix: segfault on startup when certain script constructs are used
+  e.g. "if not $msg ..."
+- bugfix: ommysql lost configfile/section parameters after first close
+  This means that when a connection was broken, it was probably
+  re-instantiated with different parameters than configured.
+- bugfix: regression in template processing with subtrees in templates
+  Thanks to Pavel Levshin for the fix
+- bugfix: regular worker threads are not properly (re)started if DA
+  mode is active.
+  This occurs only under rare conditions, but definitely is a bug that
+  needed to be addressed. It probably is present since version 4.
+  Note that this patch has not been applied to v7.4-stable, as it
+  is very unlikely to happen and the fix itself has some regression
+  potential (the fix looks very solid, but it addresses a core component).
+  Thanks to Pavel Levshin for the fix
+- now emit warning message if om with msg passing mode uses action queue
+  These can modify the message, and this causes races.
+- bugfix: $SystemLogUseSysTimeStamp/$SystemLogUsePIDFromSystem did not work
+  Thanks to Tomas Heinrich for the patch.
+---------------------------------------------------------------------------
+Version 7.5.6 [devel] 2013-10-29
+- impstats: add capability to bind to a ruleset
+- improved performance of RainerScript variable access
+  by refactoring the whole body of variable handling code. This also
+  solves some of the anomalies experienced in some versions of rsyslog.
+  All variable types are now handled in unified code, including
+  access via templates.
+- RainerScript: make use of 64 bit for numbers where available
+  Thanks to Pavel Levshin for enhancement.
+- slight performance optimization if GCC is used
+  We give branch prediction hints for the frequent RETiRet macro which is
+  used for error handling. Some slight performance gain is to be expected
+  from that.
+- removed global variable support
+  The original idea was not well thought out and global variables, as
+  implemented, worked far different from what anybody would expect. As
+  such, we consider the current approach as an experiment that did not
+  work out and opt to removing it, clearing the way for a better future
+  solution. Note: global vars were introduced in 7.5.3 on Sept, 11th 2013.
+- new module mmsequence, primarily used for action load balancing
+  Thanks to Pavel Levshin for contributing this module.
+- bugfix: unset statement always worked on message var, even if local
+  var was given
+- imudp: support for binding to ruleset added
+- bugfix: segfault if variable was assigned to non-container subtree
+  Thanks to Pavel Levshin for the fix
+- bugfix: imuxsock did not suport addtl sockets if syssock was disabled
+  Thanks to Pavel Levshin for the fix
+- bugfix: running imupd on multiple threads lead to segfault if recvmmsg
+  is available
+- bugfix: imudp when using recvmmsg could report wrong sender IP
+- bugfix: segfault if re_extract() function was used and no match found
+- bugfix: omelasticsearch did not compile on platforms without atomic
+  instructions
+- bugfix: potential misadressing on startup if property-filter was used
+  This could happen if the property name was longer than 127 chars, a case
+  that would not happen in practice.
+- bugfix: invalid property filter was not properly disabled in ruleset
+  Note: the cosmetic memory leak introduced with that patch in 7.4.5 is
+  now also fixed.
+- imported bugfixes from 7.4.6 stable release
+---------------------------------------------------------------------------
+Version 7.5.5 [devel] 2013-10-16
+- imfile: permit to monitor an unlimited number of files
+- imptcp: add "defaultTZ" input parameter
+- imudp: support for multiple receiver threads added
+- imudp: add "dfltTZ" input config parameter
+- bugfix: memory leak in mmnormalize
+- bugfix: mmutf8fix did not properly handle invalid UTF-8 at END of message
+  if the very last character sequence was too long, this was not detected
+  Thanks to Risto Vaarandi for reporting this problem.
+- mmanon: removed the check for specific "terminator characters" after 
+  last octet. As it turned out, this didn't work in practice as there
+  was an enormous set of potential terminator chars -- so removing
+  them was the best thing to do. Note that this may change behaviour of
+  existing installations. Yet, we still consider this an important
+  bugfix, that should be applied to the stable branch.
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=477
+  Thanks to Muri Cicanor for initiating the discussion
+- now requires libestr 0.1.7 as early versions had a nasty bug in
+  string comparisons
+- bugfix: mmanon did not detect all IP addresses in rewrite mode
+  The problem occured if two IPs were close to each other and the first one
+  was shrunk.
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=485
+  Thanks to micah-at-riseup.net for reporting this bug
+- bugfix: mmanon sometimes used invalid replacement char in simple mode
+  depending on configuration sequence, the replacement character was set
+  to 's' instead of the correct value. Most importantly, it was set to
+  's' if simple mode was selected and no replacement char set.
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=484
+  Thanks to micah-at-riseup.net for reporting this bug
+- bugfix: memory leak in mmnormalize
+- bugfix: array-based ==/!= comparisions lead to invalid results
+  This was a regression introduced in 7.3.5 bei the PRI optimizer
+---------------------------------------------------------------------------
+Version 7.5.4 [devel] 2013-10-07
+- mmpstrucdata: new module to parse RFC5424 structured data into json
+  message properties
+- change main/ruleset queue defaults to be more enterprise-like
+  new defaults are queue.size 100,000 max workers 2, worker
+  activation after 40,000 msgs are queued, batch size 256. These settings
+  are much more useful for enterprises and will not hurt low-end systems
+  that much. This is part of our re-focus on enterprise needs.
+- omfwd: new action parameter "maxErrorMessages" added
+- omfile: new module parameters to set action defaults added
+  * dirCreateMode
+  * fileCreateMode
+- mmutf8fix: new module to fix invalid UTF-8 sequences
+- imuxsock: handle unlimited number of additional listen sockets
+- doc: improve usability by linking to relevant web ressources
+  The idea is to enable users to quickly find additional information,
+  samples, HOWTOs and the like on the main site.
+  At the same time, (very) slightly remove memory footprint when
+  few listeners are monitored.
+- bugfix: omfwd parameter streamdrivermmode was not properly handled
+  it was always overwritten by whatever value was set via the 
+  legacy directive $ActionSendStreamDriverMode
+- imtcp: add streamdriver.name module parameter
+  permits overriding the system default stream driver (gtls, ptcp)
+- bugfix: build system: libgcrypt.h needed even if libgrcypt was disabled
+  Thanks to Jonny Törnbom for reporting this problem
+- imported bugfixes from 7.4.4
+---------------------------------------------------------------------------
+Version 7.5.3 [devel] 2013-09-11
+- imfile: support for escaping LF characters added
+  embedded LF in syslog messages cause a lot of trouble. imfile now has
+  the capability to escape them to "#012" (just like the regular control
+  character escape option). This requires new-style input statements to be
+  used. If legacy configuration statements are used, LF escaping is always
+  turned off to preserve compatibility.
+  NOTE: if input() statements were already used, there is a CHANGE OF
+        BEHAVIOUR: starting with this version, escaping is enabled by
+	default. So if you do not want it, you need to add
+	escapeLF="off"
+	to the input statement. Given the trouble LFs cause and the fact
+	that the majority of installations still use legacy config, we
+	considered this behaviour change acceptable and useful.
+  see also: http://blog.gerhards.net/2013/09/imfile-multi-line-messages.html
+- add support for global and local variables
+- bugfix: queue file size was not correctly processed
+  this could lead to using one queue file per message for sizes >2GiB
+  Thanks to Tomas Heinrich for the patch.
+- add main_queue() configuration object to configure main message queue
+- bugfix: stream compression in imptcp caused timestamp to be corrupted
+- imudp: add ability to specify SO_RCVBUF size (rcvbufSize parameter)
+- imudp: use inputname for statistics, if configured
+- impstats: add process resource usage counters [via getrusage()]
+- impstats: add paramter "resetCounters" to report delta values
+  possible for most, but not all, counters. See doc for details.
+- librelp 1.2.0 is now required
+- make use of new librelp generic error reporting facility
+  This leads to more error messages being passed to the user and
+  thus simplified troubleshooting.
+- bugfix: very small memory leak in imrelp
+  more or less cosmetic, a single memory block was not freed, but this
+  only happens immediately before termination (when the OS automatically
+  frees all memory). Still an annoyance e.g. in valgrind.
+- fix compile problem in debug build
+- imported fixes from 7.4.4
+---------------------------------------------------------------------------
+Version 7.5.2 [devel] 2013-07-04
+- librelp 1.1.4 is now required
+  We use API extensions for better error reporting and higher performance.
+- omrelp: use transactional mode to make imrelp emit bulk sends
+- omrelp: add "windowSize" parameter to set custom RELP window size
+- bugfix: double-free in omelasticsearch
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=461
+  a security advisory for this bug is available at:
+     http://www.lsexperts.de/advisories/lse-2013-07-03.txt
+  CVE: CVE-2013-4758 
+  PLEASE NOTE: This issue only existed if omelasticsearch was used
+  in a non-default configuration, where the "errorfile" parameter
+  was specified. Without that parameter set, the bug could not
+  be triggered.
+  Thanks to Markus Vervier and Marius Ionescu for providing a detailled
+  bug report. Special thanks to Markus for coordinating his security
+  advisory with us.
+- doc: fixed various typos
+  closes: http://bugzilla.adiscon.com/show_bug.cgi?id=391
+  Thanks to Georgi Georgiev for the patch.
+---------------------------------------------------------------------------
+Version 7.5.1 [devel] 2013-06-26
+- librelp 1.1.3 is required - older versions can lead to a segfault
+- add mmfields, which among others supports easy parsing of CEF messages
+- omrelp:
+  * new parameter "compression.prioritystring" to control encryption
+    parameters used by GnuTLS
+- imrelp:
+  * new parameter "compression.dhbits" to control the number of
+    bits being used for Diffie-Hellman key generation
+  * new parameter "compression.prioritystring" to control encryption
+    parameters used by GnuTLS
+  * support for impstats added
+  * support for setting permitted peers (client authentication) added
+  * bugfix: potential segfault at startup on invalid config parameters
+- imjournal: imported patches from 7.4.1
+- omprog: add support for command line parameters
+- added experimental TCP stream compression (imptcp only, currently)
+- added BSD-specific syslog facilities
+  * "console"
+  * "bsd_security" - this is called "security" under BSD, but that name
+    was unfortunately already taken by some standard facility. So I 
+    did the (hopefully) second-best thing and renamed it a little.
+- imported fixes from 7.4.2 (especially build problems on FreeBSD)
+- bugfix: imptcp did not properly initialize compression status variable
+  could lead to segfault if stream:always compression mode was selected
+---------------------------------------------------------------------------
+Version 7.5.0 [devel] 2013-06-11
+- imrelp: implement "ruleset" module parameter
+- imrelp/omrelp: add TLS & compression (zip) support
+- omrelp: add "rebindInterval" parameter
+- add -S command line option to specify IP address to use for RELP client
+  connections
+  Thanks to Axel Rau for the patch.
+---------------------------------------------------------------------------
+Version 7.4.11  [v7.4-stable] *never released*
+- imjournal enhancements:
+  * log entries with empty message field are no longer ignored
+  * invalid facility and severity values are replaced by defaults
+  * new config parameters to set default facility and severity
+  Thanks to Tomas Heinrich for implementing this
+---------------------------------------------------------------------------
+Version 7.4.10  [v7.4-stable] 2014-02-12
+- bugfix: json templates are improperly created
+  Strings miss the terminating NUL character, which obviously can lead
+  to all sorts of problems.
+  See also: https://github.com/rsyslog/rsyslog/issues/27
+  Thanks to Alain for the analysis and the patch.
+- ompgsql bugfix: improper handling of auto-backgrounding mode 
+  If rsyslog was set to auto-background itself (default code behaviour, but
+  many distros now turn it off for good reason), ompgsql could not
+  properly connect. This could even lead to a segfault. The core reason
+  was that a PG session handle was kept open over a fork, something that
+  is explicitely forbidden in the PG API.
+  Thanks to Alain for the analysis and the patch.
+---------------------------------------------------------------------------
+Version 7.4.9  [v7.4-stable] 2014-01-22
+- added ProcessInternalMessages global system parameter
+  This permits to inject rsyslog status messages into *another* main
+  syslogd or the journal.
+- new dependency: liblogging-stdlog (for submitting to external logger)
+- bugfix: imuxsock input parameters were not accepted
+  due to copy&paste error. Thanks to Andy Goldstein for the fix.
+- bugfix: potential double-free in RainerScript equal comparison
+  happens if the left-hand operand is JSON object and the right-hand
+  operand is a non-string that does not convert to a number (for
+  example, it can be another JSON object, probably the only case that
+  could happen in practice). This is very unlikely to be triggered.
+- bugfix: some RainerScript Json(Variable)/string comparisons were wrong
+---------------------------------------------------------------------------
 Version 7.4.8  [v7.4-stable] 2014-01-08
 - rsgtutil provides better error messages on unfinished signature blocks
 - bugfix: guard against control characters in internal (error) messages

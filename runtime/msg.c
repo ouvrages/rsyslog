@@ -65,6 +65,13 @@
 #include "net.h"
 #include "var.h"
 #include "rsconf.h"
+#include "parserif.h"
+
+/* TODO: move the global variable root to the config object - had no time to to it
+ * right now before vacation -- rgerhards, 2013-07-22
+ */
+static pthread_rwlock_t glblVars_rwlock;
+struct json_object *global_var_root = NULL;
 
 /* static data */
 DEFobjStaticHelpers
@@ -316,8 +323,8 @@ static pthread_mutex_t mutTrimCtr;	 /* mutex to handle malloc trim */
 #endif
 
 /* some forward declarations */
-static int getAPPNAMELen(msg_t *pM, sbool bLockMutex);
-static rsRetVal jsonPathFindParent(msg_t *pM, uchar *name, uchar *leaf, struct json_object **parent, int bCreate);
+static int getAPPNAMELen(msg_t * const pM, sbool bLockMutex);
+static rsRetVal jsonPathFindParent(struct json_object *jroot, uchar *name, uchar *leaf, struct json_object **parent, int bCreate);
 static uchar * jsonPathGetLeaf(uchar *name, int lenName);
 static struct json_object *jsonDeepCopy(struct json_object *src);
 
@@ -372,23 +379,16 @@ void MsgSetRcvFromWithoutAddRef(msg_t *pThis, prop_t *new)
  * If ruleset cannot be found, no update is done.
  */
 static void
-MsgSetRulesetByName(msg_t *pMsg, cstr_t *rulesetName)
+MsgSetRulesetByName(msg_t * const pMsg, cstr_t *rulesetName)
 {
 	rulesetGetRuleset(runConf, &(pMsg->pRuleset), rsCStrGetSzStrNoNULL(rulesetName));
 }
-
-
-static inline int getProtocolVersion(msg_t *pM)
-{
-	return(pM->iProtocolVersion);
-}
-
 
 /* do a DNS reverse resolution, if not already done, reflect status
  * rgerhards, 2009-11-16
  */
 static inline rsRetVal
-resolveDNS(msg_t *pMsg) {
+resolveDNS(msg_t * const pMsg) {
 	rsRetVal localRet;
 	prop_t *propFromHost = NULL;
 	prop_t *ip;
@@ -419,7 +419,7 @@ finalize_it:
 
 
 static inline void
-getInputName(msg_t *pM, uchar **ppsz, int *plen)
+getInputName(msg_t * const pM, uchar **ppsz, int *plen)
 {
 	BEGINfunc
 	if(pM == NULL || pM->pInputName == NULL) {
@@ -433,7 +433,7 @@ getInputName(msg_t *pM, uchar **ppsz, int *plen)
 
 
 static inline uchar*
-getRcvFromIP(msg_t *pM)
+getRcvFromIP(msg_t * const pM)
 {
 	uchar *psz;
 	int len;
@@ -452,13 +452,11 @@ getRcvFromIP(msg_t *pM)
 }
 
 
-/* map a property name (C string) to a property ID */
+/* map a property name (string) to a property ID */
 rsRetVal
-propNameStrToID(uchar *pName, propid_t *pPropID)
+propNameToID(uchar *pName, propid_t *pPropID)
 {
 	DEFiRet;
-
-	assert(pName != NULL);
 
 	/* sometimes there are aliases to the original MonitoWare
 	 * property names. These come after || in the ifs below. */
@@ -534,32 +532,22 @@ propNameStrToID(uchar *pName, propid_t *pPropID)
 		*pPropID = PROP_SYS_MYHOSTNAME;
 	} else if(!strcmp((char*) pName, "$!all-json")) {
 		*pPropID = PROP_CEE_ALL_JSON;
-	} else if(!strncmp((char*) pName, "$!", 2)) {
-		*pPropID = PROP_CEE;
 	} else if(!strcmp((char*) pName, "$bom")) {
 		*pPropID = PROP_SYS_BOM;
 	} else if(!strcmp((char*) pName, "$uptime")) {
 		*pPropID = PROP_SYS_UPTIME;
+	} else if(!strncmp((char*) pName, "$!", 2) || pName[0] == '!') {
+		*pPropID = PROP_CEE;
+	} else if(!strncmp((char*) pName, "$.", 2) || pName[0] == '.') {
+		*pPropID = PROP_LOCAL_VAR;
+	} else if(!strncmp((char*) pName, "$/", 2) || pName[0] == '/') {
+		*pPropID = PROP_GLOBAL_VAR;
 	} else {
+		DBGPRINTF("PROP_INVALID for name '%s'\n", pName);
 		*pPropID = PROP_INVALID;
 		iRet = RS_RET_VAR_NOT_FOUND;
 	}
 
-	RETiRet;
-}
-
-
-/* map a property name (string) to a property ID */
-rsRetVal
-propNameToID(cstr_t *pCSPropName, propid_t *pPropID)
-{
-	uchar *pName;
-	DEFiRet;
-
-	assert(pCSPropName != NULL);
-	assert(pPropID != NULL);
-	pName = rsCStrGetSzStrNoNULL(pCSPropName);
-	iRet =  propNameStrToID(pName, pPropID);
 	RETiRet;
 }
 
@@ -634,6 +622,8 @@ uchar *propIDToName(propid_t propID)
 			return UCHAR_CONSTANT("$MYHOSTNAME");
 		case PROP_CEE:
 			return UCHAR_CONSTANT("*CEE-based property*");
+		case PROP_LOCAL_VAR:
+			return UCHAR_CONSTANT("*LOCAL_VARIABLE*");
 		case PROP_CEE_ALL_JSON:
 			return UCHAR_CONSTANT("$!all-json");
 		case PROP_SYS_BOM:
@@ -699,7 +689,7 @@ static inline rsRetVal msgBaseConstruct(msg_t **ppThis)
 	pM->pszTIMESTAMP3339 = NULL;
 	pM->pszTIMESTAMP_MySQL = NULL;
         pM->pszTIMESTAMP_PgSQL = NULL;
-	pM->pCSStrucData = NULL;
+	pM->pszStrucData = NULL;
 	pM->pCSAPPNAME = NULL;
 	pM->pCSPROCID = NULL;
 	pM->pCSMSGID = NULL;
@@ -708,6 +698,8 @@ static inline rsRetVal msgBaseConstruct(msg_t **ppThis)
 	pM->rcvFrom.pRcvFrom = NULL;
 	pM->pRuleset = NULL;
 	pM->json = NULL;
+	pM->localvars = NULL;
+	pM->dfltTZ[0] = '\0';
 	memset(&pM->tRcvdAt, 0, sizeof(pM->tRcvdAt));
 	memset(&pM->tTIMESTAMP, 0, sizeof(pM->tTIMESTAMP));
 	pM->TAG.pszTAG = NULL;
@@ -841,10 +833,9 @@ CODESTARTobjDestruct(msg)
 		free(pThis->pszRcvdAt_PgSQL);
 		free(pThis->pszTIMESTAMP_MySQL);
 		free(pThis->pszTIMESTAMP_PgSQL);
+		free(pThis->pszStrucData);
 		if(pThis->iLenPROGNAME >= CONF_PROGNAME_BUFSIZE)
 			free(pThis->PROGNAME.ptr);
-		if(pThis->pCSStrucData != NULL)
-			rsCStrDestruct(&pThis->pCSStrucData);
 		if(pThis->pCSAPPNAME != NULL)
 			rsCStrDestruct(&pThis->pCSAPPNAME);
 		if(pThis->pCSPROCID != NULL)
@@ -853,6 +844,8 @@ CODESTARTobjDestruct(msg)
 			rsCStrDestruct(&pThis->pCSMSGID);
 		if(pThis->json != NULL)
 			json_object_put(pThis->json);
+		if(pThis->localvars != NULL)
+			json_object_put(pThis->localvars);
 		if(pThis->pszUUID != NULL)
 			free(pThis->pszUUID);
 #	ifndef HAVE_ATOMIC_BUILTINS
@@ -994,14 +987,21 @@ msg_t* MsgDup(msg_t* pOld)
 			tmpCOPYSZ(HOSTNAME);
 		}
 	}
+	if(pOld->pszStrucData == NULL) {
+		pNew->pszStrucData = NULL;
+	} else {
+		pNew->pszStrucData = (uchar*)strdup((char*)pOld->pszStrucData);
+		pNew->lenStrucData = pOld->lenStrucData;
+	}
 
-	tmpCOPYCSTR(StrucData);
 	tmpCOPYCSTR(APPNAME);
 	tmpCOPYCSTR(PROCID);
 	tmpCOPYCSTR(MSGID);
 
 	if(pOld->json != NULL)
 		pNew->json = jsonDeepCopy(pOld->json);
+	if(pOld->localvars != NULL)
+		pNew->localvars = jsonDeepCopy(pOld->localvars);
 
 	/* we do not copy all other cache properties, as we do not even know
 	 * if they are needed once again. So we let them re-create if needed.
@@ -1056,12 +1056,17 @@ static rsRetVal MsgSerialize(msg_t *pThis, strm_t *pStrm)
 	CHKiRet(obj.SerializeProp(pStrm, UCHAR_CONSTANT("pszRcvFrom"), PROPTYPE_PSZ, (void*) psz));
 	psz = getRcvFromIP(pThis); 
 	CHKiRet(obj.SerializeProp(pStrm, UCHAR_CONSTANT("pszRcvFromIP"), PROPTYPE_PSZ, (void*) psz));
+	psz = pThis->pszStrucData; 
+	CHKiRet(obj.SerializeProp(pStrm, UCHAR_CONSTANT("pszRcvStrucData"), PROPTYPE_PSZ, (void*) psz));
 	if(pThis->json != NULL) {
 		psz = (uchar*) json_object_get_string(pThis->json);
 		CHKiRet(obj.SerializeProp(pStrm, UCHAR_CONSTANT("json"), PROPTYPE_PSZ, (void*) psz));
 	}
+	if(pThis->localvars != NULL) {
+		psz = (uchar*) json_object_get_string(pThis->localvars);
+		CHKiRet(obj.SerializeProp(pStrm, UCHAR_CONSTANT("localvars"), PROPTYPE_PSZ, (void*) psz));
+	}
 
-	objSerializePTR(pStrm, pCSStrucData, CSTR);
 	objSerializePTR(pStrm, pCSAPPNAME, CSTR);
 	objSerializePTR(pStrm, pCSPROCID, CSTR);
 	objSerializePTR(pStrm, pCSMSGID, CSTR);
@@ -1107,7 +1112,7 @@ reinitVar(var_t *pVar)
  */
 #define isProp(name) !rsCStrSzStrCmp(pVar->pcsName, (uchar*) name, sizeof(name) - 1)
 rsRetVal
-MsgDeserialize(msg_t *pMsg, strm_t *pStrm)
+MsgDeserialize(msg_t * const pMsg, strm_t *pStrm)
 {
 	prop_t *myProp;
 	prop_t *propRcvFrom = NULL;
@@ -1202,7 +1207,15 @@ MsgDeserialize(msg_t *pMsg, strm_t *pStrm)
 		reinitVar(pVar);
 		CHKiRet(objDeserializeProperty(pVar, pStrm));
 	}
-	if(isProp("pCSStrucData")) {
+	if(isProp("localvars")) {
+		tokener = json_tokener_new();
+		pMsg->localvars = json_tokener_parse_ex(tokener, (char*)rsCStrGetSzStrNoNULL(pVar->val.pStr),
+						        cstrLen(pVar->val.pStr));
+		json_tokener_free(tokener);
+		reinitVar(pVar);
+		CHKiRet(objDeserializeProperty(pVar, pStrm));
+	}
+	if(isProp("pszStrucData")) {
 		MsgSetStructuredData(pMsg, (char*) rsCStrGetSzStrNoNULL(pVar->val.pStr));
 		reinitVar(pVar);
 		CHKiRet(objDeserializeProperty(pVar, pStrm));
@@ -1255,7 +1268,7 @@ finalize_it:
  *
  * pSecondMsgPointer = MsgAddRef(pOrgMsgPointer);
  */
-msg_t *MsgAddRef(msg_t *pM)
+msg_t *MsgAddRef(msg_t * const pM)
 {
 	assert(pM != NULL);
 #	ifdef HAVE_ATOMIC_BUILTINS
@@ -1281,7 +1294,7 @@ msg_t *MsgAddRef(msg_t *pM)
  * rgerhards, 2005-11-24
  * THIS MUST be called with the message lock locked.
  */
-static rsRetVal aquirePROCIDFromTAG(msg_t *pM)
+static rsRetVal aquirePROCIDFromTAG(msg_t * const pM)
 {
 	register int i;
 	uchar *pszTag;
@@ -1292,7 +1305,7 @@ static rsRetVal aquirePROCIDFromTAG(msg_t *pM)
 	if(pM->pCSPROCID != NULL)
 		return RS_RET_OK; /* we are already done ;) */
 
-	if(getProtocolVersion(pM) != 0)
+	if(msgGetProtocolVersion(pM) != 0)
 		return RS_RET_OK; /* we can only emulate if we have legacy format */
 
 	pszTag = (uchar*) ((pM->iLenTAG < CONF_TAG_BUFSIZE) ? pM->TAG.szBuf : pM->TAG.pszTAG);
@@ -1346,7 +1359,7 @@ finalize_it:
  * rgerhards, 2005-10-19
  */
 static inline rsRetVal
-aquireProgramName(msg_t *pM)
+aquireProgramName(msg_t * const pM)
 {
 	int i;
 	uchar *pszTag, *pszProgName;
@@ -1376,7 +1389,7 @@ finalize_it:
 
 /* Access methods - dumb & easy, not a comment for each ;)
  */
-void setProtocolVersion(msg_t *pM, int iNewVersion)
+void setProtocolVersion(msg_t * const pM, int iNewVersion)
 {
 	assert(pM != NULL);
 	if(iNewVersion != 0 && iNewVersion != 1) {
@@ -1387,7 +1400,7 @@ void setProtocolVersion(msg_t *pM, int iNewVersion)
 }
 
 /* note: string is taken from constant pool, do NOT free */
-char *getProtocolVersionString(msg_t *pM)
+char *getProtocolVersionString(msg_t * const pM)
 {
 	assert(pM != NULL);
 	return(pM->iProtocolVersion ? "1" : "0");
@@ -1397,7 +1410,7 @@ char *getProtocolVersionString(msg_t *pM)
 /* note: libuuid seems not to be thread-safe, so we need
  * to get some safeguards in place.
  */
-static void msgSetUUID(msg_t *pM)
+static void msgSetUUID(msg_t * const pM)
 {
 	size_t lenRes = sizeof(uuid_t) * 2 + 1;
 	char hex_char [] = "0123456789ABCDEF";
@@ -1425,7 +1438,7 @@ static void msgSetUUID(msg_t *pM)
 	dbgprintf("[MsgSetUUID] END\n");
 }
 
-void getUUID(msg_t *pM, uchar **pBuf, int *piLen)
+void getUUID(msg_t * const pM, uchar **pBuf, int *piLen)
 {
 	dbgprintf("[getUUID] START\n");
 	if(pM == NULL) {
@@ -1451,7 +1464,7 @@ void getUUID(msg_t *pM, uchar **pBuf, int *piLen)
 #endif
 
 void
-getRawMsg(msg_t *pM, uchar **pBuf, int *piLen)
+getRawMsg(msg_t * const pM, uchar **pBuf, int *piLen)
 {
 	if(pM == NULL) {
 		*pBuf=  UCHAR_CONSTANT("");
@@ -1471,17 +1484,17 @@ getRawMsg(msg_t *pM, uchar **pBuf, int *piLen)
 /* note: setMSGLen() is only for friends who really know what they
  * do. Setting an invalid length can be desasterous!
  */
-void setMSGLen(msg_t *pM, int lenMsg)
+void setMSGLen(msg_t * const pM, int lenMsg)
 {
 	pM->iLenMSG = lenMsg;
 }
 
-int getMSGLen(msg_t *pM)
+int getMSGLen(msg_t * const pM)
 {
 	return((pM == NULL) ? 0 : pM->iLenMSG);
 }
 
-uchar *getMSG(msg_t *pM)
+uchar *getMSG(msg_t * const pM)
 {
 	uchar *ret;
 	if(pM == NULL)
@@ -1497,7 +1510,7 @@ uchar *getMSG(msg_t *pM)
 
 
 /* Get PRI value as integer */
-static int getPRIi(msg_t *pM)
+static int getPRIi(msg_t * const pM)
 {
 	return (pM->iFacility << 3) + (pM->iSeverity);
 }
@@ -1506,7 +1519,7 @@ static int getPRIi(msg_t *pM)
 /* Get PRI value in text form
  */
 char *
-getPRI(msg_t *pM)
+getPRI(msg_t * const pM)
 {
 	/* PRI is a number in the range 0..191. Thus, we use a simple lookup table to obtain the
 	 * string value. It looks a bit clumpsy here in code ;)
@@ -1522,7 +1535,7 @@ getPRI(msg_t *pM)
 
 
 char *
-getTimeReported(msg_t *pM, enum tplFormatTypes eFmt)
+getTimeReported(msg_t * const pM, enum tplFormatTypes eFmt)
 {
 	BEGINfunc
 	if(pM == NULL)
@@ -1592,7 +1605,7 @@ getTimeReported(msg_t *pM, enum tplFormatTypes eFmt)
 	return "INVALID eFmt OPTION!";
 }
 
-static inline char *getTimeGenerated(msg_t *pM, enum tplFormatTypes eFmt)
+static inline char *getTimeGenerated(msg_t * const pM, enum tplFormatTypes eFmt)
 {
 	BEGINfunc
 	if(pM == NULL)
@@ -1679,7 +1692,7 @@ static inline char *getTimeGenerated(msg_t *pM, enum tplFormatTypes eFmt)
 }
 
 
-static inline char *getSeverity(msg_t *pM)
+static inline char *getSeverity(msg_t * const pM)
 {
 	char *name = NULL;
 
@@ -1696,7 +1709,7 @@ static inline char *getSeverity(msg_t *pM)
 }
 
 
-static inline char *getSeverityStr(msg_t *pM)
+static inline char *getSeverityStr(msg_t * const pM)
 {
 	char *name = NULL;
 
@@ -1712,7 +1725,7 @@ static inline char *getSeverityStr(msg_t *pM)
 	return name;
 }
 
-static inline char *getFacility(msg_t *pM)
+static inline char *getFacility(msg_t * const pM)
 {
 	char *name = NULL;
 
@@ -1728,7 +1741,7 @@ static inline char *getFacility(msg_t *pM)
 	return name;
 }
 
-static inline char *getFacilityStr(msg_t *pM)
+static inline char *getFacilityStr(msg_t * const pM)
 {
         char *name = NULL;
 
@@ -1752,7 +1765,7 @@ static inline char *getFacilityStr(msg_t *pM)
  * rgerhards, 2008-03-14
  */
 rsRetVal
-MsgSetFlowControlType(msg_t *pMsg, flowControl_t eFlowCtl)
+MsgSetFlowControlType(msg_t * const pMsg, flowControl_t eFlowCtl)
 {
 	DEFiRet;
 	assert(pMsg != NULL);
@@ -1767,7 +1780,7 @@ MsgSetFlowControlType(msg_t *pMsg, flowControl_t eFlowCtl)
  * rgerhards, 2009-06-16
  */
 rsRetVal
-MsgSetAfterPRIOffs(msg_t *pMsg, short offs)
+MsgSetAfterPRIOffs(msg_t * const pMsg, short offs)
 {
 	assert(pMsg != NULL);
 	pMsg->offAfterPRI = offs;
@@ -1781,7 +1794,7 @@ MsgSetAfterPRIOffs(msg_t *pMsg, short offs)
  * which already obtained the lock. So in general, this function here must
  * only be called when it it safe to do so without it aquiring a lock.
  */
-rsRetVal MsgSetAPPNAME(msg_t *pMsg, char* pszAPPNAME)
+rsRetVal MsgSetAPPNAME(msg_t * const pMsg, char* pszAPPNAME)
 {
 	DEFiRet;
 	assert(pMsg != NULL);
@@ -1799,7 +1812,7 @@ finalize_it:
 
 /* rgerhards 2004-11-24: set PROCID in msg object
  */
-rsRetVal MsgSetPROCID(msg_t *pMsg, char* pszPROCID)
+rsRetVal MsgSetPROCID(msg_t * const pMsg, char* pszPROCID)
 {
 	DEFiRet;
 	ISOBJ_TYPE_assert(pMsg, msg);
@@ -1820,7 +1833,7 @@ finalize_it:
  * This must be called WITHOUT the message lock being held.
  * rgerhards, 2009-06-26
  */
-static inline void preparePROCID(msg_t *pM, sbool bLockMutex)
+static inline void preparePROCID(msg_t * const pM, sbool bLockMutex)
 {
 	if(pM->pCSPROCID == NULL) {
 		if(bLockMutex == LOCK_MUTEX)
@@ -1848,7 +1861,7 @@ static inline int getPROCIDLen(msg_t *pM, sbool bLockMutex)
 
 /* rgerhards, 2005-11-24
  */
-char *getPROCID(msg_t *pM, sbool bLockMutex)
+char *getPROCID(msg_t * const pM, sbool bLockMutex)
 {
 	uchar *pszRet;
 
@@ -1868,7 +1881,7 @@ char *getPROCID(msg_t *pM, sbool bLockMutex)
 
 /* rgerhards 2004-11-24: set MSGID in msg object
  */
-rsRetVal MsgSetMSGID(msg_t *pMsg, char* pszMSGID)
+rsRetVal MsgSetMSGID(msg_t * const pMsg, char* pszMSGID)
 {
 	DEFiRet;
 	ISOBJ_TYPE_assert(pMsg, msg);
@@ -1887,7 +1900,7 @@ finalize_it:
 /* Return state of last parser. If it had success, "OK" is returned, else
  * "FAIL". All from the constant pool.
  */
-static inline char *getParseSuccess(msg_t *pM)
+static inline char *getParseSuccess(msg_t * const pM)
 {
 	return (pM->bParseSuccess) ? "OK" : "FAIL";
 }
@@ -1895,7 +1908,7 @@ static inline char *getParseSuccess(msg_t *pM)
 
 /* al, 2011-07-26: LockMsg to avoid race conditions
  */
-static inline char *getMSGID(msg_t *pM)
+static inline char *getMSGID(msg_t * const pM)
 {
 	if (pM->pCSMSGID == NULL) {
 		return "-"; 
@@ -1910,7 +1923,7 @@ static inline char *getMSGID(msg_t *pM)
 
 /* rgerhards 2012-03-15: set parser success (an integer, acutally bool)
  */
-void MsgSetParseSuccess(msg_t *pMsg, int bSuccess)
+void MsgSetParseSuccess(msg_t * const pMsg, int bSuccess)
 {
 	assert(pMsg != NULL);
 	pMsg->bParseSuccess = bSuccess;
@@ -1918,7 +1931,7 @@ void MsgSetParseSuccess(msg_t *pMsg, int bSuccess)
 
 /* rgerhards 2009-06-12: set associated ruleset
  */
-void MsgSetRuleset(msg_t *pMsg, ruleset_t *pRuleset)
+void MsgSetRuleset(msg_t * const pMsg, ruleset_t *pRuleset)
 {
 	assert(pMsg != NULL);
 	pMsg->pRuleset = pRuleset;
@@ -1928,7 +1941,7 @@ void MsgSetRuleset(msg_t *pMsg, ruleset_t *pRuleset)
 /* set TAG in msg object
  * (rewritten 2009-06-18 rgerhards)
  */
-void MsgSetTAG(msg_t *pMsg, uchar* pszBuf, size_t lenBuf)
+void MsgSetTAG(msg_t * const pMsg, uchar* pszBuf, size_t lenBuf)
 {
 	uchar *pBuf;
 	assert(pMsg != NULL);
@@ -1961,7 +1974,7 @@ void MsgSetTAG(msg_t *pMsg, uchar* pszBuf, size_t lenBuf)
  * if there is a TAG and, if not, if it can emulate it.
  * rgerhards, 2005-11-24
  */
-static inline void tryEmulateTAG(msg_t *pM, sbool bLockMutex)
+static inline void tryEmulateTAG(msg_t * const pM, sbool bLockMutex)
 {
 	size_t lenTAG;
 	uchar bufTAG[CONF_TAG_MAXSIZE];
@@ -1975,7 +1988,7 @@ static inline void tryEmulateTAG(msg_t *pM, sbool bLockMutex)
 		return; /* done, no need to emulate */
 	}
 	
-	if(getProtocolVersion(pM) == 1) {
+	if(msgGetProtocolVersion(pM) == 1) {
 		if(!strcmp(getPROCID(pM, MUTEX_ALREADY_LOCKED), "-")) {
 			/* no process ID, use APP-NAME only */
 			MsgSetTAG(pM, (uchar*) getAPPNAME(pM, MUTEX_ALREADY_LOCKED), getAPPNAMELen(pM, MUTEX_ALREADY_LOCKED));
@@ -1993,7 +2006,7 @@ static inline void tryEmulateTAG(msg_t *pM, sbool bLockMutex)
 
 
 void
-getTAG(msg_t *pM, uchar **ppBuf, int *piLen)
+getTAG(msg_t * const pM, uchar **ppBuf, int *piLen)
 {
 	if(pM == NULL) {
 		*ppBuf = UCHAR_CONSTANT("");
@@ -2012,7 +2025,7 @@ getTAG(msg_t *pM, uchar **ppBuf, int *piLen)
 }
 
 
-int getHOSTNAMELen(msg_t *pM)
+int getHOSTNAMELen(msg_t * const pM)
 {
 	if(pM == NULL)
 		return 0;
@@ -2028,7 +2041,7 @@ int getHOSTNAMELen(msg_t *pM)
 }
 
 
-char *getHOSTNAME(msg_t *pM)
+char *getHOSTNAME(msg_t * const pM)
 {
 	if(pM == NULL)
 		return "";
@@ -2049,7 +2062,7 @@ char *getHOSTNAME(msg_t *pM)
 }
 
 
-uchar *getRcvFrom(msg_t *pM)
+uchar *getRcvFrom(msg_t * const pM)
 {
 	uchar *psz;
 	int len;
@@ -2071,52 +2084,37 @@ uchar *getRcvFrom(msg_t *pM)
 
 /* rgerhards 2004-11-24: set STRUCTURED DATA in msg object
  */
-rsRetVal MsgSetStructuredData(msg_t *pMsg, char* pszStrucData)
+rsRetVal MsgSetStructuredData(msg_t * const pMsg, char* pszStrucData)
 {
 	DEFiRet;
 	ISOBJ_TYPE_assert(pMsg, msg);
-	if(pMsg->pCSStrucData == NULL) {
-		/* we need to obtain the object first */
-		CHKiRet(rsCStrConstruct(&pMsg->pCSStrucData));
-	}
-	/* if we reach this point, we have the object */
-	iRet = rsCStrSetSzStr(pMsg->pCSStrucData, (uchar*) pszStrucData);
-
+	free(pMsg->pszStrucData);
+	CHKmalloc(pMsg->pszStrucData = (uchar*)strdup(pszStrucData));
+	pMsg->lenStrucData = strlen(pszStrucData);
 finalize_it:
 	RETiRet;
 }
 
-/* get the length of the "STRUCTURED-DATA" sz string
- * rgerhards, 2005-11-24
- */
-#if 0 /* This method is currently not called, be we like to preserve it */
-static int getStructuredDataLen(msg_t *pM)
+
+/* get the "STRUCTURED-DATA" as sz string, including length */
+void
+MsgGetStructuredData(msg_t * const pM, uchar **pBuf, rs_size_t *len)
 {
-	return (pM->pCSStrucData == NULL) ? 1 : rsCStrLen(pM->pCSStrucData);
-}
-#endif
-
-
-/* get the "STRUCTURED-DATA" as sz string
- * rgerhards, 2005-11-24
- */
-static inline char *getStructuredData(msg_t *pM)
-{
-	uchar *pszRet;
-
 	MsgLock(pM);
-	if(pM->pCSStrucData == NULL)
-		pszRet = UCHAR_CONSTANT("-");
-	else 
-		pszRet = rsCStrGetSzStrNoNULL(pM->pCSStrucData);
+	if(pM->pszStrucData == NULL) {
+		*pBuf = UCHAR_CONSTANT("-"),
+		*len = 1;
+	} else  {
+		*pBuf = pM->pszStrucData,
+		*len = pM->lenStrucData;
+	}
 	MsgUnlock(pM);
-	return (char*) pszRet;
 }
 
 /* get the "programname" as sz string
  * rgerhards, 2005-10-19
  */
-uchar *getProgramName(msg_t *pM, sbool bLockMutex)
+uchar *getProgramName(msg_t * const pM, sbool bLockMutex)
 {
 	if(pM->iLenPROGNAME == -1) {
 		if(bLockMutex == LOCK_MUTEX) {
@@ -2139,13 +2137,13 @@ uchar *getProgramName(msg_t *pM, sbool bLockMutex)
  * now would like to send out the same one via syslog-protocol.
  * MUST be called with the Msg Lock locked!
  */
-static void tryEmulateAPPNAME(msg_t *pM)
+static void tryEmulateAPPNAME(msg_t * const pM)
 {
 	assert(pM != NULL);
 	if(pM->pCSAPPNAME != NULL)
 		return; /* we are already done */
 
-	if(getProtocolVersion(pM) == 0) {
+	if(msgGetProtocolVersion(pM) == 0) {
 		/* only then it makes sense to emulate */
 		MsgSetAPPNAME(pM, (char*)getProgramName(pM, MUTEX_ALREADY_LOCKED));
 	}
@@ -2157,7 +2155,7 @@ static void tryEmulateAPPNAME(msg_t *pM)
  * This must be called WITHOUT the message lock being held.
  * rgerhards, 2009-06-26
  */
-static inline void prepareAPPNAME(msg_t *pM, sbool bLockMutex)
+static inline void prepareAPPNAME(msg_t * const pM, sbool bLockMutex)
 {
 	if(pM->pCSAPPNAME == NULL) {
 		if(bLockMutex == LOCK_MUTEX)
@@ -2174,7 +2172,7 @@ static inline void prepareAPPNAME(msg_t *pM, sbool bLockMutex)
 
 /* rgerhards, 2005-11-24
  */
-char *getAPPNAME(msg_t *pM, sbool bLockMutex)
+char *getAPPNAME(msg_t * const pM, sbool bLockMutex)
 {
 	uchar *pszRet;
 
@@ -2193,7 +2191,7 @@ char *getAPPNAME(msg_t *pM, sbool bLockMutex)
 
 /* rgerhards, 2005-11-24
  */
-static int getAPPNAMELen(msg_t *pM, sbool bLockMutex)
+static int getAPPNAMELen(msg_t * const pM, sbool bLockMutex)
 {
 	assert(pM != NULL);
 	prepareAPPNAME(pM, bLockMutex);
@@ -2213,6 +2211,15 @@ void MsgSetInputName(msg_t *pThis, prop_t *inputName)
 	if(pThis->pInputName != NULL)
 		prop.Destruct(&pThis->pInputName);
 	pThis->pInputName = inputName;
+}
+
+/* Set default TZ. Note that at most 7 chars are set, as we would
+ * otherwise overrun our buffer! 
+ */
+void MsgSetDfltTZ(msg_t *pThis, char *tz)
+{
+	strncpy(pThis->dfltTZ, tz, 7);
+	pThis->dfltTZ[7] = '\0'; /* ensure 0-Term in case of overflow! */
 }
 
 
@@ -2236,7 +2243,6 @@ msgSetFromSockinfo(msg_t *pThis, struct sockaddr_storage *sa){
 finalize_it:
 	RETiRet;
 }
-
 
 /* rgerhards 2008-09-10: set RcvFrom name in msg object. This calls AddRef()
  * on the property, because this must be done in all current cases and there
@@ -2342,7 +2348,7 @@ void MsgSetHOSTNAME(msg_t *pThis, uchar* pszHOSTNAME, int lenHOSTNAME)
  * (exactly by one). This can happen if we have a message that does not 
  * contain any MSG part.
  */
-void MsgSetMSGoffs(msg_t *pMsg, short offs)
+void MsgSetMSGoffs(msg_t * const pMsg, short offs)
 {
 	ISOBJ_TYPE_assert(pMsg, msg);
 	pMsg->offMSG = offs;
@@ -2426,7 +2432,7 @@ void MsgSetRawMsg(msg_t *pThis, char* pszRawMsg, size_t lenMsg)
  * try to remove it altogether).
  * rgerhards, 2009-06-16
  */
-void MsgSetRawMsgWOSize(msg_t *pMsg, char* pszRawMsg)
+void MsgSetRawMsgWOSize(msg_t * const pMsg, char* pszRawMsg)
 {
 	MsgSetRawMsg(pMsg, pszRawMsg, strlen(pszRawMsg));
 }
@@ -2463,9 +2469,15 @@ typedef enum ENOWType { NOW_NOW, NOW_YEAR, NOW_MONTH, NOW_DAY, NOW_HOUR, NOW_HHO
 static uchar *getNOW(eNOWType eNow, struct syslogTime *t)
 {
 	uchar *pBuf;
+	struct syslogTime tt;
 
 	if((pBuf = (uchar*) MALLOC(sizeof(uchar) * tmpBUFSIZE)) == NULL) {
 		return NULL;
+	}
+
+	if(t == NULL) { /* can happen if called via script engine */
+		datetime.getCurrTime(&tt, NULL);
+		t = &tt;
 	}
 
 	if(t->year == 0) { /* not yet set! */
@@ -2510,12 +2522,12 @@ static uchar *getNOW(eNOWType eNow, struct syslogTime *t)
 #undef tmpBUFSIZE /* clean up */
 
 
-/* Get a CEE-Property as string value*/
+/* Get a JSON-Property as string value  (used for various types of JSON-based vars) */
 rsRetVal
-getCEEPropVal(msg_t *pM, es_str_t *propName, uchar **pRes, rs_size_t *buflen, unsigned short *pbMustBeFreed)
+getJSONPropVal(msg_t * const pMsg, msgPropDescr_t *pProp, uchar **pRes, rs_size_t *buflen, unsigned short *pbMustBeFreed)
 {
-	uchar *name = NULL;
 	uchar *leaf;
+	struct json_object *jroot;
 	struct json_object *parent;
 	struct json_object *field;
 	DEFiRet;
@@ -2523,15 +2535,26 @@ getCEEPropVal(msg_t *pM, es_str_t *propName, uchar **pRes, rs_size_t *buflen, un
 	if(*pbMustBeFreed)
 		free(*pRes);
 	*pRes = NULL;
-	// TODO: mutex?
-	if(pM->json == NULL) goto finalize_it;
 
-	if(!es_strbufcmp(propName, (uchar*)"!", 1)) {
-		field = pM->json;
+	if(pProp->id == PROP_CEE) {
+		jroot = pMsg->json;
+	} else if(pProp->id == PROP_LOCAL_VAR) {
+		jroot = pMsg->localvars;
+	} else if(pProp->id == PROP_GLOBAL_VAR) {
+		pthread_rwlock_rdlock(&glblVars_rwlock);
+		jroot = global_var_root;
 	} else {
-		name = (uchar*)es_str2cstr(propName, NULL);
-		leaf = jsonPathGetLeaf(name, ustrlen(name));
-		CHKiRet(jsonPathFindParent(pM, name, leaf, &parent, 1));
+		DBGPRINTF("msgGetJSONPropVal; invalid property id %d\n",
+			  pProp->id);
+		ABORT_FINALIZE(RS_RET_NOT_FOUND);
+	}
+	if(jroot == NULL) goto finalize_it;
+
+	if(!strcmp((char*)pProp->name, "!")) {
+		field = jroot;
+	} else {
+		leaf = jsonPathGetLeaf(pProp->name, pProp->nameLen);
+		CHKiRet(jsonPathFindParent(jroot, pProp->name, leaf, &parent, 1));
 		field = json_object_object_get(parent, (char*)leaf);
 	}
 	if(field != NULL) {
@@ -2541,7 +2564,8 @@ getCEEPropVal(msg_t *pM, es_str_t *propName, uchar **pRes, rs_size_t *buflen, un
 	}
 
 finalize_it:
-	free(name);
+	if(pProp->id == PROP_GLOBAL_VAR)
+		pthread_rwlock_unlock(&glblVars_rwlock);
 	if(*pRes == NULL) {
 		/* could not find any value, so set it to empty */
 		*pRes = (unsigned char*)"";
@@ -2551,35 +2575,47 @@ finalize_it:
 }
 
 
-/* Get a CEE-Property as native json object
- */
+/* Get a JSON-based-variable as native json object */
 rsRetVal
-msgGetCEEPropJSON(msg_t *pM, es_str_t *propName, struct json_object **pjson)
+msgGetJSONPropJSON(msg_t * const pMsg, msgPropDescr_t *pProp, struct json_object **pjson)
 {
-	uchar *name = NULL;
+	struct json_object *jroot;
 	uchar *leaf;
 	struct json_object *parent;
 	DEFiRet;
 
-	// TODO: mutex?
-	if(pM->json == NULL) {
+	if(pProp->id == PROP_CEE) {
+		jroot = pMsg->json;
+	} else if(pProp->id == PROP_LOCAL_VAR) {
+		jroot = pMsg->localvars;
+	} else if(pProp->id == PROP_GLOBAL_VAR) {
+		pthread_rwlock_rdlock(&glblVars_rwlock);
+		jroot = global_var_root;
+	} else {
+		DBGPRINTF("msgGetJSONPropJSON; invalid property id %d\n",
+			  pProp->id);
+		ABORT_FINALIZE(RS_RET_NOT_FOUND);
+	}
+	if(jroot == NULL) {
+		DBGPRINTF("msgGetJSONPropJSON; jroot empty for property %s\n",
+			  pProp->name);
 		ABORT_FINALIZE(RS_RET_NOT_FOUND);
 	}
 
-	if(!es_strbufcmp(propName, (uchar*)"!", 1)) {
-		*pjson = pM->json;
+	if(!strcmp((char*)pProp->name, "!")) {
+		*pjson = jroot;
 		FINALIZE;
 	}
-	name = (uchar*)es_str2cstr(propName, NULL);
-	leaf = jsonPathGetLeaf(name, ustrlen(name));
-	CHKiRet(jsonPathFindParent(pM, name, leaf, &parent, 1));
+	leaf = jsonPathGetLeaf(pProp->name, pProp->nameLen);
+	CHKiRet(jsonPathFindParent(jroot, pProp->name, leaf, &parent, 1));
 	*pjson = json_object_object_get(parent, (char*)leaf);
 	if(*pjson == NULL) {
 		ABORT_FINALIZE(RS_RET_NOT_FOUND);
 	}
 
 finalize_it:
-	free(name);
+	if(pProp->id == PROP_GLOBAL_VAR)
+		pthread_rwlock_unlock(&glblVars_rwlock);
 	RETiRet;
 }
 
@@ -2783,8 +2819,8 @@ finalize_it:
 #define RET_OUT_OF_MEMORY { *pbMustBeFreed = 0;\
 	*pPropLen = sizeof("**OUT OF MEMORY**") - 1; \
 	return(UCHAR_CONSTANT("**OUT OF MEMORY**"));}
-uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
-                 propid_t propid, es_str_t *propName, rs_size_t *pPropLen,
+uchar *MsgGetProp(msg_t * const pMsg, struct templateEntry *pTpe,
+                 msgPropDescr_t *pProp, rs_size_t *pPropLen,
 		 unsigned short *pbMustBeFreed, struct syslogTime *ttNow)
 {
 	uchar *pRes; /* result pointer */
@@ -2807,7 +2843,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 
 	*pbMustBeFreed = 0;
 
-	switch(propid) {
+	switch(pProp->id) {
 		case PROP_MSG:
 			pRes = getMSG(pMsg);
 			bufLen = getMSGLen(pMsg);
@@ -2880,7 +2916,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			pRes = (uchar*)getProtocolVersionString(pMsg);
 			break;
 		case PROP_STRUCTURED_DATA:
-			pRes = (uchar*)getStructuredData(pMsg);
+			MsgGetStructuredData(pMsg, &pRes, &bufLen);
 			break;
 		case PROP_APP_NAME:
 			pRes = (uchar*)getAPPNAME(pMsg, LOCK_MUTEX);
@@ -2979,7 +3015,9 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			}
 			break;
 		case PROP_CEE:
-			getCEEPropVal(pMsg, propName, &pRes, &bufLen, pbMustBeFreed);
+		case PROP_LOCAL_VAR:
+		case PROP_GLOBAL_VAR:
+			getJSONPropVal(pMsg, pProp, &pRes, &bufLen, pbMustBeFreed);
 			break;
 		case PROP_SYS_BOM:
 			if(*pbMustBeFreed == 1)
@@ -3040,7 +3078,7 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 			/* there is no point in continuing, we may even otherwise render the
 			 * error message unreadable. rgerhards, 2007-07-10
 			 */
-			dbgprintf("invalid property id: '%d'\n", propid);
+			dbgprintf("invalid property id: '%d'\n", pProp->id);
 			*pbMustBeFreed = 0;
 			*pPropLen = sizeof("**INVALID PROPERTY NAME**") - 1;
 			return UCHAR_CONSTANT("**INVALID PROPERTY NAME**");
@@ -3648,66 +3686,6 @@ uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
 }
 
 
-/* The function returns a cee variable suitable for use with RainerScript. 
- * Note: caller must free the returned string.
- * Note that we need to do a lot of conversions between es_str_t and cstr -- this will go away once
- * we have moved larger parts of rsyslog to es_str_t. Acceptable for the moment, especially as we intend
- * to rewrite the script engine as well!
- * rgerhards, 2010-12-03
- */
-es_str_t*
-msgGetCEEVarNew(msg_t *pMsg, char *name)
-{
-	uchar *leaf;
-	char *val;
-	es_str_t *estr = NULL;
-	struct json_object *json, *parent;
-
-	ISOBJ_TYPE_assert(pMsg, msg);
-
-	if(pMsg->json == NULL) {
-		estr = es_newStr(1);
-		goto done;
-	}
-	leaf = jsonPathGetLeaf((uchar*)name, strlen(name));
-	if(jsonPathFindParent(pMsg, (uchar*)name, leaf, &parent, 1) != RS_RET_OK) {
-		estr = es_newStr(1);
-		goto done;
-	}
-	json = json_object_object_get(parent, (char*)leaf);
-	val = (char*)json_object_get_string(json);
-	estr = es_newStrFromCStr(val, strlen(val));
-done:
-	return estr;
-}
-
-
-/* Return an es_str_t for given message property.
- */
-es_str_t*
-msgGetMsgVarNew(msg_t *pThis, uchar *name)
-{
-	rs_size_t propLen;
-	uchar *pszProp = NULL;
-	propid_t propid;
-	unsigned short bMustBeFreed = 0;
-	es_str_t *estr;
-
-	ISOBJ_TYPE_assert(pThis, msg);
-
-	/* always call MsgGetProp() without a template specifier */
-	/* TODO: optimize propNameToID() call -- rgerhards, 2009-06-26 */
-	propNameStrToID(name, &propid);
-	pszProp = (uchar*) MsgGetProp(pThis, NULL, propid, NULL, &propLen, &bMustBeFreed, NULL);
-
-	estr = es_newStrFromCStr((char*)pszProp, propLen);
-	if(bMustBeFreed)
-		free(pszProp);
-
-	return estr;
-}
-
-
 /* This function can be used as a generic way to set properties.
  * We have to handle a lot of legacy, so our return value is not always
  * 100% correct (called functions do not always provide one, should
@@ -3758,7 +3736,7 @@ rsRetVal MsgSetProperty(msg_t *pThis, var_t *pProp)
 		prop.Destruct(&propRcvFrom);
 	} else if(isProp("pszHOSTNAME")) {
 		MsgSetHOSTNAME(pThis, rsCStrGetSzStrNoNULL(pProp->val.pStr), rsCStrLen(pProp->val.pStr));
-	} else if(isProp("pCSStrucData")) {
+	} else if(isProp("pszStrucData")) {
 		MsgSetStructuredData(pThis, (char*) rsCStrGetSzStrNoNULL(pProp->val.pStr));
 	} else if(isProp("pCSAPPNAME")) {
 		MsgSetAPPNAME(pThis, (char*) rsCStrGetSzStrNoNULL(pProp->val.pStr));
@@ -3798,7 +3776,7 @@ finalize_it:
  * rgerhards, 2008-01-14
  */
 rsRetVal
-MsgGetSeverity(msg_t *pMsg, int *piSeverity)
+MsgGetSeverity(msg_t * const pMsg, int *piSeverity)
 {
 	*piSeverity = pMsg->iSeverity;
 	return RS_RET_OK;
@@ -3809,16 +3787,22 @@ static uchar *
 jsonPathGetLeaf(uchar *name, int lenName)
 {
 	int i;
-	for(i = lenName ; name[i] != '!' && i >= 0 ; --i)
-		/* just skip */;
-	if(name[i] == '!')
+	for(i = lenName ; i >= 0 ; --i)
+		if(i == 0) {
+			if(name[0] == '!'  || name[0] == '.' || name[0] == '/')
+				break;
+		} else {
+			if(name[i] == '!')
+				break;
+		}
+	if(name[i] == '!' || name[i] == '.' || name[i] == '/')
 		++i;
 	return name + i;
 }
 
 
 static rsRetVal
-jsonPathFindNext(struct json_object *root, uchar **name, uchar *leaf,
+jsonPathFindNext(struct json_object *root, uchar *namestart, uchar **name, uchar *leaf,
 		 struct json_object **found, int bCreate)
 {
 	uchar namebuf[1024];
@@ -3827,9 +3811,9 @@ jsonPathFindNext(struct json_object *root, uchar **name, uchar *leaf,
 	uchar *p = *name;
 	DEFiRet;
 
-	if(*p == '!')
+	if(*p == '!' || (*name == namestart && (*p == '.' || *p == '/')))
 		++p;
-	for(i = 0 ; *p && *p != '!' && p != leaf && i < sizeof(namebuf)-1 ; ++i, ++p)
+	for(i = 0 ; *p && !(p == namestart && (*p == '.' || *p == '/')) && *p != '!' && p != leaf && i < sizeof(namebuf)-1 ; ++i, ++p)
 		namebuf[i] = *p;
 	if(i > 0) {
 		namebuf[i] = '\0';
@@ -3853,12 +3837,14 @@ finalize_it:
 }
 
 static rsRetVal
-jsonPathFindParent(msg_t *pM, uchar *name, uchar *leaf, struct json_object **parent, int bCreate)
+jsonPathFindParent(struct json_object *jroot, uchar *name, uchar *leaf, struct json_object **parent, int bCreate)
 {
+	uchar *namestart;
 	DEFiRet;
-	*parent = pM->json;
+	namestart = name;
+	*parent = jroot;
 	while(name < leaf-1) {
-		jsonPathFindNext(*parent, &name, leaf, parent, bCreate);
+		jsonPathFindNext(*parent, namestart, &name, leaf, parent, bCreate);
 	}
 	RETiRet;
 }
@@ -3885,55 +3871,62 @@ DBGPRINTF("AAAA jsonMerge adds '%s'\n", it.key);
 
 /* find a JSON structure element (field or container doesn't matter).  */
 rsRetVal
-jsonFind(msg_t *pM, es_str_t *propName, struct json_object **jsonres)
+jsonFind(struct json_object *jroot, msgPropDescr_t *pProp, struct json_object **jsonres)
 {
-	uchar *name = NULL;
 	uchar *leaf;
 	struct json_object *parent;
 	struct json_object *field;
 	DEFiRet;
 
-	if(pM->json == NULL) {
+	if(jroot == NULL) {
 		field = NULL;
 		goto finalize_it;
 	}
 
-	if(!es_strbufcmp(propName, (uchar*)"!", 1)) {
-		field = pM->json;
+	if(!strcmp((char*)pProp->name, "!")) {
+		field = jroot;
 	} else {
-		name = (uchar*)es_str2cstr(propName, NULL);
-		leaf = jsonPathGetLeaf(name, ustrlen(name));
-		CHKiRet(jsonPathFindParent(pM, name, leaf, &parent, 0));
+		leaf = jsonPathGetLeaf(pProp->name, pProp->nameLen);
+		CHKiRet(jsonPathFindParent(jroot, pProp->name, leaf, &parent, 0));
 		field = json_object_object_get(parent, (char*)leaf);
 	}
 	*jsonres = field;
 
 finalize_it:
-	free(name);
 	RETiRet;
 }
 
 rsRetVal
-msgAddJSON(msg_t *pM, uchar *name, struct json_object *json)
+msgAddJSON(msg_t * const pM, uchar *name, struct json_object *json)
 {
 	/* TODO: error checks! This is a quick&dirty PoC! */
+	struct json_object **pjroot;
 	struct json_object *parent, *leafnode;
 	uchar *leaf;
 	DEFiRet;
 
 	MsgLock(pM);
-	if(name[0] == '!' && name[1] == '\0') {
-		if(pM->json == NULL)
-			pM->json = json;
+	if(name[0] == '!') {
+		pjroot = &pM->json;
+	} else if(name[0] == '.') {
+		pjroot = &pM->localvars;
+	} else { /* globl var */
+		pthread_rwlock_wrlock(&glblVars_rwlock);
+		pjroot = &global_var_root;
+	}
+
+	if(name[1] == '\0') { /* full tree? */
+		if(*pjroot == NULL)
+			*pjroot = json;
 		else
-			CHKiRet(jsonMerge(pM->json, json));
+			CHKiRet(jsonMerge(*pjroot, json));
 	} else {
-		if(pM->json == NULL) {
+		if(*pjroot == NULL) {
 			/* now we need a root obj */
-			pM->json = json_object_new_object();
+			*pjroot = json_object_new_object();
 		}
 		leaf = jsonPathGetLeaf(name, ustrlen(name));
-		CHKiRet(jsonPathFindParent(pM, name, leaf, &parent, 1));
+		CHKiRet(jsonPathFindParent(*pjroot, name, leaf, &parent, 1));
 		if (json_object_get_type(parent) != json_type_object) {
 			DBGPRINTF("msgAddJSON: not a container in json path,"
 				"name is '%s'\n", name);
@@ -3945,7 +3938,7 @@ msgAddJSON(msg_t *pM, uchar *name, struct json_object *json)
 			json_object_object_add(parent, (char*)leaf, json);
 		} else {
 			if(json_object_get_type(json) == json_type_object) {
-				CHKiRet(jsonMerge(pM->json, json));
+				CHKiRet(jsonMerge(*pjroot, json));
 			} else {
 //dbgprintf("AAAA: leafnode already exists, type is %d, update with %d\n", (int)json_object_get_type(leafnode), (int)json_object_get_type(json));
 				/* TODO: improve the code below, however, the current
@@ -3971,33 +3964,52 @@ msgAddJSON(msg_t *pM, uchar *name, struct json_object *json)
 	}
 
 finalize_it:
+	if(name[0] == '/')
+		pthread_rwlock_unlock(&glblVars_rwlock);
 	MsgUnlock(pM);
 	RETiRet;
 }
 
+
 rsRetVal
-msgDelJSON(msg_t *pM, uchar *name)
+msgDelJSON(msg_t * const pM, uchar *name)
 {
+	struct json_object **jroot;
 	struct json_object *parent, *leafnode;
 	uchar *leaf;
 	DEFiRet;
 
 dbgprintf("AAAA: unset variable '%s'\n", name);
 	MsgLock(pM);
-	if(name[0] == '!' && name[1] == '\0') {
-		/* strange, but I think we should permit this. After all,
+
+	if(name[0] == '!') {
+		jroot = &pM->json;
+	} else if(name[0] == '.') {
+		jroot = &pM->localvars;
+	} else { /* globl var */
+		pthread_rwlock_wrlock(&glblVars_rwlock);
+		jroot = &global_var_root;
+	}
+	if(jroot == NULL) {
+		DBGPRINTF("msgDelJSONVar; jroot empty in unset for property %s\n",
+			  name);
+		FINALIZE;
+	}
+
+	if(name[1] == '\0') {
+		/* full tree! Strange, but I think we should permit this. After all,
 		 * we trust rsyslog.conf to be written by the admin.
 		 */
 		DBGPRINTF("unsetting JSON root object\n");
-		json_object_put(pM->json);
-		pM->json = NULL;
+		json_object_put(*jroot);
+		*jroot = NULL;
 	} else {
-		if(pM->json == NULL) {
+		if(*jroot == NULL) {
 			/* now we need a root obj */
-			pM->json = json_object_new_object();
+			*jroot = json_object_new_object();
 		}
 		leaf = jsonPathGetLeaf(name, ustrlen(name));
-		CHKiRet(jsonPathFindParent(pM, name, leaf, &parent, 1));
+		CHKiRet(jsonPathFindParent(*jroot, name, leaf, &parent, 1));
 		leafnode = json_object_object_get(parent, (char*)leaf);
 DBGPRINTF("AAAA: unset found JSON value path '%s', " "leaf '%s', leafnode %p\n", name, leaf, leafnode);
 		if(leafnode == NULL) {
@@ -4012,6 +4024,8 @@ DBGPRINTF("AAAA: unset found JSON value path '%s', " "leaf '%s', leafnode %p\n",
 	}
 
 finalize_it:
+	if(name[0] == '/')
+		pthread_rwlock_unlock(&glblVars_rwlock);
 	MsgUnlock(pM);
 	RETiRet;
 }
@@ -4033,7 +4047,11 @@ jsonDeepCopy(struct json_object *src)
 		dst = json_object_new_double(json_object_get_double(src));
 		break;
 	case json_type_int:
+#ifdef HAVE_JSON_OBJECT_NEW_INT64
+		dst = json_object_new_int64(json_object_get_int64(src));
+#else /* HAVE_JSON_OBJECT_NEW_INT64 */
 		dst = json_object_new_int(json_object_get_int(src));
+#endif /* HAVE_JSON_OBJECT_NEW_INT64 */
 		break;
 	case json_type_string:
 		dst = json_object_new_string(json_object_get_string(src));
@@ -4064,7 +4082,7 @@ done:	return dst;
 
 
 rsRetVal
-msgSetJSONFromVar(msg_t *pMsg, uchar *varname, struct var *v)
+msgSetJSONFromVar(msg_t * const pMsg, uchar *varname, struct var *v)
 {
 	struct json_object *json = NULL;
 	char *cstr;
@@ -4076,7 +4094,11 @@ msgSetJSONFromVar(msg_t *pMsg, uchar *varname, struct var *v)
 		free(cstr);
 		break;
 	case 'N':/* number (integer) */
+#ifdef HAVE_JSON_OBJECT_NEW_INT64
+		json = json_object_new_int64(v->d.n);
+#else /* HAVE_JSON_OBJECT_NEW_INT64 */
 		json = json_object_new_int((int) v->d.n);
+#endif /* HAVE_JSON_OBJECT_NEW_INT64 */
 		break;
 	case 'J':/* native JSON */
 		json = jsonDeepCopy(v->d.json);
@@ -4085,10 +4107,75 @@ msgSetJSONFromVar(msg_t *pMsg, uchar *varname, struct var *v)
 		v->datatype);
 		ABORT_FINALIZE(RS_RET_ERR);
 	}
-	msgAddJSON(pMsg, varname+1, json);
+
+	msgAddJSON(pMsg, varname, json);
 finalize_it:
 	RETiRet;
 }
+
+rsRetVal
+MsgAddToStructuredData(msg_t * const pMsg, uchar *toadd, rs_size_t len)
+{
+	uchar *newptr;
+	rs_size_t newlen;
+	DEFiRet;
+	newlen = (pMsg->pszStrucData[0] == '-') ? len : pMsg->lenStrucData + len;
+	CHKmalloc(newptr = (uchar*) realloc(pMsg->pszStrucData, newlen+1));
+	pMsg->pszStrucData = newptr;
+	if(pMsg->pszStrucData[0] == '-') { /* empty? */
+		memcpy(pMsg->pszStrucData, toadd, len);
+	} else {
+		memcpy(pMsg->pszStrucData+pMsg->lenStrucData, toadd, len);
+	}
+	pMsg->pszStrucData[newlen] = '\0';
+	pMsg->lenStrucData = newlen;
+finalize_it:
+	RETiRet;
+}
+
+
+/* Fill a message propert description. Space must already be alloced
+ * by the caller. This is for efficiency, as we expect this to happen
+ * as part of a larger structure alloc.
+ * Note that CEE/LOCAL_VAR properties can come in either as
+ * "$!xx"/"$.xx" or "!xx"/".xx" - we will unify them here.
+ */
+rsRetVal
+msgPropDescrFill(msgPropDescr_t *pProp, uchar *name, int nameLen)
+{
+	propid_t id;
+	int offs;
+	DEFiRet;
+	if(propNameToID(name, &id) != RS_RET_OK) {
+		parser_errmsg("invalid property '%s'", name);
+		ABORT_FINALIZE(RS_RET_INVLD_PROP);
+	}
+	if(id == PROP_CEE || id == PROP_LOCAL_VAR || id == PROP_GLOBAL_VAR) {
+	  	/* in these cases, we need the field name for later processing */
+		/* normalize name: remove $ if present */
+		offs = (name[0] == '$') ? 1 : 0;
+		pProp->name = ustrdup(name + offs);
+		pProp->nameLen = nameLen - offs;
+		/* we patch the root name, so that support functions do not need to
+		 * check for different root chars. */
+		pProp->name[0] = '!';
+	}
+	pProp->id = id;
+finalize_it:
+	RETiRet;
+}
+
+void
+msgPropDescrDestruct(msgPropDescr_t *pProp)
+{
+	if(pProp != NULL) {
+		if(pProp->id == PROP_CEE ||
+		   pProp->id == PROP_LOCAL_VAR ||
+		   pProp->id == PROP_GLOBAL_VAR)
+			free(pProp->name);
+	}
+}
+
 
 /* dummy */
 rsRetVal msgQueryInterface(void) { return RS_RET_NOT_IMPLEMENTED; }
@@ -4098,6 +4185,8 @@ rsRetVal msgQueryInterface(void) { return RS_RET_NOT_IMPLEMENTED; }
  * rgerhards, 2008-01-04
  */
 BEGINObjClassInit(msg, 1, OBJ_IS_CORE_MODULE)
+	pthread_rwlock_init(&glblVars_rwlock, NULL);
+
 	/* request objects we use */
 	CHKiRet(objUse(datetime, CORE_COMPONENT));
 	CHKiRet(objUse(glbl, CORE_COMPONENT));

@@ -525,9 +525,6 @@ static rsRetVal doTryResume(instanceData *pData)
 	if(pData->pSockArray != NULL)
 		FINALIZE;
 
-	if(pData->host == NULL)
-		ABORT_FINALIZE(RS_RET_DISABLE_ACTION);
-
 	if(pData->libnet_handle == NULL) {
 		/* Initialize the libnet library.  Root priviledges are required.
 		 * this initializes a IPv4 socket to use for forging UDP packets.
@@ -563,7 +560,7 @@ static rsRetVal doTryResume(instanceData *pData)
 	}
 	DBGPRINTF("%s found, resuming.\n", pData->host);
 	pData->f_addr = res;
-	pData->pSockArray = net.create_udp_socket((uchar*)pData->host, NULL, 0);
+	pData->pSockArray = net.create_udp_socket((uchar*)pData->host, NULL, 0, 0);
 
 finalize_it:
 	if(iRet != RS_RET_OK) {
@@ -571,8 +568,7 @@ finalize_it:
 			freeaddrinfo(pData->f_addr);
 			pData->f_addr = NULL;
 		}
-		if(iRet != RS_RET_DISABLE_ACTION)
-			iRet = RS_RET_SUSPENDED;
+		iRet = RS_RET_SUSPENDED;
 	}
 
 	RETiRet;

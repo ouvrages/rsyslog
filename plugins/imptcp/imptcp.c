@@ -10,7 +10,7 @@
  *
  * File begun on 2010-08-10 by RGerhards
  *
- * Copyright 2007-2012 Rainer Gerhards and Adiscon GmbH.
+ * Copyright 2007-2013 Rainer Gerhards and Adiscon GmbH.
  *
  * This file is part of rsyslog.
  *
@@ -50,6 +50,8 @@
 #include <sys/socket.h>
 #include <sys/epoll.h>
 #include <netinet/tcp.h>
+#include <stdint.h>
+#include <zlib.h>
 #if HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
@@ -93,6 +95,11 @@ static void * wrkr(void *myself);
 
 #define DFLT_wrkrMax 2
 
+#define COMPRESS_NEVER 0
+#define COMPRESS_SINGLE_MSG 1	/* old, single-message compression */
+/* all other settings are for stream-compression */
+#define COMPRESS_STREAM_ALWAYS 2
+
 /* config settings */
 typedef struct configSettings_s {
 	int bKeepAlive;			/* support keep-alive packets */
@@ -117,11 +124,13 @@ struct instanceConf_s {
 	int bEmitMsgOnClose;
 	int bSuppOctetFram;		/* support octet-counted framing? */
 	int iAddtlFrameDelim;
+	uint8_t compressionMode;
 	uchar *pszBindPort;		/* port to bind to */
 	uchar *pszBindAddr;		/* IP to bind socket to */
 	uchar *pszBindRuleset;		/* name of ruleset to bind to */
 	uchar *pszInputName;		/* value for inputname property, NULL is OK and handled by core engine */
 	ruleset_t *pBindRuleset;	/* ruleset to bind listener to (use system default if unspecified) */
+	uchar *dfltTZ;
 	int ratelimitInterval;
 	int ratelimitBurst;
 	struct instanceConf_s *next;
@@ -154,8 +163,10 @@ static struct cnfparamdescr inppdescr[] = {
 	{ "address", eCmdHdlrString, 0 },
 	{ "name", eCmdHdlrString, 0 },
 	{ "ruleset", eCmdHdlrString, 0 },
+	{ "defaulttz", eCmdHdlrString, 0 },
 	{ "supportoctetcountedframing", eCmdHdlrBinary, 0 },
 	{ "notifyonconnectionclose", eCmdHdlrBinary, 0 },
+	{ "compression.mode", eCmdHdlrGetWord, 0 },
 	{ "keepalive", eCmdHdlrBinary, 0 },
 	{ "keepalive.probes", eCmdHdlrInt, 0 },
 	{ "keepalive.time", eCmdHdlrInt, 0 },
@@ -191,7 +202,9 @@ struct ptcpsrv_s {
 	int iKeepAliveIntvl;
 	int iKeepAliveProbes;
 	int iKeepAliveTime;
+	uint8_t compressionMode;
 	uchar *pszInputName;
+	uchar *dfltTZ;
 	prop_t *pInputName;		/* InputName in (fast to process) property format */
 	ruleset_t *pRuleset;
 	ptcplstn_t *pLstn;		/* root of our listeners */
@@ -207,11 +220,13 @@ struct ptcpsrv_s {
  * includes support for doubly-linked list.
  */
 struct ptcpsess_s {
-//	ptcpsrv_t *pSrv;	/* our server TODO: check remove! */
 	ptcplstn_t *pLstn;	/* our listener */
 	ptcpsess_t *prev, *next;
 	int sock;
 	epolld_t *epd;
+	sbool bzInitDone; /* did we do an init of zstrm already? */
+	z_stream zstrm;	/* zip stream to use for tcp compression */
+	uint8_t compressionMode;
 //--- from tcps_sess.h
 	int iMsg;		 /* index of next char to store in msg */
 	int bAtStrtOfFram;	/* are we at the very beginning of a new frame? */
@@ -239,6 +254,8 @@ struct ptcplstn_s {
 	sbool bSuppOctetFram;
 	epolld_t *epd;
 	statsobj_t *stats;	/* listener stats */
+	intctr_t rcvdBytes;
+	intctr_t rcvdDecompressed;
 	STATSCOUNTER_DEF(ctrSubmit, mutCtrSubmit)
 };
 
@@ -680,6 +697,8 @@ doSubmitMsg(ptcpsess_t *pThis, struct syslogTime *stTime, time_t ttGenTime, mult
 	MsgSetRawMsg(pMsg, (char*)pThis->pMsg, pThis->iMsg);
 	MsgSetInputName(pMsg, pSrv->pInputName);
 	MsgSetFlowControlType(pMsg, eFLOWCTL_LIGHT_DELAY);
+	if(pSrv->dfltTZ != NULL)
+		MsgSetDfltTZ(pMsg, (char*) pSrv->dfltTZ);
 	pMsg->msgFlags  = NEEDS_PARSING | PARSE_HOSTNAME;
 	MsgSetRcvFrom(pMsg, pThis->peerName);
 	CHKiRet(MsgSetRcvFromIP(pMsg, pThis->peerIP));
@@ -806,19 +825,18 @@ processDataRcvd(ptcpsess_t *pThis, char c, struct syslogTime *stTime, time_t ttG
  * EXTRACT from tcps_sess.c
  */
 static rsRetVal
-DataRcvd(ptcpsess_t *pThis, char *pData, size_t iLen)
+DataRcvdUncompressed(ptcpsess_t *pThis, char *pData, size_t iLen, struct syslogTime *stTime, time_t ttGenTime)
 {
 	multi_submit_t multiSub;
 	msg_t *pMsgs[CONF_NUM_MULTISUB];
-	struct syslogTime stTime;
-	time_t ttGenTime;
 	char *pEnd;
 	DEFiRet;
 
 	assert(pData != NULL);
 	assert(iLen > 0);
 
-	datetime.getCurrTime(&stTime, &ttGenTime);
+	if(ttGenTime == 0)
+		datetime.getCurrTime(stTime, &ttGenTime);
 	multiSub.ppMsgs = pMsgs;
 	multiSub.maxElem = CONF_NUM_MULTISUB;
 	multiSub.nElem = 0;
@@ -827,12 +845,77 @@ DataRcvd(ptcpsess_t *pThis, char *pData, size_t iLen)
 	pEnd = pData + iLen; /* this is one off, which is intensional */
 
 	while(pData < pEnd) {
-		CHKiRet(processDataRcvd(pThis, *pData++, &stTime, ttGenTime, &multiSub));
+		CHKiRet(processDataRcvd(pThis, *pData++, stTime, ttGenTime, &multiSub));
 	}
 
 	iRet = multiSubmitFlush(&multiSub);
 
 finalize_it:
+	RETiRet;
+}
+
+static rsRetVal
+DataRcvdCompressed(ptcpsess_t *pThis, char *buf, size_t len)
+{
+	struct syslogTime stTime;
+	time_t ttGenTime;
+	int zRet;	/* zlib return state */
+	unsigned outavail;
+	uchar zipBuf[64*1024]; // TODO: alloc on heap, and much larger (512KiB? batch size!)
+	DEFiRet;
+	// TODO: can we do stats counters? Even if they are not 100% correct under all cases,
+	// by simply updating the input and output sizes?
+	uint64_t outtotal;
+
+	datetime.getCurrTime(&stTime, &ttGenTime);
+	outtotal = 0;
+
+	if(!pThis->bzInitDone) {
+		/* allocate deflate state */
+		pThis->zstrm.zalloc = Z_NULL;
+		pThis->zstrm.zfree = Z_NULL;
+		pThis->zstrm.opaque = Z_NULL;
+		zRet = inflateInit(&pThis->zstrm);
+		if(zRet != Z_OK) {
+			DBGPRINTF("imptcp: error %d returned from zlib/inflateInit()\n", zRet);
+			ABORT_FINALIZE(RS_RET_ZLIB_ERR);
+		}
+		pThis->bzInitDone = RSTRUE;
+	}
+
+	pThis->zstrm.next_in = (Bytef*) buf;
+	pThis->zstrm.avail_in = len;
+	/* run inflate() on buffer until everything has been uncompressed */
+	do {
+		DBGPRINTF("imptcp: in inflate() loop, avail_in %d, total_in %ld\n", pThis->zstrm.avail_in, pThis->zstrm.total_in);
+		pThis->zstrm.avail_out = sizeof(zipBuf);
+		pThis->zstrm.next_out = zipBuf;
+		zRet = inflate(&pThis->zstrm, Z_SYNC_FLUSH);    /* no bad return value */
+		//zRet = inflate(&pThis->zstrm, Z_NO_FLUSH);    /* no bad return value */
+		DBGPRINTF("after inflate, ret %d, avail_out %d\n", zRet, pThis->zstrm.avail_out);
+		outavail = sizeof(zipBuf) - pThis->zstrm.avail_out;
+		if(outavail != 0) {
+			outtotal += outavail;
+			pThis->pLstn->rcvdDecompressed += outavail;
+			CHKiRet(DataRcvdUncompressed(pThis, (char*)zipBuf, outavail, &stTime, ttGenTime));
+		}
+	} while (pThis->zstrm.avail_out == 0);
+
+	dbgprintf("end of DataRcvCompress, sizes: in %lld, out %llu\n", (long long) len, outtotal);
+finalize_it:
+	RETiRet;
+}
+
+static rsRetVal
+DataRcvd(ptcpsess_t *pThis, char *pData, size_t iLen)
+{
+	struct syslogTime stTime;
+	DEFiRet;
+	pThis->pLstn->rcvdBytes += iLen;
+	if(pThis->compressionMode >= COMPRESS_STREAM_ALWAYS)
+		iRet =  DataRcvdCompressed(pThis, pData, iLen);
+	else
+		iRet =  DataRcvdUncompressed(pThis, pData, iLen, &stTime, 0);
 	RETiRet;
 }
 
@@ -935,7 +1018,15 @@ addLstn(ptcpsrv_t *pSrv, int sock, int isIPv6)
 	CHKiRet(statsobj.SetName(pLstn->stats, statname));
 	STATSCOUNTER_INIT(pLstn->ctrSubmit, pLstn->mutCtrSubmit);
 	CHKiRet(statsobj.AddCounter(pLstn->stats, UCHAR_CONSTANT("submitted"),
-		ctrType_IntCtr, &(pLstn->ctrSubmit)));
+		ctrType_IntCtr, CTR_FLAG_RESETTABLE, &(pLstn->ctrSubmit)));
+	/* the following counters are not protected by mutexes; we accept
+	 * that they may not be 100% correct */
+	pLstn->rcvdBytes = 0,
+	pLstn->rcvdDecompressed = 0;
+	CHKiRet(statsobj.AddCounter(pLstn->stats, UCHAR_CONSTANT("bytes.received"),
+		ctrType_IntCtr, CTR_FLAG_RESETTABLE, &(pLstn->rcvdBytes)));
+	CHKiRet(statsobj.AddCounter(pLstn->stats, UCHAR_CONSTANT("bytes.decompressed"),
+		ctrType_IntCtr, CTR_FLAG_RESETTABLE, &(pLstn->rcvdDecompressed)));
 	CHKiRet(statsobj.ConstructFinalize(pLstn->stats));
 
 	/* add to start of server's listener list */
@@ -968,9 +1059,11 @@ addSess(ptcplstn_t *pLstn, int sock, prop_t *peerName, prop_t *peerIP)
 	pSess->bSuppOctetFram = pLstn->bSuppOctetFram;
 	pSess->inputState = eAtStrtFram;
 	pSess->iMsg = 0;
+	pSess->bzInitDone = 0;
 	pSess->bAtStrtOfFram = 1;
 	pSess->peerName = peerName;
 	pSess->peerIP = peerIP;
+	pSess->compressionMode = pLstn->pSrv->compressionMode;
 
 	/* add to start of server's listener list */
 	pSess->prev = NULL;
@@ -988,6 +1081,45 @@ finalize_it:
 }
 
 
+/* finish zlib buffer, to be called before closing the session.
+ */
+static rsRetVal
+doZipFinish(ptcpsess_t *pSess)
+{
+	int zRet;	/* zlib return state */
+	DEFiRet;
+	unsigned outavail;
+	struct syslogTime stTime;
+	uchar zipBuf[32*1024]; // TODO: use "global" one from pSess
+
+	if(!pSess->bzInitDone)
+		goto done;
+
+	pSess->zstrm.avail_in = 0;
+	/* run inflate() on buffer until everything has been compressed */
+	do {
+		DBGPRINTF("doZipFinish: in inflate() loop, avail_in %d, total_in %ld\n", pSess->zstrm.avail_in, pSess->zstrm.total_in);
+		pSess->zstrm.avail_out = sizeof(zipBuf);
+		pSess->zstrm.next_out = zipBuf;
+		zRet = inflate(&pSess->zstrm, Z_FINISH);    /* no bad return value */
+		DBGPRINTF("after inflate, ret %d, avail_out %d\n", zRet, pSess->zstrm.avail_out);
+		outavail = sizeof(zipBuf) - pSess->zstrm.avail_out;
+		if(outavail != 0) {
+			pSess->pLstn->rcvdDecompressed += outavail;
+			CHKiRet(DataRcvdUncompressed(pSess, (char*)zipBuf, outavail, &stTime, 0)); // TODO: query time!
+		}
+	} while (pSess->zstrm.avail_out == 0);
+
+finalize_it:
+	zRet = inflateEnd(&pSess->zstrm);
+	if(zRet != Z_OK) {
+		DBGPRINTF("imptcp: error %d returned from zlib/inflateEnd()\n", zRet);
+	}
+
+	pSess->bzInitDone = 0;
+done:	RETiRet;
+}
+
 /* close/remove a session
  * NOTE: we must first remove the fd from the epoll set and then close it -- else we
  * get an error "bad file descriptor" from epoll.
@@ -998,6 +1130,9 @@ closeSess(ptcpsess_t *pSess)
 	int sock;
 	DEFiRet;
 	
+	if(pSess->compressionMode >= COMPRESS_STREAM_ALWAYS)
+		doZipFinish(pSess);
+
 	sock = pSess->sock;
 	CHKiRet(removeEPollSock(sock, pSess->epd));
 	close(sock);
@@ -1044,10 +1179,12 @@ createInstance(instanceConf_t **pinst)
 	inst->iKeepAliveProbes = 0;
 	inst->iKeepAliveTime = 0;
 	inst->bEmitMsgOnClose = 0;
+	inst->dfltTZ = NULL;
 	inst->iAddtlFrameDelim = TCPSRV_NO_ADDTL_DELIMITER;
 	inst->pBindRuleset = NULL;
 	inst->ratelimitBurst = 10000; /* arbitrary high limit */
 	inst->ratelimitInterval = 0; /* off */
+	inst->compressionMode = COMPRESS_SINGLE_MSG;
 
 	/* node created, let's add to config */
 	if(loadModConf->tail == NULL) {
@@ -1127,6 +1264,8 @@ addListner(modConfData_t __attribute__((unused)) *modConf, instanceConf_t *inst)
 	pSrv->iKeepAliveProbes = inst->iKeepAliveProbes;
 	pSrv->iKeepAliveTime = inst->iKeepAliveTime;
 	pSrv->bEmitMsgOnClose = inst->bEmitMsgOnClose;
+	pSrv->compressionMode = inst->compressionMode;
+	pSrv->dfltTZ = inst->dfltTZ;
 	CHKiRet(ratelimitNew(&pSrv->ratelimiter, "imtcp", (char*)inst->pszBindPort));
 	ratelimitSetLinuxLike(pSrv->ratelimiter, inst->ratelimitInterval, inst->ratelimitBurst);
 	ratelimitSetThreadSafe(pSrv->ratelimiter);
@@ -1269,6 +1408,10 @@ sessActivity(ptcpsess_t *pSess)
 {
 	int lenRcv;
 	int lenBuf;
+	uchar *peerName;
+	int lenPeer;
+	int remsock = 0; /* init just to keep compiler happy... :-( */
+	sbool bEmitOnClose = 0;
 	char rcvBuf[128*1024];
 	DEFiRet;
 
@@ -1285,13 +1428,15 @@ sessActivity(ptcpsess_t *pSess)
 		} else if (lenRcv == 0) {
 			/* session was closed, do clean-up */
 			if(pSess->pLstn->pSrv->bEmitMsgOnClose) {
-				uchar *peerName;
-				int lenPeer;
-				prop.GetString(pSess->peerName, &peerName, &lenPeer);
-				errmsg.LogError(0, RS_RET_PEER_CLOSED_CONN, "imptcp session %d closed by remote peer %s.",
-						pSess->sock, peerName);
+				prop.GetString(pSess->peerName, &peerName, &lenPeer),
+				remsock = pSess->sock;
+				bEmitOnClose = 1;
 			}
-			CHKiRet(closeSess(pSess));
+			CHKiRet(closeSess(pSess)); /* close may emit more messages in strmzip mode! */
+			if(bEmitOnClose) {
+				errmsg.LogError(0, RS_RET_PEER_CLOSED_CONN, "imptcp session %d closed by "
+					  	"remote peer %s.", remsock, peerName);
+			}
 			break;
 		} else {
 			if(errno == EAGAIN || errno == EWOULDBLOCK)
@@ -1415,6 +1560,7 @@ wrkr(void *myself)
 BEGINnewInpInst
 	struct cnfparamvals *pvals;
 	instanceConf_t *inst;
+	char *cstr;
 	int i;
 CODESTARTnewInpInst
 	DBGPRINTF("newInpInst (imptcp)\n");
@@ -1443,6 +1589,19 @@ CODESTARTnewInpInst
 			inst->pszBindRuleset = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
 		} else if(!strcmp(inppblk.descr[i].name, "supportoctetcountedframing")) {
 			inst->bSuppOctetFram = (int) pvals[i].val.d.n;
+		} else if(!strcmp(inppblk.descr[i].name, "compression.mode")) {
+			cstr = es_str2cstr(pvals[i].val.d.estr, NULL);
+			if(!strcasecmp(cstr, "stream:always")) {
+				inst->compressionMode = COMPRESS_STREAM_ALWAYS;
+			} else if(!strcasecmp(cstr, "none")) {
+				inst->compressionMode = COMPRESS_NEVER;
+			} else {
+				errmsg.LogError(0, RS_RET_PARAM_ERROR, "omfwd: invalid value for 'compression.mode' "
+					 "parameter (given is '%s')", cstr);
+				free(cstr);
+				ABORT_FINALIZE(RS_RET_PARAM_ERROR);
+			}
+			free(cstr);
 		} else if(!strcmp(inppblk.descr[i].name, "keepalive")) {
 			inst->bKeepAlive = (int) pvals[i].val.d.n;
 		} else if(!strcmp(inppblk.descr[i].name, "keepalive.probes")) {
@@ -1455,6 +1614,8 @@ CODESTARTnewInpInst
 			inst->iAddtlFrameDelim = (int) pvals[i].val.d.n;
 		} else if(!strcmp(inppblk.descr[i].name, "notifyonconnectionclose")) {
 			inst->bEmitMsgOnClose = (int) pvals[i].val.d.n;
+		} else if(!strcmp(inppblk.descr[i].name, "defaulttz")) {
+			inst->dfltTZ = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
 		} else if(!strcmp(inppblk.descr[i].name, "ratelimit.burst")) {
 			inst->ratelimitBurst = (int) pvals[i].val.d.n;
 		} else if(!strcmp(inppblk.descr[i].name, "ratelimit.interval")) {
@@ -1609,6 +1770,7 @@ CODESTARTfreeCnf
 		free(inst->pszBindAddr);
 		free(inst->pszBindRuleset);
 		free(inst->pszInputName);
+		free(inst->dfltTZ);
 		del = inst;
 		inst = inst->next;
 		free(del);
@@ -1658,7 +1820,9 @@ shutdownSrv(ptcpsrv_t *pSrv)
 		/* now unlink listner */
 		lstnDel = pLstn;
 		pLstn = pLstn->next;
-		DBGPRINTF("imptcp shutdown listen socket %d\n", lstnDel->sock);
+		DBGPRINTF("imptcp shutdown listen socket %d (rcvd %lld bytes, "
+			  "decompressed %lld)\n", lstnDel->sock, lstnDel->rcvdBytes,
+			  lstnDel->rcvdDecompressed);
 		free(lstnDel->epd);
 		free(lstnDel);
 	}
