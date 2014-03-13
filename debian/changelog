@@ -5,6 +5,7 @@ rsyslog (7.6.1-1) UNRELEASED; urgency=medium
   * Update Build-Depends:
     - Bump librelp-dev to (>= 1.2.3).
     - Add liblogging-stdlog-dev (>= 1.0.1).
+  * Fix typo in rsyslog.postrm: dissappear → disappear
 
  -- Michael Biebl <biebl@debian.org>  Thu, 13 Mar 2014 18:07:48 +0100
 
