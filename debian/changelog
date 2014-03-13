@@ -1,6 +1,7 @@
 rsyslog (7.6.1-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * Update patches.
 
  -- Michael Biebl <biebl@debian.org>  Thu, 13 Mar 2014 18:07:48 +0100
 

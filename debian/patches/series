@@ -1,4 +1,1 @@
-# Debian patches for rsyslog
-01-dont_create_db.patch
-02-mongo-template-not-mandatory.patch
-03-json-nul-terminator.patch
+0001-Don-t-create-a-database.patch
