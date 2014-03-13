@@ -21,7 +21,7 @@
  * For further information, please see http://www.rsyslog.com
  *
  * rsyslog - An Enhanced syslogd Replacement.
- * Copyright 2003-2012 Rainer Gerhards and Adiscon GmbH.
+ * Copyright 2003-2014 Rainer Gerhards and Adiscon GmbH.
  *
  * This file is part of rsyslog.
  *
@@ -82,6 +82,7 @@
 #endif
 
 #include <signal.h>
+#include <liblogging/stdlog.h>
 
 #if HAVE_PATHS_H
 #include <paths.h>
@@ -417,12 +418,10 @@ finalize_it:
  * function is also passed to the runtime library as the generic error
  * message handler. -- rgerhards, 2008-04-17
  */
-rsRetVal
-submitErrMsg(int iErr, uchar *msg)
+void
+submitErrMsg(const int severity, const int iErr, const uchar *msg)
 {
-	DEFiRet;
-	iRet = logmsgInternal(iErr, LOG_SYSLOG|LOG_ERR, msg, 0);
-	RETiRet;
+	logmsgInternal(iErr, LOG_SYSLOG|(severity & 0x07), msg, 0);
 }
 
 
@@ -432,35 +431,21 @@ submitMsgWithDfltRatelimiter(msg_t *pMsg)
 	return ratelimitAddMsg(dflt_ratelimiter, NULL, pMsg);
 }
 
-/* rgerhards 2004-11-09: the following is a function that can be used
- * to log a message orginating from the syslogd itself.
+/* This function logs a message to rsyslog itself, using its own
+ * internal structures. This means external programs (like the
+ * system journal) will never see this message.
  */
-rsRetVal
-logmsgInternal(int iErr, int pri, const uchar *const msg, int flags)
+static rsRetVal
+logmsgInternalSelf(const int iErr, const int pri, const size_t lenMsg,
+	const char *__restrict__ const msg, int flags)
 {
 	uchar pszTag[33];
-	size_t lenMsg;
-	unsigned i;
-	char *bufModMsg = NULL; /* buffer for modified message, should we need to modify */
 	msg_t *pMsg;
 	DEFiRet;
 
-	/* we first do a path the remove control characters that may have accidently
-	 * introduced (program error!). This costs performance, but we do not expect
-	 * to be called very frequently in any case ;) -- rgerhards, 2013-12-19.
-	 */
-	lenMsg = ustrlen(msg);
-	for(i = 0 ; i < lenMsg ; ++i) {
-		if(msg[i] < 0x20 || msg[i] == 0x7f) {
-			if(bufModMsg == NULL) {
-				CHKmalloc(bufModMsg = strdup((char*) msg));
-			}
-			bufModMsg[i] = ' ';
-		}
-	}
 	CHKiRet(msgConstruct(&pMsg));
 	MsgSetInputName(pMsg, pInternalInputName);
-	MsgSetRawMsg(pMsg, (bufModMsg == NULL) ? (char*)msg : bufModMsg, lenMsg);
+	MsgSetRawMsg(pMsg, (char*)msg, lenMsg);
 	MsgSetHOSTNAME(pMsg, glbl.GetLocalHostName(), ustrlen(glbl.GetLocalHostName()));
 	MsgSetRcvFrom(pMsg, glbl.GetLocalHostNameProp());
 	MsgSetRcvFromIP(pMsg, glbl.GetLocalHostIP());
@@ -480,19 +465,6 @@ logmsgInternal(int iErr, int pri, const uchar *const msg, int flags)
 	flags |= INTERNAL_MSG;
 	pMsg->msgFlags  = flags;
 
-	/* we now check if we should print internal messages out to stderr. This was
-	 * suggested by HKS as a way to help people troubleshoot rsyslog configuration
-	 * (by running it interactively. This makes an awful lot of sense, so I add
-	 * it here. -- rgerhards, 2008-07-28
-	 * Note that error messages can not be disable during a config verify. This
-	 * permits us to process unmodified config files which otherwise contain a
-	 * supressor statement.
-	 */
-	if(((Debug == DEBUG_FULL || !doFork) && ourConf->globals.bErrMsgToStderr) || iConfigVerify) {
-		if(LOG_PRI(pri) == LOG_ERR)
-			fprintf(stderr, "rsyslogd: %s\n", (bufModMsg == NULL) ? (char*)msg : bufModMsg);
-	}
-
 	if(bHaveMainQueue == 0) { /* not yet in queued mode */
 		iminternalAddMsg(pMsg);
 	} else {
@@ -501,6 +473,58 @@ logmsgInternal(int iErr, int pri, const uchar *const msg, int flags)
 		 */
 		ratelimitAddMsg(internalMsg_ratelimiter, NULL, pMsg);
 	}
+finalize_it:
+	RETiRet;
+}
+
+
+/* rgerhards 2004-11-09: the following is a function that can be used
+ * to log a message orginating from the syslogd itself.
+ */
+rsRetVal
+logmsgInternal(int iErr, int pri, const uchar *const msg, int flags)
+{
+	size_t lenMsg;
+	unsigned i;
+	char *bufModMsg = NULL; /* buffer for modified message, should we need to modify */
+	DEFiRet;
+
+	/* we first do a path the remove control characters that may have accidently
+	 * introduced (program error!). This costs performance, but we do not expect
+	 * to be called very frequently in any case ;) -- rgerhards, 2013-12-19.
+	 */
+	lenMsg = ustrlen(msg);
+	for(i = 0 ; i < lenMsg ; ++i) {
+		if(msg[i] < 0x20 || msg[i] == 0x7f) {
+			if(bufModMsg == NULL) {
+				CHKmalloc(bufModMsg = strdup((char*) msg));
+			}
+			bufModMsg[i] = ' ';
+		}
+	}
+
+	if(bProcessInternalMessages) {
+		CHKiRet(logmsgInternalSelf(iErr, pri, lenMsg,
+					   (bufModMsg == NULL) ? (char*)msg : bufModMsg,
+					   flags));
+	} else {
+		stdlog_log(NULL, LOG_PRI(pri), "%s",
+			   (bufModMsg == NULL) ? (char*)msg : bufModMsg);
+	}
+
+	/* we now check if we should print internal messages out to stderr. This was
+	 * suggested by HKS as a way to help people troubleshoot rsyslog configuration
+	 * (by running it interactively. This makes an awful lot of sense, so I add
+	 * it here. -- rgerhards, 2008-07-28
+	 * Note that error messages can not be disabled during a config verify. This
+	 * permits us to process unmodified config files which otherwise contain a
+	 * supressor statement.
+	 */
+	if(((Debug == DEBUG_FULL || !doFork) && ourConf->globals.bErrMsgToStderr) || iConfigVerify) {
+		if(LOG_PRI(pri) == LOG_ERR)
+			fprintf(stderr, "rsyslogd: %s\n", (bufModMsg == NULL) ? (char*)msg : bufModMsg);
+	}
+
 finalize_it:
 	free(bufModMsg);
 	RETiRet;
@@ -757,6 +781,13 @@ static void doDie(int sig)
 		abort();
 	}
 	bFinished = sig;
+	if(glblDebugOnShutdown) {
+		/* kind of hackish - set to 0, so that debug_swith will enable
+		 * and AND emit the "start debug log" message.
+		 */
+		debugging_on = 0;
+		debug_switch();
+	}
 #	undef MSG1
 #	undef MSG2
 }
@@ -1072,7 +1103,7 @@ finalize_it:
  * the time being (remember that we want to restructure config processing at large!).
  * rgerhards, 2009-10-27
  */
-rsRetVal createMainQueue(qqueue_t **ppQueue, uchar *pszQueueName, struct cnfparamvals *queueParams)
+rsRetVal createMainQueue(qqueue_t **ppQueue, uchar *pszQueueName, struct nvlst *lst)
 {
 	struct queuefilenames_s *qfn;
 	uchar *qfname = NULL;
@@ -1088,7 +1119,7 @@ rsRetVal createMainQueue(qqueue_t **ppQueue, uchar *pszQueueName, struct cnfpara
 	/* name our main queue object (it's not fatal if it fails...) */
 	obj.SetName((obj_t*) (*ppQueue), pszQueueName);
 
-	if(queueParams == NULL) { /* use legacy parameters? */
+	if(lst == NULL) { /* use legacy parameters? */
 		/* ... set some properties ... */
 	#	define setQPROP(func, directive, data) \
 		CHKiRet_Hdlr(func(*ppQueue, data)) { \
@@ -1145,7 +1176,7 @@ rsRetVal createMainQueue(qqueue_t **ppQueue, uchar *pszQueueName, struct cnfpara
 	#	undef setQPROPstr
 	} else { /* use new style config! */
 		qqueueSetDefaultsRulesetQueue(*ppQueue);
-		qqueueApplyCnfParam(*ppQueue, queueParams);
+		qqueueApplyCnfParam(*ppQueue, lst);
 	}
 
 	/* ... and finally start the queue! */
@@ -1269,6 +1300,7 @@ doHUP(void)
 
 	queryLocalHostname(); /* re-read our name */
 	ruleset.IterateAllActions(ourConf, doHUPActions, NULL);
+	lookupDoHUP();
 }
 
 
@@ -1358,6 +1390,11 @@ static void printVersion(void)
 #else
 	printf("\tuuid support:\t\t\t\tNo\n");
 #endif
+#ifdef HAVE_JSON_OBJECT_NEW_INT64
+	printf("\tNumber of Bits in RainerScript integers: 64\n");
+#else
+	printf("\tNumber of Bits in RainerScript integers: 32 (due to too-old json-c lib)\n");
+#endif
 	printf("\nSee http://www.rsyslog.com for more information.\n");
 }
 
@@ -1375,7 +1412,7 @@ InitGlobalClasses(void)
 	/* Intialize the runtime system */
 	pErrObj = "rsyslog runtime"; /* set in case the runtime errors before setting an object */
 	CHKiRet(rsrtInit(&pErrObj, &obj));
-	CHKiRet(rsrtSetErrLogger(submitErrMsg)); /* set out error handler */
+	rsrtSetErrLogger(submitErrMsg);
 
 	/* Now tell the system which classes we need ourselfs */
 	pErrObj = "glbl";
@@ -1788,7 +1825,7 @@ int realMain(int argc, char **argv)
 	 * of other options, we do this during the inital option processing.
 	 * rgerhards, 2008-04-04
 	 */
-	while((ch = getopt(argc, argv, "46a:Ac:dDef:g:hi:l:m:M:nN:op:qQr::s:t:T:u:vwx")) != EOF) {
+	while((ch = getopt(argc, argv, "46a:Ac:dDef:g:hi:l:m:M:nN:op:qQr::s:S:t:T:u:vwx")) != EOF) {
 		switch((char)ch) {
                 case '4':
                 case '6':
@@ -1806,6 +1843,7 @@ int realMain(int argc, char **argv)
 		case 'q': /* add hostname if DNS resolving has failed */
 		case 'Q': /* dont resolve hostnames in ACL to IPs */
 		case 's':
+		case 'S': /* Source IP for local client to be used on multihomed host */
 		case 'T': /* chroot on startup (primarily for testing) */
 		case 'u': /* misc user settings */
 		case 'w': /* disable disallowed host warnings */
@@ -1897,6 +1935,13 @@ int realMain(int argc, char **argv)
                 case 'a':
 			fprintf(stderr, "rsyslogd: error -a is no longer supported, use module imuxsock instead");
                         break;
+		case 'S':		/* Source IP for local client to be used on multihomed host */
+			if(glbl.GetSourceIPofLocalClient() != NULL) {
+				fprintf (stderr, "rsyslogd: Only one -S argument allowed, the first one is taken.\n");
+			} else {
+				glbl.SetSourceIPofLocalClient((uchar*)arg);
+			}
+			break;
 		case 'f':		/* configuration file */
 			ConfFile = (uchar*) arg;
 			break;

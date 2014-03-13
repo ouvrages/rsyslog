@@ -8,7 +8,7 @@
  * Please note that there currently is no glbl.c file as we do not yet
  * have any implementations.
  *
- * Copyright 2008-2012 Rainer Gerhards and Adiscon GmbH.
+ * Copyright 2008-2013 Rainer Gerhards and Adiscon GmbH.
  *
  * This file is part of the rsyslog runtime library.
  *
@@ -37,6 +37,7 @@
 #define glblGetIOBufSize() 4096 /* size of the IO buffer, e.g. for strm class */
 
 extern pid_t glbl_ourpid;
+extern int bProcessInternalMessages;
 
 /* interfaces */
 BEGINinterface(glbl) /* name must also be changed in ENDinterface macro! */
@@ -52,6 +53,7 @@ BEGINinterface(glbl) /* name must also be changed in ENDinterface macro! */
 	SIMP_PROP(Option_DisallowWarning, int)
 	SIMP_PROP(DisableDNS, int)
 	SIMP_PROP(LocalFQDNName, uchar*)
+	SIMP_PROP(mainqCnfObj, struct cnfobj*)
 	SIMP_PROP(LocalHostName, uchar*)
 	SIMP_PROP(LocalDomain, uchar*)
 	SIMP_PROP(StripDomains, char**)
@@ -81,6 +83,8 @@ BEGINinterface(glbl) /* name must also be changed in ENDinterface macro! */
 	/* next change is v9! */
 	/* v8 - 2012-03-21 */
 	prop_t* (*GetLocalHostIP)(void);
+	uchar* (*GetSourceIPofLocalClient)(void);		/* [ar] */
+	rsRetVal (*SetSourceIPofLocalClient)(uchar*);		/* [ar] */
 #undef	SIMP_PROP
 ENDinterface(glbl)
 #define glblCURR_IF_VERSION 7 /* increment whenever you change the interface structure! */
@@ -89,11 +93,15 @@ ENDinterface(glbl)
 /* the remaining prototypes */
 PROTOTYPEObj(glbl);
 
+extern int glblDebugOnShutdown;	/* start debug log when we are shut down */
+
 static inline pid_t glblGetOurPid(void) { return glbl_ourpid; }
 static inline void glblSetOurPid(pid_t pid) { glbl_ourpid = pid; }
 
 void glblPrepCnf(void);
 void glblProcessCnf(struct cnfobj *o);
+void glblProcessMainQCnf(struct cnfobj *o);
+void glblDestructMainqCnfObj();
 void glblDoneLoadCnf(void);
 const uchar * glblGetWorkDirRaw(void);
 

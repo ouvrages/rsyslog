@@ -28,11 +28,10 @@
 #include "syslogd-types.h"
 #include "queue.h"
 
-/* external data - this is to be removed when we change the action
- * object interface (will happen some time..., at latest when the
- * config file format is changed). -- rgerhards, 2008-01-28
- */
+/* external data */
 extern int glbliActionResumeRetryCount;
+extern int bActionReportSuspension;
+extern int bActionReportSuspensionCont;
 
 
 typedef enum {
@@ -53,6 +52,9 @@ struct action_s {
 	time_t	tLastExec;	/* time this action was last executed */
 	sbool	bExecWhenPrevSusp;/* execute only when previous action is suspended? */
 	sbool	bWriteAllMarkMsgs;/* should all mark msgs be written (not matter how recent the action was executed)? */
+	sbool	bReportSuspension;/* should suspension (and reactivation) of the action reported */
+	sbool	bReportSuspensionCont;
+	sbool	bJustResumed;	/* set when tryResume returned OK, but no message yet actually written */
 	int	iSecsExecOnceInterval; /* if non-zero, minimum seconds to wait until action is executed again */
 	action_state_t eState;	/* current state of action */
 	sbool	bHadAutoCommit;	/* did an auto-commit happen during doAction()? */
@@ -79,19 +81,22 @@ struct action_s {
 	qqueue_t *pQueue;	/* action queue */
 	pthread_mutex_t mutAction; /* primary action mutex */
 	pthread_mutex_t mutActExec; /* mutex to guard actual execution of doAction for single-threaded modules */
-	uchar *pszName;		/* action name (for documentation) */
+	uchar *pszName;		/* action name */
 	DEF_ATOMIC_HELPER_MUT(mutCAS);
 	/* for statistics subsystem */
 	statsobj_t *statsobj;
 	STATSCOUNTER_DEF(ctrProcessed, mutCtrProcessed);
 	STATSCOUNTER_DEF(ctrFail, mutCtrFail);
+	STATSCOUNTER_DEF(ctrSuspend, mutCtrSuspend);
+	STATSCOUNTER_DEF(ctrSuspendDuration, mutCtrSuspendDuration);
+	STATSCOUNTER_DEF(ctrResume, mutCtrResume);
 };
 
 
 /* function prototypes
  */
 rsRetVal actionConstruct(action_t **ppThis);
-rsRetVal actionConstructFinalize(action_t *pThis, struct cnfparamvals *queueParams);
+rsRetVal actionConstructFinalize(action_t *pThis, struct nvlst *lst);
 rsRetVal actionDestruct(action_t *pThis);
 rsRetVal actionDbgPrint(action_t *pThis);
 rsRetVal actionSetGlobalResumeInterval(int iNewVal);
@@ -99,7 +104,7 @@ rsRetVal actionDoAction(action_t *pAction);
 rsRetVal actionWriteToAction(action_t *pAction, msg_t *pMsg);
 rsRetVal actionCallHUPHdlr(action_t *pAction);
 rsRetVal actionClassInit(void);
-rsRetVal addAction(action_t **ppAction, modInfo_t *pMod, void *pModData, omodStringRequest_t *pOMSR, struct cnfparamvals *actParams, struct cnfparamvals *queueParams, int bSuspended);
+rsRetVal addAction(action_t **ppAction, modInfo_t *pMod, void *pModData, omodStringRequest_t *pOMSR, struct cnfparamvals *actParams, struct nvlst *lst, int bSuspended);
 rsRetVal activateActions(void);
 rsRetVal actionNewInst(struct nvlst *lst, action_t **ppAction);
 rsRetVal actionProcessCnf(struct cnfobj *o);

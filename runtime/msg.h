@@ -3,7 +3,7 @@
  *
  * File begun on 2007-07-13 by RGerhards (extracted from syslogd.c)
  *
- * Copyright 2007-2012 Rainer Gerhards and Adiscon GmbH.
+ * Copyright 2007-2013 Rainer Gerhards and Adiscon GmbH.
  *
  * This file is part of the rsyslog runtime library.
  *
@@ -30,6 +30,7 @@
 
 #include <pthread.h>
 #include <libestr.h>
+#include <stdint.h>
 #include <json.h>
 #include "obj.h"
 #include "syslogd-types.h"
@@ -85,7 +86,8 @@ struct msg {
 	char *pszTIMESTAMP3339;	/* TIMESTAMP as RFC3339 formatted string (32 charcters at most) */
 	char *pszTIMESTAMP_MySQL;/* TIMESTAMP as MySQL formatted string (always 14 charcters) */
         char *pszTIMESTAMP_PgSQL;/* TIMESTAMP as PgSQL formatted string (always 21 characters) */
-	cstr_t *pCSStrucData;   /* STRUCTURED-DATA */
+	uchar *pszStrucData;    /* STRUCTURED-DATA */
+	uint16_t lenStrucData;	/* (cached) length of STRUCTURED-DATA */
 	cstr_t *pCSAPPNAME;	/* APP-NAME */
 	cstr_t *pCSPROCID;	/* PROCID */
 	cstr_t *pCSMSGID;	/* MSGID */
@@ -107,6 +109,7 @@ struct msg {
 	struct syslogTime tRcvdAt;/* time the message entered this program */
 	struct syslogTime tTIMESTAMP;/* (parsed) value of the timestamp */
 	struct json_object *json;
+	struct json_object *localvars;
 	/* some fixed-size buffers to save malloc()/free() for frequently used fields (from the default templates) */
 	uchar szRawMsg[CONF_RAWMSG_BUFSIZE];	/* most messages are small, and these are stored here (without malloc/free!) */
 	uchar szHOSTNAME[CONF_HOSTNAME_BUFSIZE];
@@ -124,7 +127,8 @@ struct msg {
 	char pszRcvdAt_SecFrac[7];	     /* same as above. Both are fractional seconds for their respective timestamp */
 	char pszTIMESTAMP_Unix[12]; /* almost as small as a pointer! */
 	char pszRcvdAt_Unix[12];
-    uchar *pszUUID; /* The message's UUID */
+	char dfltTZ[8];	    /* 7 chars max, less overhead than ptr! */
+	uchar *pszUUID; /* The message's UUID */
 };
 
 
@@ -141,6 +145,9 @@ struct msg {
 #define NEEDS_ACLCHK_U	0x080	/* check UDP ACLs after DNS resolution has been done in main queue consumer */
 #define NO_PRI_IN_RAW	0x100	/* rawmsg does not include a PRI (Solaris!), but PRI is already set correctly in the msg object */
 
+/* (syslog) protocol types */
+#define MSG_LEGACY_PROTOCOL 0
+#define MSG_RFC5424_PROTOCOL 1
 
 /* function prototypes
  */
@@ -154,6 +161,7 @@ msg_t* MsgDup(msg_t* pOld);
 msg_t *MsgAddRef(msg_t *pM);
 void setProtocolVersion(msg_t *pM, int iNewVersion);
 void MsgSetInputName(msg_t *pMsg, prop_t*);
+void MsgSetDfltTZ(msg_t *pThis, char *tz);
 rsRetVal MsgSetAPPNAME(msg_t *pMsg, char* pszAPPNAME);
 rsRetVal MsgSetPROCID(msg_t *pMsg, char* pszPROCID);
 rsRetVal MsgSetMSGID(msg_t *pMsg, char* pszMSGID);
@@ -162,6 +170,8 @@ void MsgSetTAG(msg_t *pMsg, uchar* pszBuf, size_t lenBuf);
 void MsgSetRuleset(msg_t *pMsg, ruleset_t*);
 rsRetVal MsgSetFlowControlType(msg_t *pMsg, flowControl_t eFlowCtl);
 rsRetVal MsgSetStructuredData(msg_t *pMsg, char* pszStrucData);
+rsRetVal MsgAddToStructuredData(msg_t *pMsg, uchar *toadd, rs_size_t len);
+void MsgGetStructuredData(msg_t *pM, uchar **pBuf, rs_size_t *len);
 rsRetVal msgSetFromSockinfo(msg_t *pThis, struct sockaddr_storage *sa);
 void MsgSetRcvFrom(msg_t *pMsg, prop_t*);
 void MsgSetRcvFromStr(msg_t *pMsg, uchar* pszRcvFrom, int, prop_t **);
@@ -173,20 +183,14 @@ void MsgSetMSGoffs(msg_t *pMsg, short offs);
 void MsgSetRawMsgWOSize(msg_t *pMsg, char* pszRawMsg);
 void MsgSetRawMsg(msg_t *pMsg, char* pszRawMsg, size_t lenMsg);
 rsRetVal MsgReplaceMSG(msg_t *pThis, uchar* pszMSG, int lenMSG);
-uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe,
-                  propid_t propid, es_str_t *propName,
+uchar *MsgGetProp(msg_t *pMsg, struct templateEntry *pTpe, msgPropDescr_t *pProp,
 		  rs_size_t *pPropLen, unsigned short *pbMustBeFreed, struct syslogTime *ttNow);
-rsRetVal msgGetMsgVar(msg_t *pThis, cstr_t *pstrPropName, var_t **ppVar);
-es_str_t* msgGetMsgVarNew(msg_t *pThis, uchar *name);
 uchar *getRcvFrom(msg_t *pM);
 void getTAG(msg_t *pM, uchar **ppBuf, int *piLen);
 char *getTimeReported(msg_t *pM, enum tplFormatTypes eFmt);
 char *getPRI(msg_t *pMsg);
 void getRawMsg(msg_t *pM, uchar **pBuf, int *piLen);
-rsRetVal msgGetCEEVar(msg_t *pThis, cstr_t *propName, var_t **ppVar);
-es_str_t* msgGetCEEVarNew(msg_t *pMsg, char *name);
 rsRetVal msgAddJSON(msg_t *pM, uchar *name, struct json_object *json);
-rsRetVal getCEEPropVal(msg_t *pM, es_str_t *propName, uchar **pRes, rs_size_t *buflen, unsigned short *pbMustBeFreed);
 rsRetVal MsgGetSeverity(msg_t *pThis, int *piSeverity);
 rsRetVal MsgDeserialize(msg_t *pMsg, strm_t *pStrm);
 
@@ -202,18 +206,29 @@ char *getHOSTNAME(msg_t *pM);
 int getHOSTNAMELen(msg_t *pM);
 uchar *getProgramName(msg_t *pM, sbool bLockMutex);
 uchar *getRcvFrom(msg_t *pM);
-rsRetVal propNameToID(cstr_t *pCSPropName, propid_t *pPropID);
+rsRetVal propNameToID(uchar *pName, propid_t *pPropID);
 uchar *propIDToName(propid_t propID);
-rsRetVal msgGetCEEPropJSON(msg_t *pM, es_str_t *propName, struct json_object **pjson);
+rsRetVal msgGetJSONPropJSON(msg_t *pMsg, msgPropDescr_t *pProp, struct json_object **pjson);
+rsRetVal getJSONPropVal(msg_t *pMsg, msgPropDescr_t *pProp, uchar **pRes, rs_size_t *buflen, unsigned short *pbMustBeFreed);
 rsRetVal msgSetJSONFromVar(msg_t *pMsg, uchar *varname, struct var *var);
 rsRetVal msgDelJSON(msg_t *pMsg, uchar *varname);
-rsRetVal jsonFind(msg_t *pM, es_str_t *propName, struct json_object **jsonres);
+rsRetVal jsonFind(struct json_object *jroot, msgPropDescr_t *pProp, struct json_object **jsonres);
 
-static inline rsRetVal
-msgUnsetJSON(msg_t *pMsg, uchar *varname) {
-	return msgDelJSON(pMsg, varname+1);
+rsRetVal msgPropDescrFill(msgPropDescr_t *pProp, uchar *name, int nameLen);
+void msgPropDescrDestruct(msgPropDescr_t *pProp);
+
+static inline int
+msgGetProtocolVersion(msg_t *pM)
+{
+	return(pM->iProtocolVersion);
 }
 
+/* returns non-zero if the message has structured data, 0 otherwise */
+static inline sbool
+MsgHasStructuredData(msg_t *pM)
+{
+	return (pM->pszStrucData == NULL) ? 0 : 1;
+}
 
 /* ------------------------------ some inline functions ------------------------------ */
 

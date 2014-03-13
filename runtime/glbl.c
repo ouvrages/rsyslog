@@ -7,7 +7,7 @@
  *
  * Module begun 2008-04-16 by Rainer Gerhards
  *
- * Copyright 2008-2013 Rainer Gerhards and Adiscon GmbH.
+ * Copyright 2008-2014 Rainer Gerhards and Adiscon GmbH.
  *
  * This file is part of the rsyslog runtime library.
  *
@@ -31,6 +31,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <assert.h>
@@ -43,6 +44,7 @@
 #include "prop.h"
 #include "atomic.h"
 #include "errmsg.h"
+#include "action.h"
 #include "rainerscript.h"
 #include "net.h"
 
@@ -61,6 +63,13 @@ DEFobjCurrIf(net)
  * For this object, these variables are obviously what makes the "meat" of the
  * class...
  */
+int glblDebugOnShutdown = 0;	/* start debug log when we are shut down */
+
+static struct cnfobj *mainqCnfObj = NULL;/* main queue object, to be used later in startup sequence */
+int bProcessInternalMessages = 1;	/* Should rsyslog itself process internal messages?
+					 * 1 - yes
+					 * 0 - send them to libstdlog (e.g. to push to journal)
+					 */
 static uchar *pszWorkDir = NULL;
 static int bOptimizeUniProc = 1;	/* enable uniprocessor optimizations */
 static int bParseHOSTNAMEandTAG = 1;	/* parser modification (based on startup params!) */
@@ -91,6 +100,7 @@ static DEF_ATOMIC_HELPER_MUT(mutTerminateInputs);
 #ifdef USE_UNLIMITED_SELECT
 static int iFdSetSize = howmany(FD_SETSIZE, __NFDBITS) * sizeof (fd_mask); /* size of select() bitmask in bytes */
 #endif
+static uchar *SourceIPofLocalClient = NULL;	/* [ar] Source IP for local client to be used on multihomed host */
 
 
 /* tables for interfacing with the v6 config system */
@@ -99,10 +109,15 @@ static struct cnfparamdescr cnfparamdescr[] = {
 	{ "dropmsgswithmaliciousdnsptrrecords", eCmdHdlrBinary, 0 },
 	{ "localhostname", eCmdHdlrGetWord, 0 },
 	{ "preservefqdn", eCmdHdlrBinary, 0 },
+	{ "debug.onshutdown", eCmdHdlrBinary, 0 },
+	{ "debug.logfile", eCmdHdlrString, 0 },
 	{ "defaultnetstreamdrivercafile", eCmdHdlrString, 0 },
 	{ "defaultnetstreamdriverkeyfile", eCmdHdlrString, 0 },
 	{ "defaultnetstreamdriver", eCmdHdlrString, 0 },
 	{ "maxmessagesize", eCmdHdlrSize, 0 },
+	{ "action.reportsuspension", eCmdHdlrBinary, 0 },
+	{ "action.reportsuspensioncontinuation", eCmdHdlrBinary, 0 },
+	{ "processinternalmessages", eCmdHdlrBinary, 0 }
 };
 static struct cnfparamblk paramblk =
 	{ CNFPARAMBLK_VERSION,
@@ -138,6 +153,7 @@ static dataType Get##nameFunc(void) \
 SIMP_PROP(ParseHOSTNAMEandTAG, bParseHOSTNAMEandTAG, int)
 SIMP_PROP(OptimizeUniProc, bOptimizeUniProc, int)
 SIMP_PROP(PreserveFQDN, bPreserveFQDN, int)
+SIMP_PROP(mainqCnfObj, mainqCnfObj, struct cnfobj *)
 SIMP_PROP(MaxLine, iMaxLine, int)
 SIMP_PROP(DefPFFamily, iDefPFFamily, int) /* note that in the future we may check the family argument */
 SIMP_PROP(DropMalPTRMsgs, bDropMalPTRMsgs, int)
@@ -514,6 +530,23 @@ GetDfltNetstrmDrvrCertFile(void)
 }
 
 
+/* [ar] Source IP for local client to be used on multihomed host */
+static rsRetVal
+SetSourceIPofLocalClient(uchar *newname)
+{
+	if(SourceIPofLocalClient != NULL) {
+		free(SourceIPofLocalClient); }
+	SourceIPofLocalClient = newname;
+	return RS_RET_OK;
+}
+
+static uchar*
+GetSourceIPofLocalClient(void)
+{
+	return(SourceIPofLocalClient);
+}
+
+
 /* queryInterface function
  * rgerhards, 2008-02-21
  */
@@ -534,6 +567,8 @@ CODESTARTobjQueryInterface(glbl)
 	pIf->GetLocalHostIP = GetLocalHostIP;
 	pIf->SetGlobalInputTermination = SetGlobalInputTermination;
 	pIf->GetGlobalInputTermState = GetGlobalInputTermState;
+	pIf->GetSourceIPofLocalClient = GetSourceIPofLocalClient;	/* [ar] */
+	pIf->SetSourceIPofLocalClient = SetSourceIPofLocalClient;	/* [ar] */
 #define SIMP_PROP(name) \
 	pIf->Get##name = Get##name; \
 	pIf->Set##name = Set##name;
@@ -545,6 +580,7 @@ CODESTARTobjQueryInterface(glbl)
 	SIMP_PROP(DropMalPTRMsgs);
 	SIMP_PROP(Option_DisallowWarning);
 	SIMP_PROP(DisableDNS);
+	SIMP_PROP(mainqCnfObj);
 	SIMP_PROP(LocalFQDNName)
 	SIMP_PROP(LocalHostName)
 	SIMP_PROP(LocalDomain)
@@ -595,6 +631,8 @@ static rsRetVal resetConfigVariables(uchar __attribute__((unused)) *pp, void __a
 void
 glblPrepCnf(void)
 {
+	free(mainqCnfObj);
+	mainqCnfObj = NULL;
 	free(cnfparamvals);
 	cnfparamvals = NULL;
 }
@@ -607,11 +645,57 @@ glblPrepCnf(void)
 void
 glblProcessCnf(struct cnfobj *o)
 {
+	int i;
+
 	cnfparamvals = nvlstGetParams(o->nvlst, &paramblk, cnfparamvals);
 	dbgprintf("glbl param blk after glblProcessCnf:\n");
 	cnfparamsPrint(&paramblk, cnfparamvals);
+
+	/* The next thing is a bit hackish and should be changed in higher
+	 * versions. There are a select few parameters which we need to
+	 * act on immediately. These are processed here.
+	 */
+	for(i = 0 ; i < paramblk.nParams ; ++i) {
+		if(!cnfparamvals[i].bUsed)
+			continue;
+		if(!strcmp(paramblk.descr[i].name, "processinternalmessages")) {
+			bProcessInternalMessages = (int) cnfparamvals[i].val.d.n;
+		}
+	}
 }
 
+/* Set mainq parameters. Note that when this is not called, we'll use the
+ * legacy parameter config. mainq parameters can only be set once.
+ */
+void
+glblProcessMainQCnf(struct cnfobj *o)
+{
+	if(mainqCnfObj == NULL) {
+		mainqCnfObj = o;
+	} else {
+		errmsg.LogError(0, RS_RET_ERR, "main_queue() object can only be specified "
+				"once - all but first ignored\n");
+	}
+}
+
+/* destruct the main q cnf object after it is no longer needed. This is
+ * also used to do some final checks.
+ */
+void
+glblDestructMainqCnfObj()
+{
+	/* Only destruct if not NULL! */
+	if (mainqCnfObj != NULL) {
+		nvlstChkUnused(mainqCnfObj->nvlst);
+	}
+	cnfobjDestruct(mainqCnfObj);
+	mainqCnfObj = NULL;
+}
+
+
+/* This processes the "regular" parameters which are to be set after the
+ * config has been fully loaded.
+ */
 void
 glblDoneLoadCnf(void)
 {
@@ -648,14 +732,34 @@ glblDoneLoadCnf(void)
 		} else if(!strcmp(paramblk.descr[i].name,
 				"dropmsgswithmaliciousdnsptrrecords")) {
 			bDropMalPTRMsgs = (int) cnfparamvals[i].val.d.n;
+		} else if(!strcmp(paramblk.descr[i].name, "action.reportsuspension")) {
+			bActionReportSuspension = (int) cnfparamvals[i].val.d.n;
+		} else if(!strcmp(paramblk.descr[i].name, "action.reportsuspensioncontinuation")) {
+			bActionReportSuspensionCont = (int) cnfparamvals[i].val.d.n;
 		} else if(!strcmp(paramblk.descr[i].name, "maxmessagesize")) {
 			iMaxLine = (int) cnfparamvals[i].val.d.n;
+		} else if(!strcmp(paramblk.descr[i].name, "debug.onshutdown")) {
+			glblDebugOnShutdown = (int) cnfparamvals[i].val.d.n;
+			errmsg.LogError(0, RS_RET_OK, "debug: onShutdown set to %d", glblDebugOnShutdown);
+		} else if(!strcmp(paramblk.descr[i].name, "debug.logfile")) {
+			if(pszAltDbgFileName == NULL) {
+				pszAltDbgFileName = es_str2cstr(cnfparamvals[i].val.d.estr, NULL);
+				if((altdbg = open(pszAltDbgFileName, O_WRONLY|O_CREAT|O_TRUNC|O_NOCTTY|O_CLOEXEC, S_IRUSR|S_IWUSR)) == -1) {
+					errmsg.LogError(0, RS_RET_ERR, "debug log file '%s' could not be opened", pszAltDbgFileName);
+				}
+			}
+			errmsg.LogError(0, RS_RET_OK, "debug log file is '%s', fd %d", pszAltDbgFileName, altdbg);
 		} else {
 			dbgprintf("glblDoneLoadCnf: program error, non-handled "
 			  "param '%s'\n", paramblk.descr[i].name);
 		}
 	}
-finalize_it:	;
+
+	if(glblDebugOnShutdown && Debug != DEBUG_FULL) {
+		Debug = DEBUG_ONDEMAND;
+		stddbg = -1;
+	}
+finalize_it:	return;
 }
 
 

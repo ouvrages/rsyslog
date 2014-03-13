@@ -241,6 +241,30 @@ if ENABLE_MMANON
 SUBDIRS += plugins/mmanon
 endif
 
+if ENABLE_MMUTF8FIX
+SUBDIRS += plugins/mmutf8fix
+endif
+
+if ENABLE_MMCOUNT
+SUBDIRS += plugins/mmcount
+endif
+
+if ENABLE_MMSEQUENCE
+SUBDIRS += plugins/mmsequence
+endif
+
+if ENABLE_MMFIELDS
+SUBDIRS += plugins/mmfields
+endif
+
+if ENABLE_MMPSTRUCDATA
+SUBDIRS += plugins/mmpstrucdata
+endif
+
+if ENABLE_MMRFC5424ADDHMAC
+SUBDIRS += plugins/mmrfc5424addhmac
+endif
+
 if ENABLE_ORACLE
 SUBDIRS += plugins/omoracle
 endif
@@ -290,5 +314,5 @@ DISTCHECK_CONFIGURE_FLAGS=	--enable-gssapi_krb5 \
 				--with-systemdsystemunitdir=$$dc_install_base/$(systemdsystemunitdir) 
 # temporarily disable these checks for make distcheck 2012-09-06 rgerhards
 #				--enable-extended-tests \
-#				--enable-pgsql \
+#				--enable-pgsql 
 ACLOCAL_AMFLAGS = -I m4

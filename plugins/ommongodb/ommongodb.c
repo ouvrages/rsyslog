@@ -81,7 +81,7 @@ static struct cnfparamdescr actpdescr[] = {
 	{ "collection", eCmdHdlrGetWord, 0 },
 	{ "uid", eCmdHdlrGetWord, 0 },
 	{ "pwd", eCmdHdlrGetWord, 0 },
-	{ "template", eCmdHdlrGetWord, 1 }
+	{ "template", eCmdHdlrGetWord, 0 }
 };
 static struct cnfparamblk actpblk =
 	{ CNFPARAMBLK_VERSION,
@@ -235,12 +235,18 @@ getDefaultBSON(msg_t *pMsg)
 	int severity, facil;
 	gint64 ts_gen, ts_rcv; /* timestamps: generated, received */
 	int secfrac;
+	msgPropDescr_t cProp; /* we use internal implementation knowledge... */
 
-	procid = MsgGetProp(pMsg, NULL, PROP_PROGRAMNAME, NULL, &procid_len, &procid_free, NULL);
-	tag = MsgGetProp(pMsg, NULL, PROP_SYSLOGTAG, NULL, &tag_len, &tag_free, NULL);
-	pid = MsgGetProp(pMsg, NULL, PROP_PROCID, NULL, &pid_len, &pid_free, NULL);
-	sys = MsgGetProp(pMsg, NULL, PROP_HOSTNAME, NULL, &sys_len, &sys_free, NULL);
-	msg = MsgGetProp(pMsg, NULL, PROP_MSG, NULL, &msg_len, &msg_free, NULL);
+	cProp.id = PROP_PROGRAMNAME;
+	procid = MsgGetProp(pMsg, NULL, &cProp, &procid_len, &procid_free, NULL);
+	cProp.id = PROP_SYSLOGTAG;
+	tag = MsgGetProp(pMsg, NULL, &cProp, &tag_len, &tag_free, NULL);
+	cProp.id = PROP_PROCID;
+	pid = MsgGetProp(pMsg, NULL, &cProp, &pid_len, &pid_free, NULL);
+	cProp.id = PROP_HOSTNAME;
+	sys = MsgGetProp(pMsg, NULL, &cProp, &sys_len, &sys_free, NULL);
+	cProp.id = PROP_MSG;
+	msg = MsgGetProp(pMsg, NULL, &cProp, &msg_len, &msg_free, NULL);
 
 	// TODO: move to datetime? Refactor in any case! rgerhards, 2012-03-30
 	ts_gen = (gint64) datetime.syslogTime2time_t(&pMsg->tTIMESTAMP) * 1000; /* ms! */
@@ -311,8 +317,11 @@ BSONAppendJSONObject(bson *doc, const gchar *name, struct json_object *json)
 	case json_type_int: {
 		int64_t i;
 
-		/* FIXME: the future version will have get_int64 */
+#ifdef HAVE_JSON_OBJECT_NEW_INT64
+		i = json_object_get_int64(json);
+#else /* HAVE_JSON_OBJECT_NEW_INT64 */
 		i = json_object_get_int(json);
+#endif /* HAVE_JSON_OBJECT_NEW_INT64 */
 		if (i >= INT32_MIN && i <= INT32_MAX)
 			return bson_append_int32(doc, name, i);
 		else

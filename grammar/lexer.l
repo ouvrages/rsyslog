@@ -9,7 +9,7 @@
   * cases. So while we hope that cfsysline support can be dropped some time in
   * the future, we will probably keep these useful constructs.
   *
-  * Copyright 2011-2012 Rainer Gerhards and Adiscon GmbH.
+  * Copyright 2011-2013 Rainer Gerhards and Adiscon GmbH.
   *
   * This file is part of the rsyslog runtime library.
   *
@@ -129,7 +129,7 @@ int fileno(FILE *stream);
 <EXPR>0[0-7]+ |			/* octal number */
 <EXPR>0x[0-7a-f] |		/* hex number, following rule is dec; strtoll handles all! */
 <EXPR>([1-9][0-9]*|0)		{ yylval.n = strtoll(yytext, NULL, 0); return NUMBER; }
-<EXPR>\$[$!]{0,1}[a-z][!a-z0-9\-_\.]*	{ yylval.s = strdup(yytext); return VAR; }
+<EXPR>\$[$!./]{0,1}[a-z][!a-z0-9\-_\.]*	{ yylval.s = strdup(yytext+1); return VAR; }
 <EXPR>\'([^'\\]|\\['"\\$bntr]|\\x[0-9a-f][0-9a-f]|\\[0-7][0-7][0-7])*\'	 {
 				   yytext[yyleng-1] = '\0';
 				   unescapeStr((uchar*)yytext+1, yyleng-2);
@@ -176,6 +176,8 @@ int fileno(FILE *stream);
 <INCL>[^ \t\n]+			{ if(cnfDoInclude(yytext) != 0)
 					yyterminate();
 				  BEGIN INITIAL; }
+"main_queue"[ \n\t]*"("		{ yylval.objType = CNFOBJ_MAINQ;
+				  BEGIN INOBJ; return BEGINOBJ; }
 "global"[ \n\t]*"("		{ yylval.objType = CNFOBJ_GLOBAL;
 				  BEGIN INOBJ; return BEGINOBJ; }
 "template"[ \n\t]*"("		{ yylval.objType = CNFOBJ_TPL;
@@ -189,6 +191,8 @@ int fileno(FILE *stream);
 "input"[ \n\t]*"("		{ yylval.objType = CNFOBJ_INPUT;
 				  BEGIN INOBJ; return BEGINOBJ; }
 "module"[ \n\t]*"("		{ yylval.objType = CNFOBJ_MODULE;
+				  BEGIN INOBJ; return BEGINOBJ; }
+"lookup_table"[ \n\t]*"("	{ yylval.objType = CNFOBJ_LOOKUP_TABLE;
 				  BEGIN INOBJ; return BEGINOBJ; }
 "action"[ \n\t]*"("		{ BEGIN INOBJ; return BEGIN_ACTION; }
 ^[ \t]*:\$?[a-z\-]+[ ]*,[ ]*!?[a-z]+[ ]*,[ ]*\"(\\\"|[^\"])*\"	{

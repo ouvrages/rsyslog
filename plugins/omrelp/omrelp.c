@@ -7,7 +7,7 @@
  *
  * File begun on 2008-03-13 by RGerhards
  *
- * Copyright 2008-2013 Adiscon GmbH.
+ * Copyright 2008-2014 Adiscon GmbH.
  *
  * This file is part of rsyslog.
  *
@@ -55,6 +55,9 @@ DEF_OMOD_STATIC_DATA
 DEFobjCurrIf(errmsg)
 DEFobjCurrIf(glbl)
 
+#define DFLT_ENABLE_TLS 0
+#define DFLT_ENABLE_TLSZIP 0
+
 static relpEngine_t *pRelpEngine;	/* our relp engine */
 
 typedef struct _instanceData {
@@ -62,9 +65,24 @@ typedef struct _instanceData {
 	uchar *port;
 	int bInitialConnect; /* is this the initial connection request of our module? (0-no, 1-yes) */
 	int bIsConnected; /* currently connected to server? 0 - no, 1 - yes */
+	int sizeWindow;		/**< the RELP window size - 0=use default */
 	unsigned timeout;
+	unsigned rebindInterval;
+	unsigned nSent;
 	relpClt_t *pRelpClt; /* relp client for this instance */
+	sbool bEnableTLS;
+	sbool bEnableTLSZip;
+	sbool bHadAuthFail;	/**< set on auth failure, will cause retry to disable action */
+	uchar *pristring;		/* GnuTLS priority string (NULL if not to be provided) */
+	uchar *authmode;
+	uchar *caCertFile;
+	uchar *myCertFile;
+	uchar *myPrivKeyFile;
 	uchar *tplName;
+	struct {
+		int nmemb;
+		uchar **name;
+	} permittedPeers;
 } instanceData;
 
 typedef struct configSettings_s {
@@ -77,7 +95,17 @@ static configSettings_t __attribute__((unused)) cs;
 /* action (instance) parameters */
 static struct cnfparamdescr actpdescr[] = {
 	{ "target", eCmdHdlrGetWord, 1 },
+	{ "tls", eCmdHdlrBinary, 0 },
+	{ "tls.compression", eCmdHdlrBinary, 0 },
+	{ "tls.prioritystring", eCmdHdlrString, 0 },
+	{ "tls.cacert", eCmdHdlrString, 0 },
+	{ "tls.mycert", eCmdHdlrString, 0 },
+	{ "tls.myprivkey", eCmdHdlrString, 0 },
+	{ "tls.authmode", eCmdHdlrString, 0 },
+	{ "tls.permittedpeer", eCmdHdlrArray, 0 },
 	{ "port", eCmdHdlrGetWord, 0 },
+	{ "rebindinterval", eCmdHdlrInt, 0 },
+	{ "windowsize", eCmdHdlrInt, 0 },
 	{ "timeout", eCmdHdlrInt, 0 },
 	{ "template", eCmdHdlrGetWord, 0 }
 };
@@ -104,32 +132,111 @@ static uchar *getRelpPt(instanceData *pData)
 		return(pData->port);
 }
 
+static void
+onErr(void *pUsr, char *objinfo, char* errmesg, __attribute__((unused)) relpRetVal errcode)
+{
+	instanceData *pData = (instanceData*) pUsr;
+	errmsg.LogError(0, RS_RET_RELP_AUTH_FAIL, "omrelp[%s:%s]: error '%s', object "
+			" '%s' - action may not work as intended",
+			pData->target, pData->port, errmesg, objinfo);
+}
+
+static void
+onGenericErr(char *objinfo, char* errmesg, __attribute__((unused)) relpRetVal errcode)
+{
+	errmsg.LogError(0, RS_RET_RELP_ERR, "omrelp: librelp error '%s', object "
+			"'%s' - action may not work as intended",
+			errmesg, objinfo);
+}
+
+static void
+onAuthErr(void *pUsr, char *authinfo, char* errmesg, __attribute__((unused)) relpRetVal errcode)
+{
+	instanceData *pData = (instanceData*) pUsr;
+	errmsg.LogError(0, RS_RET_RELP_AUTH_FAIL, "omrelp[%s:%s]: authentication error '%s', peer "
+			"is '%s' - DISABLING action", pData->target, pData->port, errmesg, authinfo);
+	pData->bHadAuthFail = 1;
+}
+
 static inline rsRetVal
 doCreateRelpClient(instanceData *pData)
 {
+	int i;
 	DEFiRet;
 	if(relpEngineCltConstruct(pRelpEngine, &pData->pRelpClt) != RELP_RET_OK)
 		ABORT_FINALIZE(RS_RET_RELP_ERR);
 	if(relpCltSetTimeout(pData->pRelpClt, pData->timeout) != RELP_RET_OK)
 		ABORT_FINALIZE(RS_RET_RELP_ERR);
+	if(relpCltSetWindowSize(pData->pRelpClt, pData->sizeWindow) != RELP_RET_OK)
+		ABORT_FINALIZE(RS_RET_RELP_ERR);
+	if(relpCltSetUsrPtr(pData->pRelpClt, pData) != RELP_RET_OK)
+		ABORT_FINALIZE(RS_RET_RELP_ERR);
+	if(pData->bEnableTLS) {
+		if(relpCltEnableTLS(pData->pRelpClt) != RELP_RET_OK)
+			ABORT_FINALIZE(RS_RET_RELP_ERR);
+		if(pData->bEnableTLSZip) {
+			if(relpCltEnableTLSZip(pData->pRelpClt) != RELP_RET_OK)
+				ABORT_FINALIZE(RS_RET_RELP_ERR);
+		}
+		if(relpCltSetGnuTLSPriString(pData->pRelpClt, (char*) pData->pristring) != RELP_RET_OK)
+			ABORT_FINALIZE(RS_RET_RELP_ERR);
+		if(relpCltSetAuthMode(pData->pRelpClt, (char*) pData->authmode) != RELP_RET_OK) {
+			errmsg.LogError(0, RS_RET_RELP_ERR,
+					"omrelp: invalid auth mode '%s'\n", pData->authmode);
+			ABORT_FINALIZE(RS_RET_RELP_ERR);
+		}
+		if(relpCltSetCACert(pData->pRelpClt, (char*) pData->caCertFile) != RELP_RET_OK)
+			ABORT_FINALIZE(RS_RET_RELP_ERR);
+		if(relpCltSetOwnCert(pData->pRelpClt, (char*) pData->myCertFile) != RELP_RET_OK)
+			ABORT_FINALIZE(RS_RET_RELP_ERR);
+		if(relpCltSetPrivKey(pData->pRelpClt, (char*) pData->myPrivKeyFile) != RELP_RET_OK)
+			ABORT_FINALIZE(RS_RET_RELP_ERR);
+		for(i = 0 ; i <  pData->permittedPeers.nmemb ; ++i) {
+			relpCltAddPermittedPeer(pData->pRelpClt, (char*)pData->permittedPeers.name[i]);
+		}
+	}
+	if(glbl.GetSourceIPofLocalClient() == NULL) {	/* ar Do we have a client IP set? */
+		if(relpCltSetClientIP(pData->pRelpClt, glbl.GetSourceIPofLocalClient()) != RELP_RET_OK)
+			ABORT_FINALIZE(RS_RET_RELP_ERR);
+	}
+	pData->bInitialConnect = 1;
+	pData->nSent = 0;
 finalize_it:
 	RETiRet;
 }
 
-
 BEGINcreateInstance
 CODESTARTcreateInstance
-	pData->bInitialConnect = 1;
+	pData->sizeWindow = 0;
 	pData->timeout = 90;
+	pData->rebindInterval = 0;
+	pData->bEnableTLS = DFLT_ENABLE_TLS;
+	pData->bEnableTLSZip = DFLT_ENABLE_TLSZIP;
+	pData->bHadAuthFail = 0;
+	pData->pristring = NULL;
+	pData->authmode = NULL;
+	pData->caCertFile = NULL;
+	pData->myCertFile = NULL;
+	pData->myPrivKeyFile = NULL;
+	pData->permittedPeers.nmemb = 0;
 ENDcreateInstance
 
 BEGINfreeInstance
+	int i;
 CODESTARTfreeInstance
 	if(pData->pRelpClt != NULL)
 		relpEngineCltDestruct(pRelpEngine, &pData->pRelpClt);
 	free(pData->target);
 	free(pData->port);
 	free(pData->tplName);
+	free(pData->pristring);
+	free(pData->authmode);
+	free(pData->caCertFile);
+	free(pData->myCertFile);
+	free(pData->myPrivKeyFile);
+	for(i = 0 ; i <  pData->permittedPeers.nmemb ; ++i) {
+		free(pData->permittedPeers.name[i]);
+	}
 ENDfreeInstance
 
 static inline void
@@ -139,12 +246,22 @@ setInstParamDefaults(instanceData *pData)
 	pData->port = NULL;
 	pData->tplName = NULL;
 	pData->timeout = 90;
+	pData->sizeWindow = 0;
+	pData->rebindInterval = 0;
+	pData->bEnableTLS = DFLT_ENABLE_TLS;
+	pData->bEnableTLSZip = DFLT_ENABLE_TLSZIP;
+	pData->pristring = NULL;
+	pData->authmode = NULL;
+	pData->caCertFile = NULL;
+	pData->myCertFile = NULL;
+	pData->myPrivKeyFile = NULL;
+	pData->permittedPeers.nmemb = 0;
 }
 
 
 BEGINnewActInst
 	struct cnfparamvals *pvals;
-	int i;
+	int i,j;
 CODESTARTnewActInst
 	if((pvals = nvlstGetParams(lst, &actpblk, NULL)) == NULL) {
 		ABORT_FINALIZE(RS_RET_MISSING_CNFPARAMS);
@@ -164,6 +281,31 @@ CODESTARTnewActInst
 			pData->tplName = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
 		} else if(!strcmp(actpblk.descr[i].name, "timeout")) {
 			pData->timeout = (unsigned) pvals[i].val.d.n;
+		} else if(!strcmp(actpblk.descr[i].name, "rebindinterval")) {
+			pData->rebindInterval = (unsigned) pvals[i].val.d.n;
+		} else if(!strcmp(actpblk.descr[i].name, "windowsize")) {
+			pData->sizeWindow = (int) pvals[i].val.d.n;
+		} else if(!strcmp(actpblk.descr[i].name, "tls")) {
+			pData->bEnableTLS = (unsigned) pvals[i].val.d.n;
+		} else if(!strcmp(actpblk.descr[i].name, "tls.compression")) {
+			pData->bEnableTLSZip = (unsigned) pvals[i].val.d.n;
+		} else if(!strcmp(actpblk.descr[i].name, "tls.prioritystring")) {
+			pData->pristring = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
+		} else if(!strcmp(actpblk.descr[i].name, "tls.cacert")) {
+			pData->caCertFile = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
+		} else if(!strcmp(actpblk.descr[i].name, "tls.mycert")) {
+			pData->myCertFile = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
+		} else if(!strcmp(actpblk.descr[i].name, "tls.myprivkey")) {
+			pData->myPrivKeyFile = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
+		} else if(!strcmp(actpblk.descr[i].name, "tls.authmode")) {
+			pData->authmode = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
+		} else if(!strcmp(actpblk.descr[i].name, "tls.permittedpeer")) {
+			pData->permittedPeers.nmemb = pvals[i].val.d.ar->nmemb;
+			CHKmalloc(pData->permittedPeers.name =
+				malloc(sizeof(uchar*) * pData->permittedPeers.nmemb));
+			for(j = 0 ; j <  pvals[i].val.d.ar->nmemb ; ++j) {
+				pData->permittedPeers.name[j] = (uchar*)es_str2cstr(pvals[i].val.d.ar->arr[j], NULL);
+			}
 		} else {
 			dbgprintf("omrelp: program error, non-handled "
 			  "param '%s'\n", actpblk.descr[i].name);
@@ -219,20 +361,50 @@ static rsRetVal doConnect(instanceData *pData)
 
 	if(iRet == RELP_RET_OK) {
 		pData->bIsConnected = 1;
+	} else if(iRet == RELP_RET_ERR_NO_TLS) {
+		errmsg.LogError(0, RS_RET_RELP_NO_TLS, "Could not connect, librelp does NOT "
+				"support TLS");
+		ABORT_FINALIZE(RS_RET_RELP_NO_TLS);
 	} else {
 		pData->bIsConnected = 0;
 		iRet = RS_RET_SUSPENDED;
 	}
 
+finalize_it:
 	RETiRet;
 }
 
 
 BEGINtryResume
 CODESTARTtryResume
+	if(pData->bHadAuthFail) {
+		ABORT_FINALIZE(RS_RET_DISABLE_ACTION);
+	}
 	iRet = doConnect(pData);
+finalize_it:
 ENDtryResume
 
+static inline rsRetVal
+doRebind(instanceData *pData)
+{
+	DEFiRet;
+	DBGPRINTF("omrelp: destructing relp client due to rebindInterval\n");
+	CHKiRet(relpEngineCltDestruct(pRelpEngine, &pData->pRelpClt));
+	pData->bIsConnected = 0;
+	CHKiRet(doCreateRelpClient(pData));
+finalize_it:
+	RETiRet;
+}
+
+BEGINbeginTransaction
+CODESTARTbeginTransaction
+dbgprintf("omrelp: beginTransaction\n");
+	if(!pData->bIsConnected) {
+		CHKiRet(doConnect(pData));
+	}
+	relpCltHintBurstBegin(pData->pRelpClt);
+finalize_it:
+ENDbeginTransaction
 
 BEGINdoAction
 	uchar *pMsg; /* temporary buffering */
@@ -248,7 +420,7 @@ CODESTARTdoAction
 	pMsg = ppString[0];
 	lenMsg = strlen((char*) pMsg); /* TODO: don't we get this? */
 
-	/* TODO: think about handling oversize messages! */
+	/* we need to truncate oversize msgs - no way around that... */
 	if((int) lenMsg > glbl.GetMaxLine())
 		lenMsg = glbl.GetMaxLine();
 
@@ -257,12 +429,32 @@ CODESTARTdoAction
 	if(ret != RELP_RET_OK) {
 		/* error! */
 		dbgprintf("error forwarding via relp, suspending\n");
-		iRet = RS_RET_SUSPENDED;
+		ABORT_FINALIZE(RS_RET_SUSPENDED);
 	}
 
+	if(pData->rebindInterval != 0 &&
+	   (++pData->nSent >= pData->rebindInterval)) {
+	   	doRebind(pData);
+	}
 finalize_it:
+	if(pData->bHadAuthFail)
+		iRet = RS_RET_DISABLE_ACTION;
+	if(iRet == RS_RET_OK) {
+		/* we mimic non-commit, as otherwise our endTransaction handler
+		 * will not get called. While this is not 100% correct, the worst
+		 * that can happen is some message duplication, something that
+		 * rsyslog generally accepts and prefers over message loss.
+		 */
+		iRet = RS_RET_PREVIOUS_COMMITTED;
+	}
 ENDdoAction
 
+
+BEGINendTransaction
+CODESTARTendTransaction
+	dbgprintf("omrelp: endTransaction\n");
+	relpCltHintBurstEnd(pData->pRelpClt);
+ENDendTransaction
 
 BEGINparseSelectorAct
 	uchar *q;
@@ -329,7 +521,6 @@ CODE_STD_STRING_REQUESTparseSelectorAct(1)
 		++p;
 	}
 
-	/* TODO: make this if go away! */
 	if(*p == ';') {
 		*p = '\0'; /* trick to obtain hostname (later)! */
 		CHKmalloc(pData->target = ustrdup(q));
@@ -362,6 +553,7 @@ CODESTARTqueryEtryPt
 CODEqueryEtryPt_STD_OMOD_QUERIES
 CODEqueryEtryPt_STD_CONF2_CNFNAME_QUERIES 
 CODEqueryEtryPt_STD_CONF2_OMOD_QUERIES
+CODEqueryEtryPt_TXIF_OMOD_QUERIES
 CODEqueryEtryPt_SetShutdownImmdtPtr
 ENDqueryEtryPt
 
@@ -374,12 +566,12 @@ CODEmodInit_QueryRegCFSLineHdlr
 	/* create our relp engine */
 	CHKiRet(relpEngineConstruct(&pRelpEngine));
 	CHKiRet(relpEngineSetDbgprint(pRelpEngine, dbgprintf));
+	CHKiRet(relpEngineSetOnAuthErr(pRelpEngine, onAuthErr));
+	CHKiRet(relpEngineSetOnGenericErr(pRelpEngine, onGenericErr));
+	CHKiRet(relpEngineSetOnErr(pRelpEngine, onErr));
 	CHKiRet(relpEngineSetEnableCmd(pRelpEngine, (uchar*) "syslog", eRelpCmdState_Required));
 
 	/* tell which objects we need */
 	CHKiRet(objUse(errmsg, CORE_COMPONENT));
 	CHKiRet(objUse(glbl, CORE_COMPONENT));
 ENDmodInit
-
-/* vim:set ai:
- */

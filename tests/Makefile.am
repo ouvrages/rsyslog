@@ -7,6 +7,8 @@ TESTS = $(TESTRUNS)
 if ENABLE_IMDIAG
 TESTS +=  \
 	stop-localvar.sh \
+	stop-msgvar.sh \
+	rfc5424parser.sh \
 	arrayqueue.sh \
 	da-mainmsg-q.sh \
 	validation-run.sh \
@@ -72,6 +74,7 @@ TESTS +=  \
 	rscript_prifilt.sh \
 	rscript_optimizer1.sh \
 	rscript_ruleset_call.sh \
+	rs_optimizer_pri.sh \
 	cee_simple.sh \
 	cee_diskqueue.sh \
 	incltest.sh \
@@ -116,6 +119,11 @@ TESTS +=  \
 	imptcp_large.sh \
 	imptcp_addtlframedelim.sh \
 	imptcp_conndrop.sh 
+endif
+
+if ENABLE_MMPSTRUCDATA
+TESTS +=  \
+	mmpstrucdata.sh
 endif
 
 if ENABLE_GNUTLS
@@ -290,8 +298,26 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/rscript_stop.conf \
 	   rscript_stop2.sh \
 	   testsuites/rscript_stop2.conf \
+	   rscript_le.sh \
+	   testsuites/rscript_le.conf \
+	   rscript_ge.sh \
+	   testsuites/rscript_ge.conf \
+	   rscript_lt.sh \
+	   testsuites/rscript_lt.conf \
+	   rscript_gt.sh \
+	   testsuites/rscript_gt.conf \
+	   rscript_ne.sh \
+	   testsuites/rscript_ne.conf \
+	   rscript_eq.sh \
+	   testsuites/rscript_eq.conf \
 	   stop-localvar.sh \
 	   testsuites/stop-localvar.conf \
+	   stop-msgvar.sh \
+	   testsuites/stop-msgvar.conf \
+	   rfc5424parser.sh \
+	   testsuites/rfc5424parser.conf \
+	   rs_optimizer_pri.sh \
+	   testsuites/rs_optimizer_pri.conf \
 	   rscript_prifilt.sh \
 	   testsuites/rscript_prifilt.conf \
 	   rscript_optimizer1.sh \
@@ -514,6 +540,8 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   mysql-asyn.sh \
 	   mysql-asyn-vg.sh \
 	   testsuites/mysql-asyn.conf \
+	   mmpstrucdata.sh \
+	   testsuites/mmpstrucdata.conf \
 	   cfg.sh
 
 # TODO: re-enable

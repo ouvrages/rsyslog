@@ -142,7 +142,7 @@ finalize_it:
  * is called.
  */
 static rsRetVal
-addCounter(statsobj_t *pThis, uchar *ctrName, statsCtrType_t ctrType, void *pCtr)
+addCounter(statsobj_t *pThis, uchar *ctrName, statsCtrType_t ctrType, int8_t flags, void *pCtr)
 {
 	ctr_t *ctr;
 	DEFiRet;
@@ -151,6 +151,7 @@ addCounter(statsobj_t *pThis, uchar *ctrName, statsCtrType_t ctrType, void *pCtr
 	ctr->next = NULL;
 	ctr->prev = NULL;
 	CHKmalloc(ctr->name = ustrdup(ctrName));
+	ctr->flags = flags;
 	ctr->ctrType = ctrType;
 	switch(ctrType) {
 	case ctrType_IntCtr:
@@ -166,9 +167,24 @@ finalize_it:
 	RETiRet;
 }
 
+static inline void
+resetResettableCtr(ctr_t *pCtr, int8_t bResetCtrs)
+{
+	if(bResetCtrs && (pCtr->flags & CTR_FLAG_RESETTABLE)) {
+		switch(pCtr->ctrType) {
+		case ctrType_IntCtr:
+			*(pCtr->val.pIntCtr) = 0;
+			break;
+		case ctrType_Int:
+			*(pCtr->val.pInt) = 0;
+			break;
+		}
+	}
+}
+
 /* get all the object's countes together as CEE. */
 static rsRetVal
-getStatsLineCEE(statsobj_t *pThis, cstr_t **ppcstr, int cee_cookie)
+getStatsLineCEE(statsobj_t *pThis, cstr_t **ppcstr, int cee_cookie, int8_t bResetCtrs)
 {
 	cstr_t *pcstr;
 	ctr_t *pCtr;
@@ -209,7 +225,7 @@ getStatsLineCEE(statsobj_t *pThis, cstr_t **ppcstr, int cee_cookie)
 		} else {
 			cstrAppendChar(pcstr, '}');
 		}
-
+		resetResettableCtr(pCtr, bResetCtrs);
 	}
 	pthread_mutex_unlock(&pThis->mutCtr);
 
@@ -223,7 +239,7 @@ finalize_it:
 /* get all the object's countes together with object name as one line.
  */
 static rsRetVal
-getStatsLine(statsobj_t *pThis, cstr_t **ppcstr)
+getStatsLine(statsobj_t *pThis, cstr_t **ppcstr, int8_t bResetCtrs)
 {
 	cstr_t *pcstr;
 	ctr_t *pCtr;
@@ -247,6 +263,7 @@ getStatsLine(statsobj_t *pThis, cstr_t **ppcstr)
 			break;
 		}
 		cstrAppendChar(pcstr, ' ');
+		resetResettableCtr(pCtr, bResetCtrs);
 	}
 	pthread_mutex_unlock(&pThis->mutCtr);
 
@@ -265,7 +282,7 @@ finalize_it:
  * line. If the callback reports an error, processing is stopped.
  */
 static rsRetVal
-getAllStatsLines(rsRetVal(*cb)(void*, cstr_t*), void *usrptr, statsFmtType_t fmt)
+getAllStatsLines(rsRetVal(*cb)(void*, cstr_t*), void *usrptr, statsFmtType_t fmt, int8_t bResetCtrs)
 {
 	statsobj_t *o;
 	cstr_t *cstr;
@@ -274,13 +291,13 @@ getAllStatsLines(rsRetVal(*cb)(void*, cstr_t*), void *usrptr, statsFmtType_t fmt
 	for(o = objRoot ; o != NULL ; o = o->next) {
 		switch(fmt) {
 		case statsFmt_Legacy:
-			CHKiRet(getStatsLine(o, &cstr));
+			CHKiRet(getStatsLine(o, &cstr, bResetCtrs));
 			break;
 		case statsFmt_CEE:
-			CHKiRet(getStatsLineCEE(o, &cstr, 1));
+			CHKiRet(getStatsLineCEE(o, &cstr, 1, bResetCtrs));
 			break;
 		case statsFmt_JSON:
-			CHKiRet(getStatsLineCEE(o, &cstr, 0));
+			CHKiRet(getStatsLineCEE(o, &cstr, 0, bResetCtrs));
 			break;
 		}
 		CHKiRet(cb(usrptr, cstr));
@@ -348,7 +365,7 @@ CODESTARTobjQueryInterface(statsobj)
 	pIf->Destruct = statsobjDestruct;
 	pIf->DebugPrint = statsobjDebugPrint;
 	pIf->SetName = setName;
-	pIf->GetStatsLine = getStatsLine;
+	//pIf->GetStatsLine = getStatsLine;
 	pIf->GetAllStatsLines = getAllStatsLines;
 	pIf->AddCounter = addCounter;
 	pIf->EnableStats = enableStats;

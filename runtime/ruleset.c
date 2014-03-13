@@ -261,7 +261,7 @@ execUnset(struct cnfstmt *stmt, batch_t *pBatch, sbool *active)
 	for(i = 0 ; i < batchNumMsgs(pBatch) && !*(pBatch->pbShutdownImmediate) ; ++i) {
 		if(   pBatch->eltState[i] != BATCH_STATE_DISC
 		   && (active == NULL || active[i])) {
-			msgUnsetJSON(pBatch->pElem[i].pMsg, stmt->d.s_unset.varname);
+			msgDelJSON(pBatch->pElem[i].pMsg, stmt->d.s_unset.varname);
 		}
 	}
 	RETiRet;
@@ -294,15 +294,19 @@ execCall(struct cnfstmt *stmt, batch_t *pBatch, sbool *active)
 		scriptExec(stmt->d.s_call.stmt, pBatch, active);
 	} else {
 		for(i = 0 ; i < batchNumMsgs(pBatch) ; ++i) {
-			CHKmalloc(pMsg = MsgDup((msg_t*) pBatch->pElem[i].pMsg));
-			DBGPRINTF("CALL: forwarding message %d to async ruleset %p\n",
-				  i, stmt->d.s_call.ruleset->pQueue);
-			MsgSetFlowControlType(pMsg, eFLOWCTL_NO_DELAY);
-			MsgSetRuleset(pMsg, stmt->d.s_call.ruleset);
-			/* Note: we intentionally use submitMsg2() here, as we process messages
-			 * that were already run through the rate-limiter.
-			 */
-			submitMsg2(pMsg);
+			if(pBatch->eltState[i] == BATCH_STATE_DISC)
+				continue; /* will be ignored in any case */
+			if(active == NULL || active[i]) {
+				CHKmalloc(pMsg = MsgDup((msg_t*) pBatch->pElem[i].pMsg));
+				DBGPRINTF("CALL: forwarding message %d to async ruleset %p\n",
+					  i, stmt->d.s_call.ruleset->pQueue);
+				MsgSetFlowControlType(pMsg, eFLOWCTL_NO_DELAY);
+				MsgSetRuleset(pMsg, stmt->d.s_call.ruleset);
+				/* Note: we intentionally use submitMsg2() here, as we process messages
+				 * that were already run through the rate-limiter.
+				 */
+				submitMsg2(pMsg);
+			}
 		}
 	}
 finalize_it:
@@ -416,12 +420,11 @@ evalPROPFILT(struct cnfstmt *stmt, msg_t *pMsg)
 	int bRet = 0;
 	rs_size_t propLen;
 
-	if(stmt->d.s_propfilt.propID == PROP_INVALID)
+	if(stmt->d.s_propfilt.prop.id == PROP_INVALID)
 		goto done;
 
-	pszPropVal = MsgGetProp(pMsg, NULL, stmt->d.s_propfilt.propID,
-				stmt->d.s_propfilt.propName, &propLen,
-				&pbMustBeFreed, NULL);
+	pszPropVal = MsgGetProp(pMsg, NULL, &stmt->d.s_propfilt.prop,
+				&propLen, &pbMustBeFreed, NULL);
 
 	/* Now do the compares (short list currently ;)) */
 	switch(stmt->d.s_propfilt.operation ) {
@@ -465,15 +468,18 @@ evalPROPFILT(struct cnfstmt *stmt, msg_t *pMsg)
 		bRet = (bRet == 1) ?  0 : 1;
 
 	if(Debug) {
-		char *cstr;
-		if(stmt->d.s_propfilt.propID == PROP_CEE) {
-			cstr = es_str2cstr(stmt->d.s_propfilt.propName, NULL);
+		if(stmt->d.s_propfilt.prop.id == PROP_CEE) {
 			DBGPRINTF("Filter: check for CEE property '%s' (value '%s') ",
-				cstr, pszPropVal);
-			free(cstr);
+				stmt->d.s_propfilt.prop.name, pszPropVal);
+		} else if(stmt->d.s_propfilt.prop.id == PROP_LOCAL_VAR) {
+			DBGPRINTF("Filter: check for local var '%s' (value '%s') ",
+				stmt->d.s_propfilt.prop.name, pszPropVal);
+		} else if(stmt->d.s_propfilt.prop.id == PROP_GLOBAL_VAR) {
+			DBGPRINTF("Filter: check for global var '%s' (value '%s') ",
+				stmt->d.s_propfilt.prop.name, pszPropVal);
 		} else {
 			DBGPRINTF("Filter: check for property '%s' (value '%s') ",
-				propIDToName(stmt->d.s_propfilt.propID), pszPropVal);
+				propIDToName(stmt->d.s_propfilt.prop.id), pszPropVal);
 		}
 		if(stmt->d.s_propfilt.isNegated)
 			DBGPRINTF("NOT ");
@@ -952,7 +958,6 @@ rsRetVal
 rulesetProcessCnf(struct cnfobj *o)
 {
 	struct cnfparamvals *pvals;
-	struct cnfparamvals *queueParams;
 	rsRetVal localRet;
 	uchar *rsName = NULL;
 	uchar *parserName;
@@ -998,11 +1003,10 @@ rulesetProcessCnf(struct cnfobj *o)
 	}
 
 	/* pick up ruleset queue parameters */
-	qqueueDoCnfParams(o->nvlst, &queueParams);
-	if(queueCnfParamsSet(queueParams)) {
+	if(queueCnfParamsSet(o->nvlst)) {
 		rsname = (pRuleset->pszName == NULL) ? (uchar*) "[ruleset]" : pRuleset->pszName;
 		DBGPRINTF("adding a ruleset-specific \"main\" queue for ruleset '%s'\n", rsname);
-		CHKiRet(createMainQueue(&pRuleset->pQueue, rsname, queueParams));
+		CHKiRet(createMainQueue(&pRuleset->pQueue, rsname, o->nvlst));
 	}
 
 finalize_it:

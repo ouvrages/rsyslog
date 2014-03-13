@@ -48,10 +48,12 @@ host_triplet = @host@
 @ENABLE_TESTBENCH_TRUE@	$(am__append_7) $(am__append_8) \
 @ENABLE_TESTBENCH_TRUE@	$(am__append_9) $(am__append_10) \
 @ENABLE_TESTBENCH_TRUE@	$(am__append_11) $(am__append_12) \
-@ENABLE_TESTBENCH_TRUE@	$(am__append_13)
+@ENABLE_TESTBENCH_TRUE@	$(am__append_13) $(am__append_14)
 #TESTS = $(TESTRUNS) cfg.sh
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_1 = \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	stop-localvar.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	stop-msgvar.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rfc5424parser.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	arrayqueue.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	da-mainmsg-q.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	validation-run.sh \
@@ -117,6 +119,7 @@ host_triplet = @host@
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_prifilt.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_optimizer1.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rscript_ruleset_call.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rs_optimizer_pri.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	cee_simple.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	cee_diskqueue.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	incltest.sh \
@@ -153,20 +156,23 @@ host_triplet = @host@
 @ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	imptcp_addtlframedelim.sh \
 @ENABLE_IMPTCP_TRUE@@ENABLE_TESTBENCH_TRUE@	imptcp_conndrop.sh 
 
+@ENABLE_MMPSTRUCDATA_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_7 = \
+@ENABLE_MMPSTRUCDATA_TRUE@@ENABLE_TESTBENCH_TRUE@	mmpstrucdata.sh
+
 
 # TODO: re-enable in newer version
 #TESTS +=  \
 #	#sndrcv_tls_anon.sh \
 #	#sndrcv_tls_anon_rebind.sh \
 #	#imtcp-tls-basic.sh
-@ENABLE_GNUTLS_TRUE@@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@am__append_7 = imtcp-tls-basic-vg.sh \
+@ENABLE_GNUTLS_TRUE@@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@am__append_8 = imtcp-tls-basic-vg.sh \
 @ENABLE_GNUTLS_TRUE@@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@	 imtcp_conndrop_tls-vg.sh 
 
-@ENABLE_OMUXSOCK_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_8 = uxsock_simple.sh
-@ENABLE_OMUDPSPOOF_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_9 = sndrcv_omudpspoof.sh \
+@ENABLE_OMUXSOCK_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_9 = uxsock_simple.sh
+@ENABLE_OMUDPSPOOF_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_10 = sndrcv_omudpspoof.sh \
 @ENABLE_OMUDPSPOOF_TRUE@@ENABLE_TESTBENCH_TRUE@	 sndrcv_omudpspoof_nonstdpt.sh
 
-@ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_10 = omod-if-array.sh \
+@ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_11 = omod-if-array.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 proprepltest.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 parsertest.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 timestamp.sh \
@@ -178,16 +184,16 @@ host_triplet = @host@
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 tabescape_off.sh \
 @ENABLE_OMSTDOUT_TRUE@@ENABLE_TESTBENCH_TRUE@	 fieldtest.sh
 
-@ENABLE_IMDIAG_TRUE@@ENABLE_OMRULESET_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_11 = omruleset.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_OMRULESET_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_12 = omruleset.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_OMRULESET_TRUE@@ENABLE_TESTBENCH_TRUE@	 omruleset-queue.sh
 
 
 # random.sh is temporarily disabled as it needs some work
 # to rsyslog core to complete in reasonable time
 #TESTS += random.sh 
-@ENABLE_IMFILE_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_12 = imfile-basic.sh
-@ENABLE_IMFILE_TRUE@@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@am__append_13 = imfile-basic-vg.sh
-@ENABLE_GNUTLS_TRUE@am__append_14 = -lgcrypt
+@ENABLE_IMFILE_TRUE@@ENABLE_TESTBENCH_TRUE@am__append_13 = imfile-basic.sh
+@ENABLE_IMFILE_TRUE@@ENABLE_TESTBENCH_TRUE@@HAVE_VALGRIND_TRUE@am__append_14 = imfile-basic-vg.sh
+@ENABLE_GNUTLS_TRUE@am__append_15 = -lgcrypt
 subdir = tests
 DIST_COMMON = README $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -351,6 +357,8 @@ LIBGCRYPT_CFLAGS = @LIBGCRYPT_CFLAGS@
 LIBGCRYPT_LIBS = @LIBGCRYPT_LIBS@
 LIBLOGGING_CFLAGS = @LIBLOGGING_CFLAGS@
 LIBLOGGING_LIBS = @LIBLOGGING_LIBS@
+LIBLOGGING_STDLOG_CFLAGS = @LIBLOGGING_STDLOG_CFLAGS@
+LIBLOGGING_STDLOG_LIBS = @LIBLOGGING_STDLOG_LIBS@
 LIBLOGNORM_CFLAGS = @LIBLOGNORM_CFLAGS@
 LIBLOGNORM_LIBS = @LIBLOGNORM_LIBS@
 LIBM = @LIBM@
@@ -375,6 +383,8 @@ NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OPENSSL_CFLAGS = @OPENSSL_CFLAGS@
+OPENSSL_LIBS = @OPENSSL_LIBS@
 ORACLE_CFLAGS = @ORACLE_CFLAGS@
 ORACLE_LIBS = @ORACLE_LIBS@
 OTOOL = @OTOOL@
@@ -586,8 +596,26 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/rscript_stop.conf \
 	   rscript_stop2.sh \
 	   testsuites/rscript_stop2.conf \
+	   rscript_le.sh \
+	   testsuites/rscript_le.conf \
+	   rscript_ge.sh \
+	   testsuites/rscript_ge.conf \
+	   rscript_lt.sh \
+	   testsuites/rscript_lt.conf \
+	   rscript_gt.sh \
+	   testsuites/rscript_gt.conf \
+	   rscript_ne.sh \
+	   testsuites/rscript_ne.conf \
+	   rscript_eq.sh \
+	   testsuites/rscript_eq.conf \
 	   stop-localvar.sh \
 	   testsuites/stop-localvar.conf \
+	   stop-msgvar.sh \
+	   testsuites/stop-msgvar.conf \
+	   rfc5424parser.sh \
+	   testsuites/rfc5424parser.conf \
+	   rs_optimizer_pri.sh \
+	   testsuites/rs_optimizer_pri.conf \
 	   rscript_prifilt.sh \
 	   testsuites/rscript_prifilt.conf \
 	   rscript_optimizer1.sh \
@@ -810,6 +838,8 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   mysql-asyn.sh \
 	   mysql-asyn-vg.sh \
 	   testsuites/mysql-asyn.conf \
+	   mmpstrucdata.sh \
+	   testsuites/mmpstrucdata.conf \
 	   cfg.sh
 
 
@@ -829,7 +859,7 @@ uxsockrcvr_LDADD = $(SOL_LIBS)
 tcpflood_SOURCES = tcpflood.c
 tcpflood_CPPFLAGS = $(PTHREADS_CFLAGS) $(GNUTLS_CFLAGS)
 tcpflood_LDADD = $(SOL_LIBS) $(PTHREADS_LIBS) $(GNUTLS_LIBS) \
-	$(am__append_14)
+	$(am__append_15)
 minitcpsrv_SOURCES = minitcpsrvr.c
 minitcpsrv_LDADD = $(SOL_LIBS)
 syslog_caller_SOURCES = syslog_caller.c
@@ -945,22 +975,25 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/uxsockrcvr.Po@am__quote@
 
 .c.o:
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
+@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c $<
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ $<
 
 .c.obj:
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
+@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
+@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c `$(CYGPATH_W) '$<'`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .c.lo:
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.lo$$||'`;\
+@am__fastdepCC_TRUE@	$(LTCOMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Plo
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<

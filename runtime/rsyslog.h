@@ -102,50 +102,6 @@
 #define _PATH_CONSOLE	"/dev/console"
 #endif
 
-/* properties are now encoded as (tiny) integers. I do not use an enum as I would like
- * to keep the memory footprint small (and thus cache hits high).
- * rgerhards, 2009-06-26
- */
-typedef uintTiny	propid_t;
-#define PROP_INVALID			0
-#define PROP_MSG			1
-#define PROP_TIMESTAMP			2
-#define PROP_HOSTNAME			3
-#define PROP_SYSLOGTAG			4
-#define PROP_RAWMSG			5
-#define PROP_INPUTNAME			6
-#define PROP_FROMHOST			7
-#define PROP_FROMHOST_IP		8
-#define PROP_PRI			9
-#define PROP_PRI_TEXT			10
-#define PROP_IUT			11
-#define PROP_SYSLOGFACILITY		12
-#define PROP_SYSLOGFACILITY_TEXT	13
-#define PROP_SYSLOGSEVERITY		14
-#define PROP_SYSLOGSEVERITY_TEXT	15
-#define PROP_TIMEGENERATED		16
-#define PROP_PROGRAMNAME		17
-#define PROP_PROTOCOL_VERSION		18
-#define PROP_STRUCTURED_DATA		19
-#define PROP_APP_NAME			20
-#define PROP_PROCID			21
-#define PROP_MSGID			22
-#define PROP_PARSESUCCESS		23
-#define PROP_SYS_NOW			150
-#define PROP_SYS_YEAR			151
-#define PROP_SYS_MONTH			152
-#define PROP_SYS_DAY			153
-#define PROP_SYS_HOUR			154
-#define PROP_SYS_HHOUR			155
-#define PROP_SYS_QHOUR			156
-#define PROP_SYS_MINUTE			157
-#define PROP_SYS_MYHOSTNAME		158
-#define PROP_CEE			200
-#define PROP_CEE_ALL_JSON		201
-#define PROP_SYS_BOM			159
-#define PROP_SYS_UPTIME			160
-#define PROP_UUID               161
-
 
 /* The error codes below are orginally "borrowed" from
  * liblogging. As such, we reserve values up to -2999
@@ -399,7 +355,7 @@ enum rsRetVal_				/** return value. All methods return this if not specified oth
 	RS_RET_RULESET_EXISTS = -2306,/**< ruleset already exists */
 	RS_RET_DEPRECATED = -2307,/**< deprecated functionality is used */
 	RS_RET_DS_PROP_SEQ_ERR = -2308,/**< property sequence error deserializing object */
-	RS_RET_TPL_INVLD_PROP = -2309,/**< property name error in template (unknown name) */
+	RS_RET_INVLD_PROP = -2309,/**< property name error (unknown name) */
 	RS_RET_NO_RULEBASE = -2310,/**< mmnormalize: rulebase can not be found or otherwise invalid */
 	RS_RET_INVLD_MODE = -2311,/**< invalid mode specified in configuration */
 	RS_RET_INVLD_ANON_BITS = -2312,/**< mmanon: invalid number of bits to anonymize specified */
@@ -416,6 +372,19 @@ enum rsRetVal_				/** return value. All methods return this if not specified oth
 	RS_RET_CA_CERT_MISSING = -2329,/**< a CA cert is missing where one is required (e.g. TLS) */
 	RS_RET_CERT_MISSING = -2330,/**< a cert is missing where one is required (e.g. TLS) */
 	RS_RET_CERTKEY_MISSING = -2331,/**< a cert (private) key is missing where one is required (e.g. TLS) */
+	RS_RET_STRUC_DATA_INVLD = -2349,/**< structured data is malformed */
+
+	/* up to 2350 reserved for 7.4 */
+	RS_RET_QUEUE_CRY_DISK_ONLY = -2351,/**< crypto provider only supported for disk-associated queues */
+	RS_RET_NO_DATA = -2352,/**< file has no data; more a state than a real error */
+	RS_RET_RELP_AUTH_FAIL = -2353,/**< RELP peer authentication failed */
+	RS_RET_ERR_UDPSEND = -2354,/**< sending msg via UDP failed */
+	RS_RET_LAST_ERRREPORT = -2355,/**< module does not emit more error messages as limit is reached */
+	RS_RET_READ_ERR = -2356,/**< read error occured (file i/o) */
+	RS_RET_CONF_PARSE_WARNING = -2357,/**< warning parsing config file */
+	RS_RET_CONF_WRN_FULLDLY_BELOW_HIGHWTR = -2358,/**< warning queue full delay mark below high wtr mark */
+	RS_RET_RESUMED = -2359,/**< status: action was resumed (used for reporting) */
+	RS_RET_RELP_NO_TLS = -2360,/**< librel does not support TLS (but TLS requested) */
 
 	/* RainerScript error messages (range 1000.. 1999) */
 	RS_RET_SYSVAR_NOT_FOUND = 1001, /**< system variable could not be found (maybe misspelled) */
@@ -434,7 +403,12 @@ enum rsRetVal_				/** return value. All methods return this if not specified oth
  * Be sure to call the to-be-returned variable always "iRet" and
  * the function finalizer always "finalize_it".
  */
-#define CHKiRet(code) if((iRet = code) != RS_RET_OK) goto finalize_it
+#if HAVE_BUILTIN_EXCEPT
+#	define CHKiRet(code) if(__builtin_expect(((iRet = code) != RS_RET_OK), 0)) goto finalize_it
+#else
+#	define CHKiRet(code) if((iRet = code) != RS_RET_OK) goto finalize_it
+#endif
+
 /* macro below is to be used if we need our own handling, eg for cleanup */
 #define CHKiRet_Hdlr(code) if((iRet = code) != RS_RET_OK)
 /* macro below is to handle failing malloc/calloc/strdup... which we almost always handle in the same way... */
@@ -534,13 +508,13 @@ void dbgprintf(char *, ...) __attribute__((format(printf, 1, 2)));
  * add them. -- rgerhards, 2008-04-17
  */
 extern uchar *glblModPath; /* module load path */
-extern rsRetVal (*glblErrLogger)(int, uchar*);
+extern void (*glblErrLogger)(const int, const int, const uchar*);
 
 /* some runtime prototypes */
 rsRetVal rsrtInit(char **ppErrObj, obj_if_t *pObjIF);
 rsRetVal rsrtExit(void);
 int rsrtIsInit(void);
-rsRetVal rsrtSetErrLogger(rsRetVal (*errLogger)(int, uchar*));
+void rsrtSetErrLogger(void (*errLogger)(const int, const int, const uchar*));
 
 /* this define below is (later) intended to be used to implement empty
  * structs. TODO: check if compilers supports this and, if not, define

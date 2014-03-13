@@ -37,6 +37,15 @@ html_files = \
 	omjournal.html \
 	imjournal.html \
 	mmanon.html \
+	mmsequence.html \
+	mmcount.html \
+	mmfields.html \
+	mmrfc5424addhmac.html \
+	mmutf8fix.html \
+	omelasticsearch.html \
+	ommongodb.html \
+	queue_parameters.html \
+	mmpstrucdata.html \
 	omusrmsg.html \
 	omstdout.html \
 	omudpspoof.html \
@@ -61,6 +70,15 @@ html_files = \
 	src/queueWorkerLogic.dia \
 	queueWorkerLogic.jpg \
 	queueWorkerLogic_small.jpg \
+	rsyslog_secure_tls.html \
+	tls_cert_ca.html \
+	tls_cert_client.html \
+	tls_cert_errmsgs.html \
+	tls_cert_machine.html \
+	tls_cert_scenario.html \
+	tls_cert_server.html \
+	tls_cert_summary.html \
+	tls_cert_udp_relay.html \
 	tls_cert_100.jpg \
 	tls_cert_ca.jpg \
 	tls_cert.jpg \
@@ -146,6 +164,7 @@ html_files = \
 	rsyslog_conf_basic_structure.html \
 	rsyslog_conf_sysklogd_compatibility.html \
 	imkmsg.html \
+	rainerscript_call.html \
 	src/classes.dia
 
 grfx_files = \
