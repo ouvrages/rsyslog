@@ -3,7 +3,7 @@ rsyslog (7.6.2-1) UNRELEASED; urgency=medium
   * New upstream release.
   * Update patches.
   * Update Build-Depends:
-    - Bump librelp-dev to (>= 1.2.3).
+    - Bump librelp-dev to (>= 1.2.4).
     - Add liblogging-stdlog-dev (>= 1.0.1).
   * Fix typo in rsyslog.postrm: dissappear → disappear
   * Drop useless "exit 0" from maintainer scripts.
