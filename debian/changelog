@@ -9,6 +9,8 @@ rsyslog (7.6.2-1) UNRELEASED; urgency=medium
   * Drop useless "exit 0" from maintainer scripts.
   * Enable and install the mmutf8fix, mmpstrucdata and mmsequence message
     modification modules.
+  * Stop installing debian/sample.conf. Upstream ships a more up-to-date
+    example configuration file.
 
  -- Michael Biebl <biebl@debian.org>  Thu, 13 Mar 2014 18:07:48 +0100
 
