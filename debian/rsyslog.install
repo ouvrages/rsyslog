@@ -20,6 +20,9 @@ usr/lib/rsyslog/lmzlibw.so
 usr/lib/rsyslog/mmanon.so
 usr/lib/rsyslog/mmnormalize.so
 usr/lib/rsyslog/mmjsonparse.so
+usr/lib/rsyslog/mmutf8fix.so
+usr/lib/rsyslog/mmpstrucdata.so
+usr/lib/rsyslog/mmsequence.so
 usr/lib/rsyslog/ommail.so
 usr/lib/rsyslog/omprog.so
 usr/lib/rsyslog/omuxsock.so

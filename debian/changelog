@@ -7,6 +7,8 @@ rsyslog (7.6.2-1) UNRELEASED; urgency=medium
     - Add liblogging-stdlog-dev (>= 1.0.1).
   * Fix typo in rsyslog.postrm: dissappear → disappear
   * Drop useless "exit 0" from maintainer scripts.
+  * Enable and install the mmutf8fix, mmpstrucdata and mmsequence message
+    modification modules.
 
  -- Michael Biebl <biebl@debian.org>  Thu, 13 Mar 2014 18:07:48 +0100
 
