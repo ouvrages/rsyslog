@@ -1,4 +1,4 @@
-rsyslog (7.6.2-1) UNRELEASED; urgency=medium
+rsyslog (7.6.2-1) unstable; urgency=medium
 
   * New upstream release.
   * Update patches.
@@ -12,7 +12,7 @@ rsyslog (7.6.2-1) UNRELEASED; urgency=medium
   * Stop installing debian/sample.conf. Upstream ships a more up-to-date
     example configuration file.
 
- -- Michael Biebl <biebl@debian.org>  Thu, 13 Mar 2014 18:07:48 +0100
+ -- Michael Biebl <biebl@debian.org>  Mon, 17 Mar 2014 17:26:08 +0100
 
 rsyslog (7.4.8-1) unstable; urgency=medium
 
