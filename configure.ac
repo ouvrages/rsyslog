@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[7.6.1],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[7.6.2],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE([subdir-objects])
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -1071,7 +1071,7 @@ AC_ARG_ENABLE(relp,
         [enable_relp=no]
 )
 if test "x$enable_relp" = "xyes"; then
-	PKG_CHECK_MODULES(RELP, relp >= 1.2.3)
+	PKG_CHECK_MODULES(RELP, relp >= 1.2.4)
 fi
 AM_CONDITIONAL(ENABLE_RELP, test x$enable_relp = xyes)
 
