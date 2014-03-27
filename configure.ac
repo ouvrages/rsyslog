@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[7.6.2],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[7.6.3],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE([subdir-objects])
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -105,7 +105,6 @@ AC_TYPE_UINT8_T
 AC_HEADER_TIME
 AC_STRUCT_TM
 AC_C_VOLATILE
-AC_C_TYPEOF
 
 sa_includes="\
 $ac_includes_default
@@ -797,22 +796,18 @@ AC_ARG_ENABLE(libgcrypt,
         [enable_libgcrypt=yes]
 )
 if test "x$enable_libgcrypt" = "xyes"; then
-        AC_CHECK_PROG(
-      	    [HAVE_LIBGCRYPT_CONFIG],
-            [libgcrypt-config],
-            [yes],,,
-            )
-        if test "x${HAVE_LIBGCRYPT_CONFIG}" != "xyes"; then
+	AC_PATH_PROG([LIBGCRYPT_CONFIG],[libgcrypt-config],[no])
+        if test "x${LIBGCRYPT_CONFIG}" = "xno"; then
            AC_MSG_FAILURE([libgcrypt-config not found in PATH])
         fi
         AC_CHECK_LIB(
 		[gcrypt],
         	[gcry_cipher_open],
-        	[LIBGCRYPT_CFLAGS="`libgcrypt-config --cflags`"
-        	LIBGCRYPT_LIBS="`libgcrypt-config --libs`"
+        	[LIBGCRYPT_CFLAGS="`${LIBGCRYPT_CONFIG} --cflags`"
+        	LIBGCRYPT_LIBS="`${LIBGCRYPT_CONFIG} --libs`"
         	],
         	[AC_MSG_FAILURE([libgcrypt is missing])],
-        	[`libgcrypt-config --libs --cflags`]
+        	[`${LIBGCRYPT_CONFIG} --libs --cflags`]
         	)
 	AC_DEFINE([ENABLE_LIBGCRYPT], [1], [Indicator that LIBGCRYPT is present])
 fi
@@ -1071,7 +1066,7 @@ AC_ARG_ENABLE(relp,
         [enable_relp=no]
 )
 if test "x$enable_relp" = "xyes"; then
-	PKG_CHECK_MODULES(RELP, relp >= 1.2.4)
+	PKG_CHECK_MODULES(RELP, relp >= 1.2.5)
 fi
 AM_CONDITIONAL(ENABLE_RELP, test x$enable_relp = xyes)
 
