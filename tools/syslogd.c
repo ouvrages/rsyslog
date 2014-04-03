@@ -508,7 +508,7 @@ logmsgInternal(int iErr, int pri, const uchar *const msg, int flags)
 					   (bufModMsg == NULL) ? (char*)msg : bufModMsg,
 					   flags));
 	} else {
-		stdlog_log(NULL, LOG_PRI(pri), "%s",
+		stdlog_log(stdlog_hdl, LOG_PRI(pri), "%s",
 			   (bufModMsg == NULL) ? (char*)msg : bufModMsg);
 	}
 
@@ -537,24 +537,19 @@ finalize_it:
  * rgerhards, 2010-06-09
  */
 static inline rsRetVal
-preprocessBatch(batch_t *pBatch) {
+preprocessBatch(batch_t *pBatch, int *pbShutdownImmediate) {
 	prop_t *ip;
 	prop_t *fqdn;
 	prop_t *localName;
 	prop_t *propFromHost = NULL;
 	prop_t *propFromHostIP = NULL;
-	int bSingleRuleset;
-	ruleset_t *batchRuleset; /* the ruleset used for all message inside the batch, if there is a single one */
 	int bIsPermitted;
 	msg_t *pMsg;
 	int i;
 	rsRetVal localRet;
 	DEFiRet;
 
-	bSingleRuleset = 1;
-	batchRuleset = (pBatch->nElem > 0) ? pBatch->pElem[0].pMsg->pRuleset : NULL;
-	
-	for(i = 0 ; i < pBatch->nElem  && !*(pBatch->pbShutdownImmediate) ; i++) {
+	for(i = 0 ; i < pBatch->nElem  && !*pbShutdownImmediate ; i++) {
 		pMsg = pBatch->pElem[i].pMsg;
 		if((pMsg->msgFlags & NEEDS_ACLCHK_U) != 0) {
 			DBGPRINTF("msgConsumer: UDP ACL must be checked for message (hostname-based)\n");
@@ -579,11 +574,7 @@ preprocessBatch(batch_t *pBatch) {
 				pBatch->eltState[i] = BATCH_STATE_DISC;
 			}
 		}
-		if(pMsg->pRuleset != batchRuleset)
-			bSingleRuleset = 0;
 	}
-
-	batchSetSingleRuleset(pBatch, bSingleRuleset);
 
 finalize_it:
 	if(propFromHost != NULL)
@@ -600,17 +591,16 @@ finalize_it:
  * for the main queue.
  */
 static rsRetVal
-msgConsumer(void __attribute__((unused)) *notNeeded, batch_t *pBatch, int *pbShutdownImmediate)
+msgConsumer(void __attribute__((unused)) *notNeeded, batch_t *pBatch, wti_t *pWti)
 {
 	DEFiRet;
 	assert(pBatch != NULL);
-	pBatch->pbShutdownImmediate = pbShutdownImmediate; /* TODO: move this to batch creation! */
-	preprocessBatch(pBatch);
-	ruleset.ProcessBatch(pBatch);
+	preprocessBatch(pBatch, pWti->pbShutdownImmediate);
+	ruleset.ProcessBatch(pBatch, pWti);
 //TODO: the BATCH_STATE_COMM must be set somewhere down the road, but we 
 //do not have this yet and so we emulate -- 2010-06-10
 int i;
-	for(i = 0 ; i < pBatch->nElem  && !*pbShutdownImmediate ; i++) {
+	for(i = 0 ; i < pBatch->nElem  && !*pWti->pbShutdownImmediate ; i++) {
 		pBatch->eltState[i] = BATCH_STATE_COMM;
 	}
 	RETiRet;
@@ -1178,9 +1168,14 @@ rsRetVal createMainQueue(qqueue_t **ppQueue, uchar *pszQueueName, struct nvlst *
 		qqueueSetDefaultsRulesetQueue(*ppQueue);
 		qqueueApplyCnfParam(*ppQueue, lst);
 	}
+	RETiRet;
+}
 
-	/* ... and finally start the queue! */
-	CHKiRet_Hdlr(qqueueStart(*ppQueue)) {
+rsRetVal
+startMainQueue(qqueue_t *pQueue)
+{
+	DEFiRet;
+	CHKiRet_Hdlr(qqueueStart(pQueue)) {
 		/* no queue is fatal, we need to give up in that case... */
 		errmsg.LogError(0, iRet, "could not start (ruleset) main message queue"); \
 	}
@@ -1379,6 +1374,11 @@ static void printVersion(void)
 	printf("\t64bit Atomic operations supported:\tYes\n");
 #else
 	printf("\t64bit Atomic operations supported:\tNo\n");
+#endif
+#ifdef	HAVE_JEMALLOC
+	printf("\tmemory allocator:\t\t\tjemalloc\n");
+#else
+	printf("\tmemory allocator:\t\t\tsystem default\n");
 #endif
 #ifdef	RTINST
 	printf("\tRuntime Instrumentation (slow code):\tYes\n");

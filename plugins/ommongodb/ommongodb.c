@@ -4,7 +4,7 @@
  * mongodb C interface is crap. Obtain the library here:
  * https://github.com/algernon/libmongo-client
  *
- * Copyright 2007-2012 Rainer Gerhards and Adiscon GmbH.
+ * Copyright 2007-2013 Rainer Gerhards and Adiscon GmbH.
  *
  * This file is part of rsyslog.
  *
@@ -71,6 +71,10 @@ typedef struct _instanceData {
 	int bErrMsgPermitted;	/* only one errmsg permitted per connection */
 } instanceData;
 
+typedef struct wrkrInstanceData {
+	instanceData *pData;
+} wrkrInstanceData_t;
+
 
 /* tables for interfacing with the v6 config system */
 /* action (instance) parameters */
@@ -89,9 +93,15 @@ static struct cnfparamblk actpblk =
 	  actpdescr
 	};
 
+static pthread_mutex_t mutDoAct = PTHREAD_MUTEX_INITIALIZER;
+
 BEGINcreateInstance
 CODESTARTcreateInstance
 ENDcreateInstance
+
+BEGINcreateWrkrInstance
+CODESTARTcreateWrkrInstance
+ENDcreateWrkrInstance
 
 BEGINisCompatibleWithFeature
 CODESTARTisCompatibleWithFeature
@@ -125,6 +135,10 @@ CODESTARTfreeInstance
 	free(pData->dbNcoll);
 	free(pData->tplName);
 ENDfreeInstance
+
+BEGINfreeWrkrInstance
+CODESTARTfreeWrkrInstance
+ENDfreeWrkrInstance
 
 
 BEGINdbgPrintInstInfo
@@ -177,6 +191,29 @@ static rsRetVal initMongoDB(instanceData *pData, int bSilent)
 			dbgprintf("ommongodb: can not initialize MongoDB handle");
 		}
                 ABORT_FINALIZE(RS_RET_SUSPENDED);
+	}
+
+	/* perform authentication */
+	if(pData->uid && pData->pwd) {
+
+	  /* require both uid and pwd before attempting authentication */
+	  if(!pData->uid || !pData->pwd) {
+	    dbgprintf("ommongodb: authentication requires uid and pwd attributes set; skipping");
+	  }
+	  else if(!mongo_sync_cmd_authenticate(pData->conn, (const gchar*)pData->db,
+	  	  			(const gchar*)pData->uid, (const gchar*)pData->pwd)) {
+	    if(!bSilent) {
+	      reportMongoError(pData);
+	      dbgprintf("ommongodb: could not authenticate %s against '%s'", pData->uid, pData->db);
+	    }
+
+	    /* no point in continuing with an unauthenticated connection */
+	    closeMongoDB(pData);	 
+	    ABORT_FINALIZE(RS_RET_SUSPENDED);
+	  }
+	  else {
+	    dbgprintf("ommongodb: authenticated with %s against '%s'", pData->uid, pData->db);
+	  }
 	}
 
 finalize_it:
@@ -248,7 +285,7 @@ getDefaultBSON(msg_t *pMsg)
 	cProp.id = PROP_MSG;
 	msg = MsgGetProp(pMsg, NULL, &cProp, &msg_len, &msg_free, NULL);
 
-	// TODO: move to datetime? Refactor in any case! rgerhards, 2012-03-30
+	/* TODO: move to datetime? Refactor in any case! rgerhards, 2012-03-30 */
 	ts_gen = (gint64) datetime.syslogTime2time_t(&pMsg->tTIMESTAMP) * 1000; /* ms! */
 dbgprintf("ommongodb: ts_gen is %lld\n", (long long) ts_gen);
 dbgprintf("ommongodb: secfrac is %d, precision %d\n",  pMsg->tTIMESTAMP.secfrac, pMsg->tTIMESTAMP.secfracPrecision);
@@ -422,14 +459,17 @@ error:
 
 BEGINtryResume
 CODESTARTtryResume
-	if(pData->conn == NULL) {
-		iRet = initMongoDB(pData, 1);
+	if(pWrkrData->pData->conn == NULL) {
+		iRet = initMongoDB(pWrkrData->pData, 1);
 	}
 ENDtryResume
 
 BEGINdoAction
 	bson *doc = NULL;
+	instanceData *pData;
 CODESTARTdoAction
+	pthread_mutex_lock(&mutDoAct);
+	pData = pWrkrData->pData;
 	/* see if we are ready to proceed */
 	if(pData->conn == NULL) {
 		CHKiRet(initMongoDB(pData, 0));
@@ -454,6 +494,7 @@ CODESTARTdoAction
 	}
 
 finalize_it:
+	pthread_mutex_unlock(&mutDoAct);
 	if(doc != NULL)
 		bson_free(doc);
 ENDdoAction
@@ -560,6 +601,7 @@ ENDmodExit
 BEGINqueryEtryPt
 CODESTARTqueryEtryPt
 CODEqueryEtryPt_STD_OMOD_QUERIES
+CODEqueryEtryPt_STD_OMOD8_QUERIES
 CODEqueryEtryPt_STD_CONF2_OMOD_QUERIES
 ENDqueryEtryPt
 

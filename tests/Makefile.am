@@ -10,6 +10,7 @@ TESTS +=  \
 	stop-msgvar.sh \
 	rfc5424parser.sh \
 	arrayqueue.sh \
+	global_vars.sh \
 	da-mainmsg-q.sh \
 	validation-run.sh \
 	imtcp-multiport.sh \
@@ -17,6 +18,7 @@ TESTS +=  \
 	diskqueue.sh \
 	diskqueue-fsync.sh \
 	rulesetmultiqueue.sh \
+	rulesetmultiqueue-v6.sh \
 	manytcp.sh \
 	rsf_getenv.sh \
 	imtcp_conndrop.sh \
@@ -48,6 +50,7 @@ TESTS +=  \
 	execonlywhenprevsuspended2.sh \
 	execonlywhenprevsuspended3.sh \
 	execonlywhenprevsuspended4.sh \
+	execonlywhenprevsuspended_multiwrkr.sh \
 	pipe_noreader.sh \
 	dircreate_dflt.sh \
 	dircreate_off.sh \
@@ -60,6 +63,7 @@ TESTS +=  \
 	discard-rptdmsg.sh \
 	discard-allmark.sh \
 	discard.sh \
+	stop.sh \
 	failover-async.sh \
 	failover-double.sh \
 	failover-basic.sh \
@@ -141,6 +145,10 @@ endif
 
 if ENABLE_OMUXSOCK
 TESTS += uxsock_simple.sh
+endif
+
+if ENABLE_RELP
+TESTS += sndrcv_relp.sh
 endif
 
 if ENABLE_OMUDPSPOOF
@@ -298,6 +306,8 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/rscript_stop.conf \
 	   rscript_stop2.sh \
 	   testsuites/rscript_stop2.conf \
+	   stop.sh \
+	   testsuites/stop.conf \
 	   rscript_le.sh \
 	   testsuites/rscript_le.conf \
 	   rscript_ge.sh \
@@ -314,6 +324,8 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/stop-localvar.conf \
 	   stop-msgvar.sh \
 	   testsuites/stop-msgvar.conf \
+	   global_vars.sh \
+	   testsuites/global_vars.conf \
 	   rfc5424parser.sh \
 	   testsuites/rfc5424parser.conf \
 	   rs_optimizer_pri.sh \
@@ -426,6 +438,9 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   sndrcv.sh \
 	   testsuites/sndrcv_sender.conf \
 	   testsuites/sndrcv_rcvr.conf \
+	   sndrcv_relp.sh \
+	   testsuites/sndrcv_relp_sender.conf \
+	   testsuites/sndrcv_relp_rcvr.conf \
 	   sndrcv_udp.sh \
 	   testsuites/sndrcv_udp_sender.conf \
 	   testsuites/sndrcv_udp_rcvr.conf \
@@ -489,6 +504,8 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/master.nolimittag \
 	   rulesetmultiqueue.sh \
 	   testsuites/rulesetmultiqueue.conf \
+	   rulesetmultiqueue-v6.sh \
+	   testsuites/rulesetmultiqueue-v6.conf \
 	   omruleset.sh \
 	   testsuites/omruleset.conf \
 	   omruleset-queue.sh \
@@ -507,6 +524,8 @@ EXTRA_DIST= 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/execonlywhenprevsuspended3.conf \
 	   execonlywhenprevsuspended4.sh \
 	   testsuites/execonlywhenprevsuspended4.conf \
+	   execonlywhenprevsuspended_multiwrkr.sh \
+	   testsuites/execonlywhenprevsuspended_multiwrkr.conf \
 	   tabescape_dflt.sh \
 	   testsuites/tabescape_dflt.conf \
 	   testsuites/1.tabescape_dflt \

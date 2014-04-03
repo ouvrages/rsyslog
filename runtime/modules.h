@@ -134,11 +134,15 @@ struct modInfo_s {
 			/* below: perform the configured action
 			 */
 			rsRetVal (*beginTransaction)(void*);
-			rsRetVal (*doAction)(uchar**, unsigned, void*);
+			rsRetVal (*commitTransaction)(void *const, actWrkrIParams_t *const, const unsigned);
+			rsRetVal (*doAction)(uchar**, void*);
 			rsRetVal (*endTransaction)(void*);
 			rsRetVal (*parseSelectorAct)(uchar**, void**,omodStringRequest_t**);
 			rsRetVal (*newActInst)(uchar *modName, struct nvlst *lst, void **, omodStringRequest_t **);
 			rsRetVal (*SetShutdownImmdtPtr)(void *pData, void *pPtr);
+			rsRetVal (*createWrkrInstance)(void*ppWrkrData, void*pData);
+			rsRetVal (*freeWrkrInstance)(void*pWrkrData);
+			sbool supportsTX;	/* set if the module supports transactions */
 		} om;
 		struct { /* data for library modules */
 		    	char dummy;
@@ -147,7 +151,7 @@ struct modInfo_s {
 			rsRetVal (*parse)(msg_t*);
 		} pm;
 		struct { /* data for strgen modules */
-			rsRetVal (*strgen)(msg_t*, uchar**, size_t *);
+			rsRetVal (*strgen)(const msg_t*const, actWrkrIParams_t *const iparam);
 		} sm;
 	} mod;
 	void *pModHdlr; /* handler to the dynamic library holding the module */

@@ -53,6 +53,10 @@ typedef struct _instanceData {
 	uchar *jsonRoot;	/**< container where to store fields */
 } instanceData;
 
+typedef struct wrkrInstanceData {
+	instanceData *pData;
+} wrkrInstanceData_t;
+
 struct modConfData_s {
 	rsconf_t *pConf;	/* our overall config object */
 };
@@ -99,6 +103,10 @@ BEGINcreateInstance
 CODESTARTcreateInstance
 ENDcreateInstance
 
+BEGINcreateWrkrInstance
+CODESTARTcreateWrkrInstance
+ENDcreateWrkrInstance
+
 
 BEGINisCompatibleWithFeature
 CODESTARTisCompatibleWithFeature
@@ -109,6 +117,10 @@ BEGINfreeInstance
 CODESTARTfreeInstance
 	free(pData->jsonRoot);
 ENDfreeInstance
+
+BEGINfreeWrkrInstance
+CODESTARTfreeWrkrInstance
+ENDfreeWrkrInstance
 
 
 static inline void
@@ -359,7 +371,7 @@ dbgprintf("DDDD: parse mmpstrucdata\n");
 	/* don't check return code - we never want rsyslog to retry
 	 * or suspend this action!
 	 */
-	parse_sd(pData, pMsg);
+	parse_sd(pWrkrData->pData, pMsg);
 dbgprintf("DDDD: done parse mmpstrucdata\n");
 finalize_it:
 ENDdoAction
@@ -387,6 +399,7 @@ ENDmodExit
 BEGINqueryEtryPt
 CODESTARTqueryEtryPt
 CODEqueryEtryPt_STD_OMOD_QUERIES
+CODEqueryEtryPt_STD_OMOD8_QUERIES
 CODEqueryEtryPt_STD_CONF2_OMOD_QUERIES
 CODEqueryEtryPt_STD_CONF2_QUERIES
 ENDqueryEtryPt

@@ -49,6 +49,7 @@
 #define CONF_PROGNAME_BUFSIZE		16
 #define CONF_HOSTNAME_BUFSIZE		32
 #define CONF_PROP_BUFSIZE		16	/* should be close to sizeof(ptr) or lighly above it */
+#define CONF_IPARAMS_BUFSIZE		16	/* initial size of iparams array in wti (is automatically extended) */
 #define	CONF_MIN_SIZE_FOR_COMPRESS	60 	/* config param: minimum message size to try compression. The smaller
 						 * the message, the less likely is any compression gain. We check for
 						 * gain before we submit the message. But to do so we still need to
@@ -386,6 +387,9 @@ enum rsRetVal_				/** return value. All methods return this if not specified oth
 	RS_RET_RESUMED = -2359,/**< status: action was resumed (used for reporting) */
 	RS_RET_RELP_NO_TLS = -2360,/**< librel does not support TLS (but TLS requested) */
 
+	/* up to 2400 reserved for 7.5 & 7.6 */
+	RS_RET_INVLD_OMOD = -2400, /**< invalid output module, does not provide proper interfaces */
+
 	/* RainerScript error messages (range 1000.. 1999) */
 	RS_RET_SYSVAR_NOT_FOUND = 1001, /**< system variable could not be found (maybe misspelled) */
 	RS_RET_FIELD_NOT_FOUND = 1002, /**< field() function did not find requested field */
@@ -473,6 +477,37 @@ extern pthread_attr_t default_thread_attr;
 extern int default_thr_sched_policy;
 #endif
 
+/* The following structure defines immutable parameters which need to
+ * be passed as action parameters.
+ *
+ * Note that output plugins may request multiple templates. Let's say
+ * an output requests n templates. Than the overall table must hold
+ * n*nbrMsgs records, and each messages begins on a n-boundary. There
+ * is a macro defined below to access the proper element.
+ *
+ * WARNING: THIS STRUCTURE IS PART OF THE ***OUTPUT MODULE INTERFACE***
+ * It is passed into the doCommit() function. Do NOT modify it until
+ * absolutely necessary - all output plugins need to be changed!
+ *
+ * If a change is "just" for internal working, consider adding a
+ * separate paramter outside of this structure. Of course, it is
+ * best to avoid this as well ;-)
+ * rgerhards, 2013-12-04
+ */
+struct __attribute__ ((__packed__)) actWrkrIParams {
+	uchar *param;
+	uint32_t lenBuf;  /* length of string buffer (if string ptr) */
+	uint32_t lenStr;  /* length of current string (if string ptr) */
+};
+
+/* macro to access actWrkrIParams base object:
+ * param is ptr to base address
+ * nActTpls is the number of templates the action has requested
+ * iMsg is the message index
+ * iTpl is the template index
+ * This macro can be used for read and write access.
+ */
+#define actParam(param, nActTpls, iMsg, iTpl) (param[(iMsg*nActTpls)+iTpl])
 
 /* for the time being, we do our own portability handling here. It
  * looks like autotools either does not yet support checks for it, or

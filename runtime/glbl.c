@@ -64,6 +64,7 @@ DEFobjCurrIf(net)
  * class...
  */
 int glblDebugOnShutdown = 0;	/* start debug log when we are shut down */
+stdlog_channel_t stdlog_hdl = NULL;	/* handle to be used for stdlog */
 
 static struct cnfobj *mainqCnfObj = NULL;/* main queue object, to be used later in startup sequence */
 int bProcessInternalMessages = 1;	/* Should rsyslog itself process internal messages?
@@ -71,6 +72,7 @@ int bProcessInternalMessages = 1;	/* Should rsyslog itself process internal mess
 					 * 0 - send them to libstdlog (e.g. to push to journal)
 					 */
 static uchar *pszWorkDir = NULL;
+static uchar *stdlog_chanspec = NULL;
 static int bOptimizeUniProc = 1;	/* enable uniprocessor optimizations */
 static int bParseHOSTNAMEandTAG = 1;	/* parser modification (based on startup params!) */
 static int bPreserveFQDN = 0;		/* should FQDNs always be preserved? */
@@ -93,6 +95,14 @@ static uchar *pszDfltNetstrmDrvrCAF = NULL; /* default CA file for the netstrm d
 static uchar *pszDfltNetstrmDrvrKeyFile = NULL; /* default key file for the netstrm driver (server) */
 static uchar *pszDfltNetstrmDrvrCertFile = NULL; /* default cert file for the netstrm driver (server) */
 static int bTerminateInputs = 0;		/* global switch that inputs shall terminate ASAP (1=> terminate) */
+static uchar cCCEscapeChar = '#'; /* character to be used to start an escape sequence for control chars */
+static int bDropTrailingLF = 1; /* drop trailing LF's on reception? */
+static int bEscapeCCOnRcv = 1; /* escape control characters on reception: 0 - no, 1 - yes */
+static int bSpaceLFOnRcv = 0; /* replace newlines with spaces on reception: 0 - no, 1 - yes */
+static int bEscape8BitChars = 0; /* escape characters > 127 on reception: 0 - no, 1 - yes */
+static int bEscapeTab = 1; /* escape tab control character when doing CC escapes: 0 - no, 1 - yes */
+static int bParserEscapeCCCStyle = 0; /* escape control characters in c style: 0 - no, 1 - yes */
+
 pid_t glbl_ourpid;
 #ifndef HAVE_ATOMIC_BUILTINS
 static DEF_ATOMIC_HELPER_MUT(mutTerminateInputs);
@@ -113,10 +123,19 @@ static struct cnfparamdescr cnfparamdescr[] = {
 	{ "debug.logfile", eCmdHdlrString, 0 },
 	{ "defaultnetstreamdrivercafile", eCmdHdlrString, 0 },
 	{ "defaultnetstreamdriverkeyfile", eCmdHdlrString, 0 },
+        { "defaultnetstreamdrivercertfile", eCmdHdlrString, 0 },
 	{ "defaultnetstreamdriver", eCmdHdlrString, 0 },
 	{ "maxmessagesize", eCmdHdlrSize, 0 },
 	{ "action.reportsuspension", eCmdHdlrBinary, 0 },
 	{ "action.reportsuspensioncontinuation", eCmdHdlrBinary, 0 },
+	{ "parser.controlcharacterescapeprefix", eCmdHdlrGetChar, 0 },
+	{ "parser.droptrailinglfonreception", eCmdHdlrBinary, 0 },
+	{ "parser.escapecontrolcharactersonreceive", eCmdHdlrBinary, 0 },
+	{ "parser.spacelfonreceive", eCmdHdlrBinary, 0 },
+	{ "parser.escape8bitcharactersonreceive", eCmdHdlrBinary, 0},
+	{ "parser.escapecontrolcharactertab", eCmdHdlrBinary, 0},
+	{ "parser.escapecontrolcharacterscstyle", eCmdHdlrBinary, 0 },
+	{ "stdlog.channelspec", eCmdHdlrString, 0 },
 	{ "processinternalmessages", eCmdHdlrBinary, 0 }
 };
 static struct cnfparamblk paramblk =
@@ -161,6 +180,13 @@ SIMP_PROP(Option_DisallowWarning, option_DisallowWarning, int)
 SIMP_PROP(DisableDNS, bDisableDNS, int)
 SIMP_PROP(StripDomains, StripDomains, char**)
 SIMP_PROP(LocalHosts, LocalHosts, char**)
+SIMP_PROP(ParserControlCharacterEscapePrefix, cCCEscapeChar, uchar)
+SIMP_PROP(ParserDropTrailingLFOnReception, bDropTrailingLF, int)
+SIMP_PROP(ParserEscapeControlCharactersOnReceive, bEscapeCCOnRcv, int)
+SIMP_PROP(ParserSpaceLFOnReceive, bSpaceLFOnRcv, int)
+SIMP_PROP(ParserEscape8BitCharactersOnReceive, bEscape8BitChars, int)
+SIMP_PROP(ParserEscapeControlCharacterTab, bEscapeTab, int)
+SIMP_PROP(ParserEscapeControlCharactersCStyle, bParserEscapeCCCStyle, int)
 #ifdef USE_UNLIMITED_SELECT
 SIMP_PROP(FdSetSize, iFdSetSize, int)
 #endif
@@ -586,6 +612,13 @@ CODESTARTobjQueryInterface(glbl)
 	SIMP_PROP(LocalDomain)
 	SIMP_PROP(StripDomains)
 	SIMP_PROP(LocalHosts)
+	SIMP_PROP(ParserControlCharacterEscapePrefix)
+	SIMP_PROP(ParserDropTrailingLFOnReception)
+	SIMP_PROP(ParserEscapeControlCharactersOnReceive)
+	SIMP_PROP(ParserSpaceLFOnReceive)
+	SIMP_PROP(ParserEscape8BitCharactersOnReceive)
+	SIMP_PROP(ParserEscapeControlCharacterTab)
+	SIMP_PROP(ParserEscapeControlCharactersCStyle)
 	SIMP_PROP(DfltNetstrmDrvr)
 	SIMP_PROP(DfltNetstrmDrvrCAF)
 	SIMP_PROP(DfltNetstrmDrvrKeyFile)
@@ -619,6 +652,13 @@ static rsRetVal resetConfigVariables(uchar __attribute__((unused)) *pp, void __a
 	bOptimizeUniProc = 1;
 	bPreserveFQDN = 0;
 	iMaxLine = 8192;
+	cCCEscapeChar = '#';
+	bDropTrailingLF = 1;
+	bEscapeCCOnRcv = 1; /* default is to escape control characters */
+	bSpaceLFOnRcv = 0;
+	bEscape8BitChars = 0; /* default is not to escape control characters */
+	bEscapeTab = 1; /* default is to escape tab characters */
+	bParserEscapeCCCStyle = 0;
 #ifdef USE_UNLIMITED_SELECT
 	iFdSetSize = howmany(FD_SETSIZE, __NFDBITS) * sizeof (fd_mask);
 #endif
@@ -660,6 +700,11 @@ glblProcessCnf(struct cnfobj *o)
 			continue;
 		if(!strcmp(paramblk.descr[i].name, "processinternalmessages")) {
 			bProcessInternalMessages = (int) cnfparamvals[i].val.d.n;
+		} else if(!strcmp(paramblk.descr[i].name, "stdlog.channelspec")) {
+			stdlog_chanspec = (uchar*)
+				es_str2cstr(cnfparamvals[i].val.d.estr, NULL);
+			stdlog_hdl = stdlog_open("rsyslogd", 0, STDLOG_SYSLOG,
+					(char*) stdlog_chanspec);
 		}
 	}
 }
@@ -719,6 +764,10 @@ glblDoneLoadCnf(void)
 			free(pszDfltNetstrmDrvrKeyFile);
 			pszDfltNetstrmDrvrKeyFile = (uchar*)
 				es_str2cstr(cnfparamvals[i].val.d.estr, NULL);
+		} else if(!strcmp(paramblk.descr[i].name, "defaultnetstreamdrivercertfile")) {
+			free(pszDfltNetstrmDrvrCertFile);
+			pszDfltNetstrmDrvrCertFile = (uchar*)
+				es_str2cstr(cnfparamvals[i].val.d.estr, NULL);
 		} else if(!strcmp(paramblk.descr[i].name, "defaultnetstreamdrivercafile")) {
 			free(pszDfltNetstrmDrvrCAF);
 			pszDfltNetstrmDrvrCAF = (uchar*)
@@ -741,6 +790,20 @@ glblDoneLoadCnf(void)
 		} else if(!strcmp(paramblk.descr[i].name, "debug.onshutdown")) {
 			glblDebugOnShutdown = (int) cnfparamvals[i].val.d.n;
 			errmsg.LogError(0, RS_RET_OK, "debug: onShutdown set to %d", glblDebugOnShutdown);
+		} else if(!strcmp(paramblk.descr[i].name, "parser.controlcharacterescapeprefix")) {
+			cCCEscapeChar = (uchar) *es_str2cstr(cnfparamvals[i].val.d.estr, NULL);
+		} else if(!strcmp(paramblk.descr[i].name, "parser.droptrailinglfonreception")) {
+			bDropTrailingLF = (int) cnfparamvals[i].val.d.n;
+		} else if(!strcmp(paramblk.descr[i].name, "parser.escapecontrolcharactersonreceive")) {
+			bEscapeCCOnRcv = (int) cnfparamvals[i].val.d.n;
+		} else if(!strcmp(paramblk.descr[i].name, "parser.spacelfonreceive")) {
+			bSpaceLFOnRcv = (int) cnfparamvals[i].val.d.n;
+		} else if(!strcmp(paramblk.descr[i].name, "parser.escape8bitcharactersonreceive")) {
+			bEscape8BitChars = (int) cnfparamvals[i].val.d.n;
+		} else if(!strcmp(paramblk.descr[i].name, "parser.escapecontrolcharactertab")) {
+			bEscapeTab = (int) cnfparamvals[i].val.d.n;
+		} else if(!strcmp(paramblk.descr[i].name, "parser.escapecontrolcharacterscstyle")) {
+			bParserEscapeCCCStyle = (int) cnfparamvals[i].val.d.n;
 		} else if(!strcmp(paramblk.descr[i].name, "debug.logfile")) {
 			if(pszAltDbgFileName == NULL) {
 				pszAltDbgFileName = es_str2cstr(cnfparamvals[i].val.d.estr, NULL);
@@ -785,8 +848,16 @@ BEGINAbstractObjClassInit(glbl, 1, OBJ_IS_CORE_MODULE) /* class, version */
 	CHKiRet(regCfSysLineHdlr((uchar *)"localhostipif", 0, eCmdHdlrGetWord, setLocalHostIPIF, NULL, NULL));
 	CHKiRet(regCfSysLineHdlr((uchar *)"optimizeforuniprocessor", 0, eCmdHdlrBinary, NULL, &bOptimizeUniProc, NULL));
 	CHKiRet(regCfSysLineHdlr((uchar *)"preservefqdn", 0, eCmdHdlrBinary, NULL, &bPreserveFQDN, NULL));
-	CHKiRet(regCfSysLineHdlr((uchar *)"maxmessagesize", 0, eCmdHdlrSize,
-		NULL, &iMaxLine, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"maxmessagesize", 0, eCmdHdlrSize, NULL, &iMaxLine, NULL));
+
+	/* Deprecated parser config options */
+	CHKiRet(regCfSysLineHdlr((uchar *)"controlcharacterescapeprefix", 0, eCmdHdlrGetChar, NULL, &cCCEscapeChar, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"droptrailinglfonreception", 0, eCmdHdlrBinary, NULL, &bDropTrailingLF, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"escapecontrolcharactersonreceive", 0, eCmdHdlrBinary, NULL, &bEscapeCCOnRcv, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"spacelfonreceive", 0, eCmdHdlrBinary, NULL, &bSpaceLFOnRcv, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"escape8bitcharactersonreceive", 0, eCmdHdlrBinary, NULL, &bEscape8BitChars, NULL));
+	CHKiRet(regCfSysLineHdlr((uchar *)"escapecontrolcharactertab", 0, eCmdHdlrBinary, NULL, &bEscapeTab, NULL));
+
 	CHKiRet(regCfSysLineHdlr((uchar *)"resetconfigvariables", 1, eCmdHdlrCustomHandler, resetConfigVariables, NULL, NULL));
 
 	INIT_ATOMIC_HELPER_MUT(mutTerminateInputs);

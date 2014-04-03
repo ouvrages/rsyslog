@@ -398,7 +398,7 @@ addListner(instanceConf_t *inst)
 	listeners[nfd].flags = inst->bIgnoreTimestamp ? IGNDATE : NOFLAG;
 	listeners[nfd].bCreatePath = inst->bCreatePath;
 	listeners[nfd].sockName = ustrdup(inst->sockName);
-	listeners[nfd].bUseCreds = (inst->bDiscardOwnMsgs || inst->bWritePid || inst->ratelimitInterval || inst->bAnnotate) ? 1 : 0;
+	listeners[nfd].bUseCreds = (inst->bDiscardOwnMsgs || inst->bWritePid || inst->ratelimitInterval || inst->bAnnotate || inst->bUseSysTimeStamp) ? 1 : 0;
 	listeners[nfd].bAnnotate = inst->bAnnotate;
 	listeners[nfd].bParseTrusted = inst->bParseTrusted;
 	listeners[nfd].bDiscardOwnMsgs = inst->bDiscardOwnMsgs;

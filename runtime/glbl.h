@@ -8,7 +8,7 @@
  * Please note that there currently is no glbl.c file as we do not yet
  * have any implementations.
  *
- * Copyright 2008-2013 Rainer Gerhards and Adiscon GmbH.
+ * Copyright 2008-2014 Rainer Gerhards and Adiscon GmbH.
  *
  * This file is part of the rsyslog runtime library.
  *
@@ -31,6 +31,7 @@
 #define GLBL_H_INCLUDED
 
 #include <sys/types.h>
+#include <liblogging/stdlog.h>
 #include "rainerscript.h"
 #include "prop.h"
 
@@ -38,6 +39,7 @@
 
 extern pid_t glbl_ourpid;
 extern int bProcessInternalMessages;
+extern stdlog_channel_t stdlog_hdl;
 
 /* interfaces */
 BEGINinterface(glbl) /* name must also be changed in ENDinterface macro! */
@@ -62,6 +64,14 @@ BEGINinterface(glbl) /* name must also be changed in ENDinterface macro! */
 	SIMP_PROP(DfltNetstrmDrvrCAF, uchar*)
 	SIMP_PROP(DfltNetstrmDrvrKeyFile, uchar*)
 	SIMP_PROP(DfltNetstrmDrvrCertFile, uchar*)
+	SIMP_PROP(ParserControlCharacterEscapePrefix, uchar)
+	SIMP_PROP(ParserDropTrailingLFOnReception, int)
+	SIMP_PROP(ParserEscapeControlCharactersOnReceive, int)
+	SIMP_PROP(ParserSpaceLFOnReceive, int)
+	SIMP_PROP(ParserEscape8BitCharactersOnReceive, int)
+	SIMP_PROP(ParserEscapeControlCharacterTab, int)
+	SIMP_PROP(ParserEscapeControlCharactersCStyle, int)
+
 	/* added v3, 2009-06-30 */
 	rsRetVal (*GenerateLocalHostNameProperty)(void);
 	prop_t* (*GetLocalHostNameProp)(void);

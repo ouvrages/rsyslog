@@ -133,6 +133,7 @@ typedef struct s_dynaFileCacheEntry dynaFileCacheEntry;
 
 
 typedef struct _instanceData {
+	pthread_mutex_t mutWrite; /* guard against multiple instances writing to single file */
 	uchar	*fname;	/* file or template name (display only) */
 	uchar 	*tplName;	/* name of assigned template */
 	strm_t	*pStrm;		/* our output stream */
@@ -141,6 +142,7 @@ typedef struct _instanceData {
 	int	fDirCreateMode;	/* creation mode for mkdir() */
 	int	bCreateDirs;	/* auto-create directories? */
 	int	bSyncFile;	/* should the file by sync()'ed? 1- yes, 0- no */
+	uint8_t iNumTpls;	/* number of tpls we use */
 	uid_t	fileUID;	/* IDs for creation */
 	uid_t	dirUID;
 	gid_t	fileGID;
@@ -182,6 +184,11 @@ typedef struct _instanceData {
 } instanceData;
 
 
+typedef struct wrkrInstanceData {
+	instanceData *pData;
+} wrkrInstanceData_t;
+
+
 typedef struct configSettings_s {
 	int iDynaFileCacheSize; /* max cache for dynamic files */
 	int fCreateMode; /* mode to use when creating files */
@@ -208,6 +215,10 @@ struct modConfData_s {
 	uchar 	*tplName;	/* default template */
 	int fCreateMode; /* default mode to use when creating files */
 	int fDirCreateMode; /* default mode to use when creating files */
+	uid_t fileUID;	/* default IDs for creation */
+	uid_t dirUID;
+	gid_t fileGID;
+	gid_t dirGID;
 };
 
 static modConfData_t *loadModConf = NULL;/* modConf ptr to use for the current load process */
@@ -218,7 +229,15 @@ static modConfData_t *runModConf = NULL;/* modConf ptr to use for the current ex
 static struct cnfparamdescr modpdescr[] = {
 	{ "template", eCmdHdlrGetWord, 0 },
 	{ "dircreatemode", eCmdHdlrFileCreateMode, 0 },
-	{ "filecreatemode", eCmdHdlrFileCreateMode, 0 }
+	{ "filecreatemode", eCmdHdlrFileCreateMode, 0 },
+	{ "dirowner", eCmdHdlrUID, 0 },
+	{ "dirownernum", eCmdHdlrInt, 0 },
+	{ "dirgroup", eCmdHdlrGID, 0 },
+	{ "dirgroupnum", eCmdHdlrInt, 0 },
+	{ "fileowner", eCmdHdlrUID, 0 },
+	{ "fileownernum", eCmdHdlrInt, 0 },
+	{ "filegroup", eCmdHdlrGID, 0 },
+	{ "filegroupnum", eCmdHdlrInt, 0 },
 };
 static struct cnfparamblk modpblk =
 	{ CNFPARAMBLK_VERSION,
@@ -440,7 +459,7 @@ finalize_it:
  * if the entry should be d_free()ed and 0 if not.
  */
 static rsRetVal
-dynaFileDelCacheEntry(instanceData *pData, int iEntry, int bFreeEntry)
+dynaFileDelCacheEntry(instanceData *__restrict__ const pData, const int iEntry, const int bFreeEntry)
 {
 	dynaFileCacheEntry **pCache = pData->dynCache;
 	DEFiRet;
@@ -480,7 +499,7 @@ finalize_it:
  * rgerhards, 2008-10-23
  */
 static inline void
-dynaFileFreeCacheEntries(instanceData *pData)
+dynaFileFreeCacheEntries(instanceData *__restrict__ const pData)
 {
 	register int i;
 	ASSERT(pData != NULL);
@@ -496,7 +515,7 @@ dynaFileFreeCacheEntries(instanceData *pData)
 
 /* This function frees the dynamic file name cache.
  */
-static void dynaFileFreeCache(instanceData *pData)
+static void dynaFileFreeCache(instanceData *__restrict__ const pData)
 {
 	ASSERT(pData != NULL);
 
@@ -510,7 +529,7 @@ static void dynaFileFreeCache(instanceData *pData)
 
 /* close current file */
 static rsRetVal
-closeFile(instanceData *pData)
+closeFile(instanceData *__restrict__ const pData)
 {
 	DEFiRet;
 	if(pData->useSigprov) {
@@ -524,7 +543,7 @@ closeFile(instanceData *pData)
 
 /* This prepares the signature provider to process a file */
 static rsRetVal
-sigprovPrepare(instanceData *pData, uchar *fn)
+sigprovPrepare(instanceData *__restrict__ const pData, uchar *__restrict__ const fn)
 {
 	DEFiRet;
 	pData->sigprov.OnFileOpen(pData->sigprovData, fn, &pData->sigprovFileData);
@@ -538,7 +557,7 @@ sigprovPrepare(instanceData *pData, uchar *fn)
  * changed to iRet interface - 2009-03-19
  */
 static rsRetVal
-prepareFile(instanceData *pData, uchar *newFileName)
+prepareFile(instanceData *__restrict__ const pData, const uchar *__restrict__ const newFileName)
 {
 	int fd;
 	DEFiRet;
@@ -640,7 +659,7 @@ finalize_it:
  * This is a helper to writeFile(). rgerhards, 2007-07-03
  */
 static inline rsRetVal
-prepareDynFile(instanceData *pData, uchar *newFileName, unsigned iMsgOpts)
+prepareDynFile(instanceData *__restrict__ const pData, const uchar *__restrict__ const newFileName)
 {
 	uint64 ctOldest; /* "timestamp" of oldest element */
 	int iOldest;
@@ -734,16 +753,10 @@ prepareDynFile(instanceData *pData, uchar *newFileName, unsigned iMsgOpts)
 
 	/* check if we had an error */
 	if(localRet != RS_RET_OK) {
-		/* do not report anything if the message is an internally-generated
-		 * message. Otherwise, we could run into a never-ending loop. The bad
-		 * news is that we also lose errors on startup messages, but so it is.
+		/* We do no longer care about internal messages. The errmsg rate limiter
+		 * will take care of too-frequent error messages.
 		 */
-		if(iMsgOpts & INTERNAL_MSG) {
-			DBGPRINTF("Could not open dynaFile '%s', state %d, discarding message\n",
-				  newFileName, localRet);
-		} else {
-			errmsg.LogError(0, localRet, "Could not open dynamic file '%s' [state %d] - discarding message", newFileName, localRet);
-		}
+		errmsg.LogError(0, localRet, "Could not open dynamic file '%s' [state %d] - discarding message", newFileName, localRet);
 		ABORT_FINALIZE(localRet);
 	}
 
@@ -769,13 +782,14 @@ finalize_it:
  * rgerhards, 2009-06-03
  */
 static  rsRetVal
-doWrite(instanceData *pData, uchar *pszBuf, int lenBuf)
+doWrite(instanceData *__restrict__ const pData, uchar *__restrict__ const pszBuf, const int lenBuf)
 {
 	DEFiRet;
 	ASSERT(pData != NULL);
 	ASSERT(pszBuf != NULL);
 
-	DBGPRINTF("write to stream, pData->pStrm %p, lenBuf %d\n", pData->pStrm, lenBuf);
+	DBGPRINTF("omfile: write to stream, pData->pStrm %p, lenBuf %d, strt data %.128s\n",
+		  pData->pStrm, lenBuf, pszBuf);
 	if(pData->pStrm != NULL){
 		CHKiRet(strm.Write(pData->pStrm, pszBuf, lenBuf));
 		if(pData->useSigprov) {
@@ -790,27 +804,33 @@ finalize_it:
 
 /* rgerhards 2004-11-11: write to a file output.  */
 static rsRetVal
-writeFile(uchar **ppString, unsigned iMsgOpts, instanceData *pData)
+writeFile(instanceData *__restrict__ const pData,
+	  const actWrkrIParams_t *__restrict__ const pParam,
+	  const int iMsg)
 {
 	DEFiRet;
 
-	ASSERT(pData != NULL);
-
+	STATSCOUNTER_INC(pData->ctrRequests, pData->mutCtrRequests);
 	/* first check if we have a dynamic file name and, if so,
 	 * check if it still is ok or a new file needs to be created
 	 */
 	if(pData->bDynamicName) {
-		CHKiRet(prepareDynFile(pData, ppString[1], iMsgOpts));
+		DBGPRINTF("omfile: file to log to: %s\n",
+			  actParam(pParam, pData->iNumTpls, iMsg, 1).param);
+		CHKiRet(prepareDynFile(pData, actParam(pParam, pData->iNumTpls, iMsg, 1).param));
 	} else { /* "regular", non-dynafile */
 		if(pData->pStrm == NULL) {
 			CHKiRet(prepareFile(pData, pData->fname));
 			if(pData->pStrm == NULL) {
-				errmsg.LogError(0, RS_RET_NO_FILE_ACCESS, "Could not open output file '%s'", pData->fname);
+				errmsg.LogError(0, RS_RET_NO_FILE_ACCESS,
+					"Could not open output file '%s'", pData->fname);
 			}
 		}
 	}
 
-	CHKiRet(doWrite(pData, ppString[0], strlen(CHAR_CONVERT(ppString[0]))));
+	CHKiRet(doWrite(pData,
+		 	actParam(pParam, pData->iNumTpls, iMsg, 0).param,
+		 	actParam(pParam, pData->iNumTpls, iMsg, 0).lenStr));
 
 finalize_it:
 	RETiRet;
@@ -824,6 +844,10 @@ CODESTARTbeginCnfLoad
 	pModConf->tplName = NULL;
 	pModConf->fCreateMode = 0644;
 	pModConf->fDirCreateMode = 0700;
+	pModConf->fileUID = -1;
+	pModConf->dirUID = -1;
+	pModConf->fileGID = -1;
+	pModConf->dirGID = -1;
 ENDbeginCnfLoad
 
 BEGINsetModCnf
@@ -843,8 +867,10 @@ CODESTARTsetModCnf
 	}
 
 	for(i = 0 ; i < modpblk.nParams ; ++i) {
-		if(!pvals[i].bUsed)
+		if(!pvals[i].bUsed) {
 			continue;
+		}
+
 		if(!strcmp(modpblk.descr[i].name, "template")) {
 			loadModConf->tplName = (uchar*)es_str2cstr(pvals[i].val.d.estr, NULL);
 			if(pszFileDfltTplName != NULL) {
@@ -856,6 +882,22 @@ CODESTARTsetModCnf
 			loadModConf->fDirCreateMode = (int) pvals[i].val.d.n;
 		} else if(!strcmp(modpblk.descr[i].name, "filecreatemode")) {
 			loadModConf->fCreateMode = (int) pvals[i].val.d.n;
+		} else if(!strcmp(modpblk.descr[i].name, "dirowner")) {
+			loadModConf->dirUID = (int) pvals[i].val.d.n;
+		} else if(!strcmp(modpblk.descr[i].name, "dirownernum")) {
+			loadModConf->dirUID = (int) pvals[i].val.d.n;
+		} else if(!strcmp(modpblk.descr[i].name, "dirgroup")) {
+			loadModConf->dirGID = (int) pvals[i].val.d.n;
+		} else if(!strcmp(modpblk.descr[i].name, "dirgroupnum")) {
+			loadModConf->dirGID = (int) pvals[i].val.d.n;
+		} else if(!strcmp(modpblk.descr[i].name, "fileowner")) {
+			loadModConf->fileUID = (int) pvals[i].val.d.n;
+		} else if(!strcmp(modpblk.descr[i].name, "fileownernum")) {
+			loadModConf->fileUID = (int) pvals[i].val.d.n;
+		} else if(!strcmp(modpblk.descr[i].name, "filegroup")) {
+			loadModConf->fileGID = (int) pvals[i].val.d.n;
+		} else if(!strcmp(modpblk.descr[i].name, "filegroupnum")) {
+			loadModConf->fileGID = (int) pvals[i].val.d.n;
 		} else {
 			dbgprintf("omfile: program error, non-handled "
 			  "param '%s' in beginCnfLoad\n", modpblk.descr[i].name);
@@ -892,7 +934,13 @@ ENDfreeCnf
 BEGINcreateInstance
 CODESTARTcreateInstance
 	pData->pStrm = NULL;
+	pthread_mutex_init(&pData->mutWrite, NULL);
 ENDcreateInstance
+
+
+BEGINcreateWrkrInstance
+CODESTARTcreateWrkrInstance
+ENDcreateWrkrInstance
 
 
 BEGINfreeInstance
@@ -917,7 +965,13 @@ CODESTARTfreeInstance
 		free(pData->cryprovName);
 		free(pData->cryprovNameFull);
 	}
+	pthread_mutex_destroy(&pData->mutWrite);
 ENDfreeInstance
+
+
+BEGINfreeWrkrInstance
+CODESTARTfreeWrkrInstance
+ENDfreeWrkrInstance
 
 
 BEGINtryResume
@@ -930,8 +984,15 @@ CODESTARTbeginTransaction
 ENDbeginTransaction
 
 
-BEGINendTransaction
-CODESTARTendTransaction
+BEGINcommitTransaction
+	instanceData *__restrict__ const pData = pWrkrData->pData;
+	unsigned i;
+CODESTARTcommitTransaction
+	pthread_mutex_lock(&pData->mutWrite);
+
+	for(i = 0 ; i < nParams ; ++i) {
+		writeFile(pData, pParams, i);
+	}
 	/* Note: pStrm may be NULL if there was an error opening the stream */
 	if(pData->bFlushOnTXEnd && pData->pStrm != NULL) {
 		/* if we have an async writer, it controls the flush via
@@ -942,34 +1003,19 @@ CODESTARTendTransaction
 			CHKiRet(strm.Flush(pData->pStrm));
 	}
 finalize_it:
-ENDendTransaction
-
-
-BEGINdoAction
-CODESTARTdoAction
-	DBGPRINTF("file to log to: %s\n",
-		  (pData->bDynamicName) ? ppString[1] : pData->fname);
-	DBGPRINTF("omfile: start of data: '%.128s'\n", ppString[0]);
-	STATSCOUNTER_INC(pData->ctrRequests, pData->mutCtrRequests);
-	CHKiRet(writeFile(ppString, iMsgOpts, pData));
-	if(!bCoreSupportsBatching && pData->bFlushOnTXEnd) {
-		CHKiRet(strm.Flush(pData->pStrm));
-	}
-finalize_it:
-	if(iRet == RS_RET_OK)
-		iRet = RS_RET_DEFER_COMMIT;
-ENDdoAction
+	pthread_mutex_unlock(&pData->mutWrite);
+ENDcommitTransaction
 
 
 static inline void
-setInstParamDefaults(instanceData *pData)
+setInstParamDefaults(instanceData *__restrict__ const pData)
 {
 	pData->fname = NULL;
 	pData->tplName = NULL;
-	pData->fileUID = -1;
-	pData->fileGID = -1;
-	pData->dirUID = -1;
-	pData->dirGID = -1;
+	pData->fileUID = loadModConf->fileUID;
+	pData->fileGID = loadModConf->fileGID;
+	pData->dirUID = loadModConf->dirUID;
+	pData->dirGID = loadModConf->dirGID;
 	pData->bFailOnChown = 1;
 	pData->iDynaFileCacheSize = 10;
 	pData->fCreateMode = loadModConf->fCreateMode;
@@ -990,7 +1036,7 @@ setInstParamDefaults(instanceData *pData)
 
 
 static rsRetVal
-setupInstStatsCtrs(instanceData *pData)
+setupInstStatsCtrs(instanceData *__restrict__ const pData)
 {
 	uchar ctrName[512];
 	DEFiRet;
@@ -1026,7 +1072,7 @@ finalize_it:
 }
 
 static inline void
-initSigprov(instanceData *pData, struct nvlst *lst)
+initSigprov(instanceData *__restrict__ const pData, struct nvlst *lst)
 {
 	uchar szDrvrName[1024];
 
@@ -1068,7 +1114,7 @@ done:	return;
 }
 
 static inline rsRetVal
-initCryprov(instanceData *pData, struct nvlst *lst)
+initCryprov(instanceData *__restrict__ const pData, struct nvlst *lst)
 {
 	uchar szDrvrName[1024];
 	DEFiRet;
@@ -1212,12 +1258,14 @@ CODESTARTnewActInst
 
 	tplToUse = ustrdup((pData->tplName == NULL) ? getDfltTpl() : pData->tplName);
 	CHKiRet(OMSRsetEntry(*ppOMSR, 0, tplToUse, OMSR_NO_RQD_TPL_OPTS));
+	pData->iNumTpls = 1;
 
 	if(pData->bDynamicName) {
 		/* "filename" is actually a template name, we need this as string 1. So let's add it
 		 * to the pOMSR. -- rgerhards, 2007-07-27
 		 */
 		CHKiRet(OMSRsetEntry(*ppOMSR, 1, ustrdup(pData->fname), OMSR_NO_RQD_TPL_OPTS));
+		pData->iNumTpls = 2;
 		// TODO: create unified code for this (legacy+v6 system)
 		/* we now allocate the cache table */
 		CHKmalloc(pData->dynCache = (dynaFileCacheEntry**)
@@ -1259,6 +1307,7 @@ CODESTARTparseSelectorAct
 	switch(*p) {
         case '$':
 		CODE_STD_STRING_REQUESTparseSelectorAct(1)
+		pData->iNumTpls = 1;
 		/* rgerhards 2005-06-21: this is a special setting for output-channel
 		 * definitions. In the long term, this setting will probably replace
 		 * anything else, but for the time being we must co-exist with the
@@ -1274,6 +1323,7 @@ CODESTARTparseSelectorAct
 		   * a template name. rgerhards, 2007-07-03
 		   */
 		CODE_STD_STRING_REQUESTparseSelectorAct(2)
+		pData->iNumTpls = 2;
 		++p; /* eat '?' */
 		CHKiRet(cflineParseFileName(p, fname, *ppOMSR, 0, OMSR_NO_RQD_TPL_OPTS, getDfltTpl()));
 		pData->fname = ustrdup(fname);
@@ -1291,6 +1341,7 @@ CODESTARTparseSelectorAct
 	case '/':
 	case '.':
 		CODE_STD_STRING_REQUESTparseSelectorAct(1)
+		pData->iNumTpls = 1;
 		CHKiRet(cflineParseFileName(p, fname, *ppOMSR, 0, OMSR_NO_RQD_TPL_OPTS, getDfltTpl()));
 		pData->fname = ustrdup(fname);
 		pData->bDynamicName = 0;
@@ -1348,6 +1399,7 @@ static rsRetVal resetConfigVariables(uchar __attribute__((unused)) *pp, void __a
 
 BEGINdoHUP
 CODESTARTdoHUP
+	pthread_mutex_lock(&pData->mutWrite);
 	if(pData->bDynamicName) {
 		dynaFileFreeCacheEntries(pData);
 	} else {
@@ -1355,6 +1407,7 @@ CODESTARTdoHUP
 			closeFile(pData);
 		}
 	}
+	pthread_mutex_unlock(&pData->mutWrite);
 ENDdoHUP
 
 
@@ -1369,11 +1422,11 @@ ENDmodExit
 
 BEGINqueryEtryPt
 CODESTARTqueryEtryPt
-CODEqueryEtryPt_STD_OMOD_QUERIES
+CODEqueryEtryPt_STD_OMODTX_QUERIES
+CODEqueryEtryPt_STD_OMOD8_QUERIES
 CODEqueryEtryPt_STD_CONF2_QUERIES
 CODEqueryEtryPt_STD_CONF2_setModCnf_QUERIES
 CODEqueryEtryPt_STD_CONF2_OMOD_QUERIES
-CODEqueryEtryPt_TXIF_OMOD_QUERIES /* we support the transactional interface! */
 CODEqueryEtryPt_doHUP
 ENDqueryEtryPt
 
