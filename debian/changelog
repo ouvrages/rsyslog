@@ -2,6 +2,11 @@ rsyslog (8.2.0-1) UNRELEASED; urgency=medium
 
   * New upstream release.
   * Switch watch file to track v8 stable branch.
+  * Update Build-Depends:
+    - Bump librelp-dev to (>= 1.2.5).
+    - Bump liblogging-stdlog-dev to (>= 1.0.3).
+    - Bump liblognorm-dev to (>= 1.0.0).
+    - Drop libee-dev.
 
  -- Michael Biebl <biebl@debian.org>  Thu, 03 Apr 2014 03:08:04 +0200
 
