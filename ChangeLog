@@ -1,4 +1,203 @@
 ---------------------------------------------------------------------------
+Version 8.2.0 [v8-stable] 2014-04-02
+This starts a new stable branch based on 8.1.6 plus the following changes:
+- we now use doc from the rsyslog-doc project
+  As such, the ./doc subtree has been removed. Instead, a cache of the
+  rsyslog-doc project's files has been included in ./rsyslog-doc.tar.gz.
+  Note that the exact distribution mode for the doc is still under
+  discussion and may change in future releases.
+  This was agreed upon on the rsyslog mailing list. For doc issues
+  and corrections, be sure to work with the rsyslog-doc project. It is
+  currently hosted at https://github.com/rsyslog/rsyslog-doc
+- add support for specifying the liblogging-stdlog channel spec
+  new global parameter "stdlog.channelspec"
+- add "defaultnetstreamdrivercertfile" global variable to set a default
+  for the certfile. 
+  Thanks to Radu Gheorghe for the patch.
+- omelasticsearch: add new "usehttps" parameter for secured connections
+  Thanks to Radu Gheorghe for the patch.
+- "action resumed" message now also specifies module type
+  which makes troubleshooting a bit easier. Note that we cannot output all
+  the config details (like destination etc) as this would require much more
+  elaborate code changes, which we at least do not like to do in the
+  stable version.
+- add capability to override GnuTLS path in build process
+  Thanks to Clayton Shotwell for the patch
+- better and more consistent action naming, action queues now always 
+  contain the word "queue" after the action name
+- bugfix: ompipe did resume itself even when it was still in error
+  See: https://github.com/rsyslog/rsyslog/issues/35
+  Thanks to github user schplat for reporting
+---------------------------------------------------------------------------
+Version 8.1.6 [release candidate] 2014-02-20
+- omfile: permit to set global defaults for action parameters
+  Thanks to Nathan Brown for the patch.
+  See also: https://github.com/rsyslog/rsyslog/pull/23
+- add capability to escape control characters in the C way of doing it
+  adds new global parameter "parser.escapeControlCharactersCStyle"
+  Thanks to Nathan Brown for the patch.
+  See also: https://github.com/rsyslog/rsyslog/pull/13
+- parser global parameters can now be set using RainerScript global()
+  Thanks to Nathan Brown for the patch.
+  See also: https://github.com/rsyslog/rsyslog/pull/23
+- omprog: guard program-to-be-executed against CTL-C
+  This can frequently happen in debug mode, where rsyslog is terminated
+  by ctl-c. In any case, SIGINT is not meant to control the child process,
+  so it should be blocked.
+- omprog bugfix: parameter "forceSingleInstance" is NOT mandatory
+- add new jsonr property replacer option
+  Thanks to Nathan Brown for the patch.
+- added external plugin interface
+- ommongodb: add authentication support (untested)
+  Thanks to JT for the patch.
+  See also: https://github.com/rsyslog/rsyslog/pull/17
+- bugfix: json templates are improperly created
+  Strings miss the terminating NUL character, which obviously can lead
+  to all sorts of problems.
+  See also: https://github.com/rsyslog/rsyslog/issues/27
+  Thanks to Alain for the analysis and the patch.
+- ompgsql bugfix: improper handling of auto-backgrounding mode 
+  If rsyslog was set to auto-background itself (default code behaviour, but
+  many distros now turn it off for good reason), ompgsql could not
+  properly connect. This could even lead to a segfault. The core reason
+  was that a PG session handle was kept open over a fork, something that
+  is explicitely forbidden in the PG API.
+  Thanks to Alain for the analysis and the patch.
+- bugfix: ommongodb's template parameter was mandatory but should have
+  been optional
+  Thanks to Alain for the analysis and the patch.
+- bugfix: end of batch processing was not 100% correct. Could lead to
+  outputs not properly wirting messages. At least omelasticsearch did not
+  write anything to the database due to this bug.
+  See: https://github.com/rsyslog/rsyslog/issues/10
+  Thanks to Radu Gheorghe for reporting the issue.
+---------------------------------------------------------------------------
+Version 8.1.5 [devel] 2014-01-24
+- omprog: ability to execute multiple program instances per action
+  It can now execute one program instance per worker thread. This is
+  generally a very good thing the have performance wise. Usually, this
+  should cause no problems with the invoked program. For that reason,
+  we have decided to make this the default mode of operation. If not
+  desired, it can be turned off via the 'forceSingleInstance="on"'
+  action parameter.
+  CHANGE OF BEHAVIOUR: previous versions did always execute only one
+  instance per action, no matter how many workers were active. If
+  your program has special needs, you need to change your configuration.
+- imfile now supports inotify (but must be explicitely turned on)
+- imfile no longer has a limit on number of monitored files
+- added ProcessInternalMessages global system parameter
+  This permits to inject rsyslog status messages into *another* main
+  syslogd or the journal.
+- new dependency: liblogging-stdlog (for submitting to external logger)
+- bugfix: imuxsock input parameters were not accepted
+  due to copy&paste error. Thanks to Andy Goldstein for the fix.
+---------------------------------------------------------------------------
+Version 8.1.4 [devel] 2014-01-10
+- add exec_template() RainerScript function
+- imrelp: support for TCP KEEPALIVE added
+- bumped librelp dependency to 1.2.2 to support new KEEPALIVE feature
+- Add directives for numerically specifying GIDs/UIDs
+  The already present directives (FileOwner, FileGroup, DirOwner,
+  DirGroup) translate names to numerical IDs, which depends on the user
+  information being available during rsyslog's startup. This can fail if
+  the information is obtained over a network or from a service such as
+  SSSD. The new directives provide a way to specify the numerical IDs
+  directly and bypass the lookup.
+  Thanks to Tomas Heinrich for the patch.
+- bugfix: action commitTransaction() processing did not properly handle
+  suspended actions
+- bugfix: omelasticsearch fail.es stats counter was improperly maitained
+---------------------------------------------------------------------------
+Version 8.1.3 [devel] 2013-12-06
+
+THIS VERSION CAN BE CONSIDERED A "NORMAL" DEVEL RELEASE. It's no longer
+highly experimental. This assertion is based on real-world feedback.
+
+- changes to the strgen module interface
+- new output module interface for transactional modules
+- performance improvements
+  * reduced number of malloc/frees due to further changes to the
+    output module interface
+  * reduced number of malloc/frees during string template processing
+    We now re-use once allocated string template memory for as long
+    as the worker thread exists. This saves us from doing new memory
+    allocs (and their free counterpart) when the next message is
+    processed. The drawback is that the cache always is the size of
+    the so-far largest message processed. This is not considered a
+    problem, as in any case a single messages' memory footprint should
+    be far lower than that of a whole set of messages (especially on
+    busy servers).
+  * used variable qualifiers (const, __restrict__) to hopefully help
+    the compiler generate somewhat faster code
+- failed action detection more precisely for a number of actions
+  If an action  uses string parameter passing but is non-transactional 
+  it can be executed immediately, giving a quicker indicatio of
+  action failure.
+- bugfix: limiting queue disk space did not work properly
+  * queue.maxdiskspace actually initializes queue.maxfilesize
+  * total size of queue files was not checked against
+    queue.maxdiskspace for disk assisted queues.
+  Thanks to Karol Jurak for the patch.
+---------------------------------------------------------------------------
+Version 8.1.2 [experimental] 2013-11-28
+- support for liblognorm1 added - results in performance improvements
+  Thanks to Pavel Levshin for his work in this regard.
+- support for jemalloc added via --enable-jemalloc
+  Thanks to Pavel Levshin for suggesting jemalloc
+  Note that build system is experimental at this stage.
+- queue defaults have changed
+  * high water mark is now dynamically 90% of queue size
+  * low water makr is now dynamically 70% of queue size
+  * queue.discardMark is now dynamically 98% of queue size
+  * queue.workerThreadMinimumMessage set to queue.size / num workers
+  For queues with very low queue.maxSize (< 100), "emergency" defaults
+  will be used.
+- bugfix: disk queues created files in wrong working directory
+  if the $WorkDirectory was changed multiple times, all queues only
+  used the last value set.
+- bugfix: legacy directive $ActionQueueWorkerThreads was not honored
+- bugfix: mmrfc5424addhmac: "key" parameter was not properly processed
+---------------------------------------------------------------------------
+Version 8.1.1 [experimental] 2013-11-19
+- bugfix: STOP/discard(~) was mostly NOT honored
+  This lead to execution of config code that was not meant to be executed.
+- bugfix: memory leak on worker thread termination
+- bugfix: potential segfault in omfile under heavy load
+  Thanks to Pavel Levshin for alerting us.
+- bugfix: mmsequence: instance mode did not work
+  Thanks to Pavel Levshin for the patch
+- bugfix: segfault on startup when certain script constructs are used
+  e.g. "if not $msg ..."
+- omhiredis: now supports v8 output module interface and works again
+  Thanks to Pavel Levshin for the patch
+- mmaudit: now supports v8 output module interface and work again
+- bugfix: potential abort on startup in debug mode
+  This depends on template type being used. The root cause was a 
+  non-necessary debug output, which were at the wrong spot (leftover from
+  initial testing).
+  Thanks to Pavel Levshin for alerting us and providing a patch
+  proposal.
+---------------------------------------------------------------------------
+Version 8.1.0 [experimental] 2013-11-15
+- rewritten core engine for higher performance and new features
+  In detail:
+  * completely rewritten rule execution engine
+  * completely changed output module interface
+  * remodelled output module interface
+  * enabled important output modules to support full concurrent
+    operation
+  The core engine has been considerably changed and must be considered
+  experimental at this stage. Note that it does not yet include all
+  features planned for v8, but is close to this goal. In theory, the
+  engine should perform much better, especially on complex configurations
+  and busy servers. Most importantly, actions instances can now be called
+  concurrently from worker threads and many important output modules
+  support multiple concurrent action instances natively.
+- module omruleset is no longer enabled by default.
+  Note that it has been deprecated in v7 and been replaced by the "call"
+  statement. Also, it can still be build without problems, the option must
+  just explicitely be given.
+---------------------------------------------------------------------------
 Version 7.6.3 [v7.6-stable] 2014-03-27
 - add capability to override GnuTLS path in build process
   Thanks to Clayton Shotwell for the patch

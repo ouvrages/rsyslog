@@ -116,16 +116,16 @@ static int bFirstRegexpErrmsg = 1; /**< did we already do a "can't load regexp" 
 /* helper to tplToString and strgen's, extends buffer */
 #define ALLOC_INC 128
 rsRetVal
-ExtendBuf(uchar **pBuf, size_t *pLenBuf, size_t iMinSize)
+ExtendBuf(actWrkrIParams_t *__restrict__ const iparam, const size_t iMinSize)
 {
 	uchar *pNewBuf;
 	size_t iNewSize;
 	DEFiRet;
 
 	iNewSize = (iMinSize / ALLOC_INC + 1) * ALLOC_INC;
-	CHKmalloc(pNewBuf = (uchar*) realloc(*pBuf, iNewSize));
-	*pBuf = pNewBuf;
-	*pLenBuf = iNewSize;
+	CHKmalloc(pNewBuf = (uchar*) realloc(iparam->param, iNewSize));
+	iparam->param = pNewBuf;
+	iparam->lenBuf = iNewSize;
 
 finalize_it:
 	RETiRet;
@@ -137,29 +137,26 @@ finalize_it:
  * The function takes a pointer to a template and a pointer to a msg object
  * as well as a pointer to an output buffer and its size. Note that the output
  * buffer pointer may be NULL, size 0, in which case a new one is allocated.
- * The outpub buffer is grown as required. It is the caller's duty to free the
+ * The output buffer is grown as required. It is the caller's duty to free the
  * buffer when it is done. Note that it is advisable to reuse memory, as this
  * offers big performance improvements.
  * rewritten 2009-06-19 rgerhards
  */
 rsRetVal
-tplToString(struct template *pTpl, msg_t *pMsg, uchar **ppBuf, size_t *pLenBuf,
-	    struct syslogTime *ttNow)
+tplToString(struct template *__restrict__ const pTpl,
+	    msg_t *__restrict__ const pMsg,
+	    actWrkrIParams_t *__restrict const iparam,
+	    struct syslogTime *const ttNow)
 {
 	DEFiRet;
-	struct templateEntry *pTpe;
+	struct templateEntry *__restrict__ pTpe;
 	size_t iBuf;
 	unsigned short bMustBeFreed = 0;
 	uchar *pVal;
 	rs_size_t iLenVal = 0;
 
-	assert(pTpl != NULL);
-	assert(pMsg != NULL);
-	assert(ppBuf != NULL);
-	assert(pLenBuf != NULL);
-
 	if(pTpl->pStrgen != NULL) {
-		CHKiRet(pTpl->pStrgen(pMsg, ppBuf, pLenBuf));
+		CHKiRet(pTpl->pStrgen(pMsg, iparam));
 		FINALIZE;
 	}
 
@@ -170,9 +167,9 @@ tplToString(struct template *pTpl, msg_t *pMsg, uchar **ppBuf, size_t *pLenBuf,
 		 * in subtree mode and so most probably only used for debug & test.
 		 */
 		getJSONPropVal(pMsg, &pTpl->subtree, &pVal, &iLenVal, &bMustBeFreed);
-		if(iLenVal >= (rs_size_t)*pLenBuf) /* we reserve one char for the final \0! */
-			CHKiRet(ExtendBuf(ppBuf, pLenBuf, iLenVal + 1));
-		memcpy(*ppBuf, pVal, iLenVal+1);
+		if(iLenVal >= (rs_size_t)iparam->lenBuf) /* we reserve one char for the final \0! */
+			CHKiRet(ExtendBuf(iparam, iLenVal + 1));
+		memcpy(iparam->param, pVal, iLenVal+1);
 		if(bMustBeFreed)
 			free(pVal);
 		FINALIZE;
@@ -211,10 +208,10 @@ tplToString(struct template *pTpl, msg_t *pMsg, uchar **ppBuf, size_t *pLenBuf,
 		/* got source, now copy over */
 		if(iLenVal > 0) { /* may be zero depending on property */
 			/* first, make sure buffer fits */
-			if(iBuf + iLenVal >= *pLenBuf) /* we reserve one char for the final \0! */
-				CHKiRet(ExtendBuf(ppBuf, pLenBuf, iBuf + iLenVal + 1));
+			if(iBuf + iLenVal >= iparam->lenBuf) /* we reserve one char for the final \0! */
+				CHKiRet(ExtendBuf(iparam, iBuf + iLenVal + 1));
 
-			memcpy(*ppBuf + iBuf, pVal, iLenVal);
+			memcpy(iparam->param + iBuf, pVal, iLenVal);
 			iBuf += iLenVal;
 		}
 
@@ -224,15 +221,16 @@ tplToString(struct template *pTpl, msg_t *pMsg, uchar **ppBuf, size_t *pLenBuf,
 		pTpe = pTpe->pNext;
 	}
 
-	if(iBuf == *pLenBuf) {
+	if(iBuf == iparam->lenBuf) {
 		/* in the weired case of an *empty* template, this can happen.
 		 * it is debatable if we should really fix it here or simply
 		 * forbid that case. However, performance toll is minimal, so 
-		 * I tend to permit it. -- 201011-05 rgerhards
+		 * I tend to permit it. -- 2010-11-05 rgerhards
 		 */
-		CHKiRet(ExtendBuf(ppBuf, pLenBuf, iBuf + 1));
+		CHKiRet(ExtendBuf(iparam, iBuf + 1));
 	}
-	(*ppBuf)[iBuf] = '\0';
+	iparam->param[iBuf] = '\0';
+	iparam->lenStr = iBuf;
 	
 finalize_it:
 	RETiRet;
@@ -645,6 +643,17 @@ finalize_it:
 	RETiRet;
 }
 
+/* Helper that checks to see if a property already has a format
+ * type defined
+ */
+static int hasFormat(struct templateEntry *pTpe) {
+	return (
+		pTpe->data.field.options.bCSV ||
+		pTpe->data.field.options.bJSON ||
+		pTpe->data.field.options.bJSONf ||
+		pTpe->data.field.options.bJSONr
+	);
+}
 
 /* Helper to do_Parameter(). This parses the formatting options
  * specified in a template variable. It returns the passed-in pointer
@@ -715,25 +724,39 @@ static void doOptions(unsigned char **pp, struct templateEntry *pTpe)
 		 } else if(!strcmp((char*)Buf, "pos-end-relative")) {
 			pTpe->data.field.options.bFromPosEndRelative = 1;
 		 } else if(!strcmp((char*)Buf, "csv")) {
-		 	if(pTpe->data.field.options.bJSON || pTpe->data.field.options.bJSONf) {
+			if(hasFormat(pTpe)) {
 				errmsg.LogError(0, NO_ERRCODE, "error: can only specify "
-					"one option out of (json, jsonf, csv) - csv ignored");
+					"one option out of (json, jsonf, jsonr, jsonfr, csv) - csv ignored");
 			} else {
 				pTpe->data.field.options.bCSV = 1;
 			}
 		 } else if(!strcmp((char*)Buf, "json")) {
-		 	if(pTpe->data.field.options.bCSV || pTpe->data.field.options.bJSON) {
+			if(hasFormat(pTpe)) {
 				errmsg.LogError(0, NO_ERRCODE, "error: can only specify "
-					"one option out of (json, jsonf, csv) - json ignored");
+					"one option out of (json, jsonf, jsonr, jsonfr, csv) - json ignored");
 			} else {
 				pTpe->data.field.options.bJSON = 1;
 			}
 		 } else if(!strcmp((char*)Buf, "jsonf")) {
-		 	if(pTpe->data.field.options.bCSV || pTpe->data.field.options.bJSON) {
+			if(hasFormat(pTpe)) {
 				errmsg.LogError(0, NO_ERRCODE, "error: can only specify "
-					"one option out of (json, jsonf, csv) - jsonf ignored");
+					"one option out of (json, jsonf, jsonr, jsonfr, csv) - jsonf ignored");
 			} else {
 				pTpe->data.field.options.bJSONf = 1;
+			}
+		 } else if(!strcmp((char*)Buf, "jsonr")) {
+			if(hasFormat(pTpe)) {
+				errmsg.LogError(0, NO_ERRCODE, "error: can only specify "
+					"one option out of (json, jsonf, jsonr, jsonfr, csv) - jsonr ignored");
+			} else {
+				pTpe->data.field.options.bJSONr = 1;
+			}
+		 } else if(!strcmp((char*)Buf, "jsonfr")) {
+			if(hasFormat(pTpe)) {
+				errmsg.LogError(0, NO_ERRCODE, "error: can only specify "
+					"one option out of (json, jsonf, jsonr, jsonfr, csv) - jsonfr ignored");
+			} else {
+				pTpe->data.field.options.bJSONfr = 1;
 			}
 		 } else if(!strcmp((char*)Buf, "mandatory-field")) {
 			 pTpe->data.field.options.bMandatory = 1;
@@ -745,7 +768,6 @@ static void doOptions(unsigned char **pp, struct templateEntry *pTpe)
 
 	*pp = p;
 }
-
 
 /* helper to tplAddLine. Parses a parameter and generates
  * the necessary structure.
@@ -1361,7 +1383,7 @@ createPropertyTpe(struct template *pTpl, struct cnfobj *o)
 	int bPosRelativeToEnd = 0;
 	char *re_expr = NULL;
 	struct cnfparamvals *pvals = NULL;
-	enum {F_NONE, F_CSV, F_JSON, F_JSONF} formatType = F_NONE;
+	enum {F_NONE, F_CSV, F_JSON, F_JSONF, F_JSONR, F_JSONFR} formatType = F_NONE;
 	enum {CC_NONE, CC_ESCAPE, CC_SPACE, CC_DROP} controlchr = CC_NONE;
 	enum {SP_NONE, SP_DROP, SP_REPLACE} secpath = SP_NONE;
 	enum tplFormatCaseConvTypes caseconv = tplCaseConvNo;
@@ -1453,6 +1475,10 @@ createPropertyTpe(struct template *pTpl, struct cnfobj *o)
 				formatType = F_JSON;
 			} else if(!es_strbufcmp(pvals[i].val.d.estr, (uchar*)"jsonf", sizeof("jsonf")-1)) {
 				formatType = F_JSONF;
+			} else if(!es_strbufcmp(pvals[i].val.d.estr, (uchar*)"jsonr", sizeof("jsonr")-1)) {
+				formatType = F_JSONR;
+			} else if(!es_strbufcmp(pvals[i].val.d.estr, (uchar*)"jsonfr", sizeof("jsonfr")-1)) {
+				formatType = F_JSONFR;
 			} else {
 				uchar *typeStr = (uchar*) es_str2cstr(pvals[i].val.d.estr, NULL);
 				errmsg.LogError(0, RS_RET_ERR, "invalid format type '%s' for property",
@@ -1582,6 +1608,12 @@ createPropertyTpe(struct template *pTpl, struct cnfobj *o)
 		break;
 	case F_JSONF:
 		pTpe->data.field.options.bJSONf = 1;
+		break;
+	case F_JSONR:
+		pTpe->data.field.options.bJSONr = 1;
+		break;
+	case F_JSONFR:
+		pTpe->data.field.options.bJSONfr = 1;
 		break;
 	}
 	switch(controlchr) {
@@ -2140,6 +2172,12 @@ void tplPrintList(rsconf_t *conf)
 				}
 				if(pTpe->data.field.options.bJSONf) {
 					dbgprintf("[format as JSON field] ");
+				}
+				if(pTpe->data.field.options.bJSONr) {
+					dbgprintf("[format as JSON without re-escaping] ");
+				}
+				if(pTpe->data.field.options.bJSONfr) {
+					dbgprintf("[format as JSON field without re-escaping] ");
 				}
 				if(pTpe->data.field.options.bMandatory) {
 					dbgprintf("[mandatory field] ");

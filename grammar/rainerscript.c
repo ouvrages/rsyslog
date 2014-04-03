@@ -48,6 +48,7 @@
 #include "modules.h"
 #include "ruleset.h"
 #include "msg.h"
+#include "wti.h"
 #include "unicode-helper.h"
 
 DEFobjCurrIf(obj)
@@ -65,8 +66,8 @@ struct cnffunc * cnffuncNew_prifilt(int fac);
  * NOTE: This function MUST be updated if new tokens are defined in the
  *       grammar.
  */
-char *
-tokenToString(int token)
+const char *
+tokenToString(const int token)
 {
 	char *tokstr;
 	static char tokbuf[512];
@@ -117,8 +118,8 @@ tokenToString(int token)
 }
 
 
-char*
-getFIOPName(unsigned iFIOP)
+const char*
+getFIOPName(const unsigned iFIOP)
 {
 	char *pRet;
 	switch(iFIOP) {
@@ -246,7 +247,7 @@ finalize_it:
 }
 
 static void
-prifiltInvert(struct funcData_prifilt *prifilt)
+prifiltInvert(struct funcData_prifilt *__restrict__ const prifilt)
 {
 	int i;
 	for(i = 0 ; i < LOG_NFACILITIES+1 ; ++i) {
@@ -288,7 +289,7 @@ prifiltSetSeverity(struct funcData_prifilt *prifilt, int sev, int mode)
  * NOTE: fac MUST be in the range 0..24 (not multiplied by 8)!
  */
 static void
-prifiltSetFacility(struct funcData_prifilt *prifilt, int fac, int mode)
+prifiltSetFacility(struct funcData_prifilt *__restrict__ const prifilt, const int fac, const int mode)
 {
 	int i;
 
@@ -325,7 +326,9 @@ prifiltSetFacility(struct funcData_prifilt *prifilt, int fac, int mode)
  * used to keep things simple).
  */
 static void
-prifiltCombine(struct funcData_prifilt *prifilt, struct funcData_prifilt *prifilt2, int mode)
+prifiltCombine(struct funcData_prifilt *__restrict__ const prifilt,
+	       struct funcData_prifilt *__restrict__ const prifilt2,
+	       const int mode)
 {
 	int i;
 	for(i = 0 ; i < LOG_NFACILITIES+1 ; ++i) {
@@ -338,7 +341,7 @@ prifiltCombine(struct funcData_prifilt *prifilt, struct funcData_prifilt *prifil
 
 
 void
-readConfFile(FILE *fp, es_str_t **str)
+readConfFile(FILE * const fp, es_str_t **str)
 {
 	char ln[10240];
 	char buf[512];
@@ -1208,8 +1211,8 @@ var2Number(struct var *r, int *bSuccess)
 
 /* ensure that retval is a string
  */
-static inline es_str_t *
-var2String(struct var *r, int *bMustFree)
+static es_str_t *
+var2String(struct var *__restrict__ const r, int *__restrict__ const bMustFree)
 {
 	es_str_t *estr;
 	char *cstr;
@@ -1235,7 +1238,7 @@ var2String(struct var *r, int *bMustFree)
 }
 
 static uchar*
-var2CString(struct var *r, int *bMustFree)
+var2CString(struct var *__restrict__ const r, int *__restrict__ const bMustFree)
 {
 	uchar *cstr;
 	es_str_t *estr;
@@ -1265,7 +1268,7 @@ varFreeMembers(struct var *r)
 }
 
 static rsRetVal
-doExtractFieldByChar(uchar *str, uchar delim, int matchnbr, uchar **resstr)
+doExtractFieldByChar(uchar *str, uchar delim, const int matchnbr, uchar **resstr)
 {
 	int iCurrFld;
 	int iLen;
@@ -1312,7 +1315,7 @@ finalize_it:
 
 
 static rsRetVal
-doExtractFieldByStr(uchar *str, char *delim, rs_size_t lenDelim, int matchnbr, uchar **resstr)
+doExtractFieldByStr(uchar *str, char *delim, const rs_size_t lenDelim, const int matchnbr, uchar **resstr)
 {
 	int iCurrFld;
 	int iLen;
@@ -1460,17 +1463,17 @@ doFunc_exec_template(struct cnffunc *__restrict__ const func,
 	msg_t *const pMsg)
 {
 	rsRetVal localRet;
-	uchar *pBuf = NULL;
-	size_t lenBuf = 0;
+	actWrkrIParams_t iparam;
 
-	localRet = tplToString(func->funcdata, pMsg, &pBuf, &lenBuf, NULL);
+	wtiInitIParam(&iparam);
+	localRet = tplToString(func->funcdata, pMsg, &iparam, NULL);
 	if(localRet == RS_RET_OK) {
-		ret->d.estr = es_newStrFromCStr((char*)pBuf, ustrlen(pBuf));
+		ret->d.estr = es_newStrFromCStr((char*)iparam.param, iparam.lenStr);
 	} else {
 		ret->d.estr = es_newStrFromCStr("", 0);
 	}
 	ret->datatype = 'S';
-	free(pBuf);
+	free(iparam.param);
 
 	return;
 }
@@ -1480,7 +1483,8 @@ doFunc_exec_template(struct cnffunc *__restrict__ const func,
  * to keep the code small and easier to maintain.
  */
 static inline void
-doFuncCall(struct cnffunc *func, struct var *ret, void* usrptr)
+doFuncCall(struct cnffunc *__restrict__ const func, struct var *__restrict__ const ret,
+	   void *__restrict__ const usrptr)
 {
 	char *fname;
 	char *envvar;
@@ -1654,7 +1658,8 @@ dbgprintf("DDDD: executing lookup\n");
 }
 
 static inline void
-evalVar(struct cnfvar *var, void *usrptr, struct var *ret)
+evalVar(struct cnfvar *__restrict__ const var, void *__restrict__ const usrptr,
+	struct var *__restrict__ const ret)
 {
 	rs_size_t propLen;
 	uchar *pszProp = NULL;
@@ -1690,7 +1695,8 @@ evalVar(struct cnfvar *var, void *usrptr, struct var *ret)
  * and it was generally 5 to 10 times SLOWER than what we do here...
  */
 static int
-evalStrArrayCmp(es_str_t *estr_l, struct cnfarray* ar, int cmpop)
+evalStrArrayCmp(es_str_t *const estr_l, struct cnfarray *__restrict__ const ar,
+		const int cmpop)
 {
 	int i;
 	int r = 0;
@@ -1766,10 +1772,11 @@ evalStrArrayCmp(es_str_t *estr_l, struct cnfarray* ar, int cmpop)
  * simply is no case where full evaluation would make any sense at all.
  */
 void
-cnfexprEval(const struct cnfexpr *const expr, struct var *ret, void* usrptr)
+cnfexprEval(const struct cnfexpr *__restrict__ const expr, struct var *__restrict__ const ret,
+	    void *__restrict__ const usrptr)
 {
 	struct var r, l; /* memory for subexpression results */
-	es_str_t *estr_r, *estr_l;
+	es_str_t *__restrict__ estr_r, *__restrict__ estr_l;
 	int convok_r, convok_l;
 	int bMustFree, bMustFree2;
 	long long n_r, n_l;
@@ -2274,7 +2281,7 @@ cnffuncDestruct(struct cnffunc *func)
 /* Destruct an expression and all sub-expressions contained in it.
  */
 void
-cnfexprDestruct(struct cnfexpr *expr)
+cnfexprDestruct(struct cnfexpr *__restrict__ const expr)
 {
 
 	if(expr == NULL) {
@@ -2338,7 +2345,7 @@ cnfexprDestruct(struct cnfexpr *expr)
  * important.
  */
 int
-cnfexprEvalBool(struct cnfexpr *expr, void *usrptr)
+cnfexprEvalBool(struct cnfexpr *__restrict__ const expr, void *__restrict__ const usrptr)
 {
 	int convok;
 	struct var ret;
@@ -2535,7 +2542,7 @@ cnfstmtPrintOnly(struct cnfstmt *stmt, int indent, sbool subtree)
 		free(cstr);
 		break;
 	case S_ACT:
-		doIndent(indent); dbgprintf("ACTION %p [%s:%s]\n", stmt->d.act,
+		doIndent(indent); dbgprintf("ACTION %d [%s:%s]\n", stmt->d.act->iActionNbr,
 			modGetName(stmt->d.act->pMod), stmt->printable);
 		break;
 	case S_IF:
@@ -2614,7 +2621,7 @@ cnfstmtPrint(struct cnfstmt *root, int indent)
 }
 
 struct cnfnumval*
-cnfnumvalNew(long long val)
+cnfnumvalNew(const long long val)
 {
 	struct cnfnumval *numval;
 	if((numval = malloc(sizeof(struct cnfnumval))) != NULL) {
@@ -2625,7 +2632,7 @@ cnfnumvalNew(long long val)
 }
 
 struct cnfstringval*
-cnfstringvalNew(es_str_t *estr)
+cnfstringvalNew(es_str_t *const estr)
 {
 	struct cnfstringval *strval;
 	if((strval = malloc(sizeof(struct cnfstringval))) != NULL) {
@@ -2654,7 +2661,7 @@ done:	return ar;
 }
 
 struct cnfarray*
-cnfarrayAdd(struct cnfarray *ar, es_str_t *val)
+cnfarrayAdd(struct cnfarray *__restrict__ const ar, es_str_t *__restrict__ val)
 {
 	es_str_t **newptr;
 	if((newptr = realloc(ar->arr, (ar->nmemb+1)*sizeof(es_str_t*))) == NULL) {

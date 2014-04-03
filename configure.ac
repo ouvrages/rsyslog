@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[7.6.3],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[8.2.0],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE([subdir-objects])
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -33,7 +33,7 @@ PKG_PROG_PKG_CONFIG
 
 # modules we require
 PKG_CHECK_MODULES(LIBESTR, libestr >= 0.1.9)
-PKG_CHECK_MODULES(LIBLOGGING_STDLOG, liblogging-stdlog >= 1.0.1)
+PKG_CHECK_MODULES(LIBLOGGING_STDLOG, liblogging-stdlog >= 1.0.3)
 PKG_CHECK_MODULES([JSON_C], [json],, [
 	PKG_CHECK_MODULES([JSON_C], [json-c])
 ])
@@ -90,7 +90,7 @@ AC_SUBST(DL_LIBS)
 AC_HEADER_RESOLV
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS([arpa/inet.h libgen.h malloc.h fcntl.h locale.h netdb.h netinet/in.h paths.h stddef.h stdlib.h string.h sys/file.h sys/ioctl.h sys/param.h sys/socket.h sys/time.h sys/stat.h syslog.h unistd.h utmp.h utmpx.h sys/epoll.h sys/prctl.h])
+AC_CHECK_HEADERS([arpa/inet.h libgen.h malloc.h fcntl.h locale.h netdb.h netinet/in.h paths.h stddef.h stdlib.h string.h sys/file.h sys/ioctl.h sys/param.h sys/socket.h sys/time.h sys/stat.h sys/inotify.h syslog.h unistd.h utmp.h utmpx.h sys/epoll.h sys/prctl.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -125,7 +125,7 @@ AC_TYPE_SIGNAL
 AC_FUNC_STAT
 AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS([flock recvmmsg basename alarm clock_gettime gethostbyname gethostname gettimeofday localtime_r memset mkdir regcomp select setsid socket strcasecmp strchr strdup strerror strndup strnlen strrchr strstr strtol strtoul uname ttyname_r getline malloc_trim prctl epoll_create epoll_create1 fdatasync syscall lseek64])
+AC_CHECK_FUNCS([flock inotify_init recvmmsg basename alarm clock_gettime gethostbyname gethostname gettimeofday localtime_r memset mkdir regcomp select setsid socket strcasecmp strchr strdup strerror strndup strnlen strrchr strstr strtol strtoul uname ttyname_r getline malloc_trim prctl epoll_create epoll_create1 fdatasync syscall lseek64])
 
 # getifaddrs is in libc (mostly) or in libsocket (eg Solaris 11) or not defined (eg Solaris 10)
 AC_SEARCH_LIBS([getifaddrs], [socket], [AC_DEFINE(HAVE_GETIFADDRS, [1], [set define])])
@@ -377,6 +377,29 @@ AC_ARG_ENABLE(inet,
 AM_CONDITIONAL(ENABLE_INET, test x$enable_inet = xyes)
 if test "$enable_inet" = "yes"; then
         AC_DEFINE(SYSLOG_INET, 1, [network support is integrated.])
+fi
+
+# jemalloc
+AC_ARG_ENABLE(jemalloc,
+        [AS_HELP_STRING([--enable-jemalloc],[Enable jemalloc support @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_jemalloc="yes" ;;
+          no) enable_jemalloc="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-jemalloc) ;;
+         esac],
+        [enable_jemalloc="no"]
+)
+AM_CONDITIONAL(ENABLE_JEMALLOC, test x$enable_jemalloc = xyes)
+if test "$enable_jemalloc" = "yes"; then
+  AC_CHECK_LIB(
+    [jemalloc],
+    [malloc_stats_print],
+    [RT_LIBS="$RT_LIBS -ljemalloc"
+     AC_DEFINE(HAVE_JEMALLOC, 1, [jemalloc support is integrated.])
+    ],
+    [AC_MSG_FAILURE([jemalloc library is missing])],
+    []
+    )
 fi
 
 
@@ -927,8 +950,7 @@ AC_ARG_ENABLE(mmnormalize,
         [enable_mmnormalize=no]
 )
 if test "x$enable_mmnormalize" = "xyes"; then
-	PKG_CHECK_MODULES(LIBEE, libee >= 0.4.0)
-	PKG_CHECK_MODULES(LIBLOGNORM, lognorm >= 0.3.1 lognorm < 1.0.0)
+	PKG_CHECK_MODULES(LIBLOGNORM, lognorm >= 1.0.0)
 fi
 AM_CONDITIONAL(ENABLE_MMNORMALIZE, test x$enable_mmnormalize = xyes)
 
@@ -1085,30 +1107,6 @@ if test "x$enable_guardtime" = "xyes"; then
 	PKG_CHECK_MODULES(GUARDTIME, libgt >= 0.3.1)
 fi
 AM_CONDITIONAL(ENABLE_GUARDTIME, test x$enable_guardtime = xyes)
-
-
-# Support using cached man file copies, to avoid the need for rst2man
-# in the build environment
-AC_ARG_ENABLE(cached_man_pages,
-        [AS_HELP_STRING([--enable-cached-man-pages],[Enable using cached versions of man files (avoid rst2man) @<:@default=no@:>@])],
-        [case "${enableval}" in
-         yes) enable_cached_man_pages="yes" ;;
-          no) enable_cached_man_pages="no" ;;
-           *) AC_MSG_ERROR(bad value ${enableval} for --enable-cached-man-pages) ;;
-         esac],
-        [enable_cached_man_pages=no]
-)
-if test "x$enable_cached_man_pages" = "xno"; then
-# obtain path for rst2man
-  if test "x$enable_libgcrypt" = "xyes" || \
-     test "x$enable_guardtime" = "xyes"; then
-        AC_PATH_PROG([RST2MAN], [rst2man])
-        if test "x${RST2MAN}" == "x"; then
-            AC_MSG_FAILURE([rst2man not found in PATH])
-        fi
-  fi
-fi
-
 
 
 # RFC 3195 support
@@ -1349,7 +1347,7 @@ AC_ARG_ENABLE(omruleset,
           no) enable_omruleset="no" ;;
            *) AC_MSG_ERROR(bad value ${enableval} for --enable-omruleset) ;;
          esac],
-        [enable_omruleset=yes]
+        [enable_omruleset=no]
 )
 AM_CONDITIONAL(ENABLE_OMRULESET, test x$enable_omruleset = xyes)
 
@@ -1519,12 +1517,45 @@ AM_CONDITIONAL(ENABLE_OMHIREDIS, test x$enable_omhiredis = xyes)
 
 # END HIREDIS SUPPORT
 
+
+AC_CHECKING([if required man pages already exist])
+have_to_generate_man_pages="no"
+
+# man pages for libgcrypt module
+if test "x$enable_usertools" = "xyes" && test "x$enable_libgcrypt" = "xyes"; then
+    AC_CHECK_FILES(["tools/rscryutil.1" "tools/rsgtutil.1"],
+        [],
+        [have_to_generate_man_pages="yes"]
+    )
+fi
+
+# man pages for GuardTime module
+if test "x$enable_usertools" = "xyes" && test "x$enable_guardtime" = "xyes"; then
+    AC_CHECK_FILES(["tools/rscryutil.1" "tools/rsgtutil.1"],
+        [],
+        [have_to_generate_man_pages="yes"]
+    )
+fi
+
+if test "x$have_to_generate_man_pages" = "xyes"; then
+    AC_MSG_RESULT([Some man pages are missing. We need rst2man to generate the missing man pages from source...])
+else
+    AC_MSG_RESULT([All required man pages found. We don't need rst2man!])
+fi
+
+if test "x$have_to_generate_man_pages" = "xyes"; then
+    # We need rst2man to generate our man pages
+    AC_CHECK_PROGS([RST2MAN], [rst2man rst2man.py], [])
+    if test -z "$RST2MAN"; then
+        AC_MSG_ERROR([rst2man is required to build man pages. You can use the release tarball with pregenerated man pages to avoid this depedency.])
+    fi
+fi
+
 AC_CONFIG_FILES([Makefile \
 		runtime/Makefile \
 		compat/Makefile \
 		grammar/Makefile \
 		tools/Makefile \
-		doc/Makefile \
 		plugins/imudp/Makefile \
 		plugins/imtcp/Makefile \
 		plugins/im3195/Makefile \
@@ -1594,7 +1625,7 @@ echo "    Zlib compression support enabled:         $enable_zlib"
 echo "    rsyslog runtime will be built:            $enable_rsyslogrt"
 echo "    rsyslogd will be built:                   $enable_rsyslogd"
 echo "    GUI components will be built:             $enable_gui"
-echo "    cached man files will be used:            $enable_cached_man_pages"
+echo "    have to generate man pages:               $have_to_generate_man_pages"
 echo "    Unlimited select() support enabled:       $enable_unlimited_select"
 echo "    uuid support enabled:                     $enable_uuid"
 echo "    Log file signing support:                 $enable_guardtime"
