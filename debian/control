@@ -10,6 +10,7 @@ Build-Depends: debhelper (>= 8),
                libmysqlclient-dev,
                libpq-dev,
                libmongo-client-dev (>= 0.1.4),
+               libcurl4-gnutls-dev,
                libkrb5-dev,
                libgnutls-dev,
                librelp-dev (>= 1.2.5),
@@ -114,6 +115,17 @@ Recommends: mongodb-server
 Description: MongoDB output plugin for rsyslog
  This plugin allows rsyslog to write the syslog messages to MongoDB, a
  scalable, high-performance, open source NoSQL database.
+
+Package: rsyslog-elasticsearch
+Architecture: any
+Priority: extra
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+         rsyslog (= ${binary:Version}),
+Description: Elasticsearch output plugin for rsyslog
+ This plugin allows rsyslog to write syslog messages to Elasticsearch, a
+ distributed, multitenant-capable full-text search engine with a RESTful web
+ interface and schema-free JSON documents.
 
 Package: rsyslog-gssapi
 Architecture: any
