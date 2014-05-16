@@ -1,4 +1,22 @@
 ---------------------------------------------------------------------------
+Version 8.2.1 [v8-stable] 2014-04-17
+- permits to build against json-c 0.12
+  Unfortunately, json-c had an ABI breakage, so this is necessary. Note
+  that versions prior to 0.12 had security issues (CVE-2013-6370,
+  CVE-2013-6371) and so it is desirable to link against the new version.
+  Thanks to Thomas D. for the patch. Note that at least some distros
+  have fixed the security issue in older versions of json-c, so this
+  seems to apply mostly when building from sources.
+- doc is no longer shipped as part of the rsyslog tarball
+  Instead, the rsyslog-doc project creates its own tarball. This is the
+  result of a mailing list discussion after the 8.2.0 release with a
+  tarball-in-tarball approach, which was disliked by almost all distro
+  maintainers. This move also has the advantage of de-coupling the
+  release cycles of both projects a bit (which turned out to be a bit
+  problematic in practice).
+- bugfix: mmutf8fix did not detect two invalid sequences
+  Thanks to Axel Rau for the patch.
+---------------------------------------------------------------------------
 Version 8.2.0 [v8-stable] 2014-04-02
 This starts a new stable branch based on 8.1.6 plus the following changes:
 - we now use doc from the rsyslog-doc project
@@ -197,6 +215,29 @@ Version 8.1.0 [experimental] 2013-11-15
   Note that it has been deprecated in v7 and been replaced by the "call"
   statement. Also, it can still be build without problems, the option must
   just explicitely be given.
+---------------------------------------------------------------------------
+Version 7.6.4 [v7.6-stable] 2014-03-??
+- permits to build against json-c 0.12
+  Unfortunately, json-c had an ABI breakage, so this is necessary. Note
+  that versions prior to 0.12 had security issues (CVE-2013-6370,
+  CVE-2013-6371) and so it is desirable to link against the new version.
+  Thanks to Thomas D. for the patch. Note that at least some distros
+  have fixed the security issue in older versions of json-c, so this
+  seems to apply mostly when building from sources.
+- new omfile default module parameters
+  * filecreatemode
+  * fileowner
+  * fileownernum
+  * filegroup
+  * filegroupnum
+  * dirowner
+  * dirownernum
+  * dirgroup
+  * dirgroupnum
+  Thanks to Karol Jurak for the patch.
+- bugfix: using UUID property could cause segfault
+- bugfix: mmutf8fix did not detect two invalid sequences
+  Thanks to Axel Rau for the patch.
 ---------------------------------------------------------------------------
 Version 7.6.3 [v7.6-stable] 2014-03-27
 - add capability to override GnuTLS path in build process
