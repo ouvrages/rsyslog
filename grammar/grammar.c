@@ -65,6 +65,7 @@
 /* Line 358 of yacc.c  */
 #line 31 "grammar.y"
 
+#include "config.h"
 #include <stdio.h>
 #include <libestr.h>
 #include "rainerscript.h"
@@ -77,7 +78,7 @@ extern int yylex(void);
 extern int yyerror(char*);
 
 /* Line 358 of yacc.c  */
-#line 81 "grammar.c"
+#line 82 "grammar.c"
 
 # ifndef YY_NULL
 #  if defined __cplusplus && 201103L <= __cplusplus
@@ -203,7 +204,7 @@ extern int yydebug;
 typedef union YYSTYPE
 {
 /* Line 374 of yacc.c  */
-#line 44 "grammar.y"
+#line 45 "grammar.y"
 
 	char *s;
 	long long n;
@@ -220,7 +221,7 @@ typedef union YYSTYPE
 
 
 /* Line 374 of yacc.c  */
-#line 224 "grammar.c"
+#line 225 "grammar.c"
 } YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
@@ -248,7 +249,7 @@ int yyparse ();
 /* Copy the second part of user declarations.  */
 
 /* Line 377 of yacc.c  */
-#line 252 "grammar.c"
+#line 253 "grammar.c"
 
 #ifdef short
 # undef short
@@ -569,14 +570,14 @@ static const yytype_int8 yyrhs[] =
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
 static const yytype_uint8 yyrline[] =
 {
-       0,   122,   122,   123,   124,   125,   126,   127,   128,   129,
-     130,   134,   138,   139,   140,   141,   142,   143,   144,   145,
-     146,   147,   148,   149,   150,   151,   155,   159,   160,   161,
-     162,   163,   164,   165,   166,   168,   169,   170,   171,   172,
-     173,   174,   175,   176,   177,   178,   179,   180,   181,   182,
-     183,   184,   185,   186,   187,   188,   189,   190,   191,   192,
-     193,   194,   195,   196,   197,   198,   199,   200,   201,   202,
-     203,   204
+       0,   123,   123,   124,   125,   126,   127,   128,   129,   130,
+     131,   135,   139,   140,   141,   142,   143,   144,   145,   146,
+     147,   148,   149,   150,   151,   152,   156,   160,   161,   162,
+     163,   164,   165,   166,   167,   169,   170,   171,   172,   173,
+     174,   175,   176,   177,   178,   179,   180,   181,   182,   183,
+     184,   185,   186,   187,   188,   189,   190,   191,   192,   193,
+     194,   195,   196,   197,   198,   199,   200,   201,   202,   203,
+     204,   205
 };
 #endif
 
@@ -1630,49 +1631,49 @@ yyreduce:
     {
         case 3:
 /* Line 1813 of yacc.c  */
-#line 123 "grammar.y"
+#line 124 "grammar.y"
     { cnfDoObj((yyvsp[(2) - (2)].obj)); }
     break;
 
   case 4:
 /* Line 1813 of yacc.c  */
-#line 124 "grammar.y"
+#line 125 "grammar.y"
     { cnfDoScript((yyvsp[(2) - (2)].stmt)); }
     break;
 
   case 5:
 /* Line 1813 of yacc.c  */
-#line 125 "grammar.y"
+#line 126 "grammar.y"
     { cnfDoCfsysline((yyvsp[(2) - (2)].s)); }
     break;
 
   case 6:
 /* Line 1813 of yacc.c  */
-#line 126 "grammar.y"
+#line 127 "grammar.y"
     { cnfDoBSDTag((yyvsp[(2) - (2)].s)); }
     break;
 
   case 7:
 /* Line 1813 of yacc.c  */
-#line 127 "grammar.y"
+#line 128 "grammar.y"
     { cnfDoBSDHost((yyvsp[(2) - (2)].s)); }
     break;
 
   case 8:
 /* Line 1813 of yacc.c  */
-#line 128 "grammar.y"
+#line 129 "grammar.y"
     { (yyval.obj) = cnfobjNew((yyvsp[(1) - (3)].objType), (yyvsp[(2) - (3)].nvlst)); }
     break;
 
   case 9:
 /* Line 1813 of yacc.c  */
-#line 129 "grammar.y"
+#line 130 "grammar.y"
     { (yyval.obj) = cnfobjNew(CNFOBJ_TPL, (yyvsp[(2) - (3)].nvlst)); }
     break;
 
   case 10:
 /* Line 1813 of yacc.c  */
-#line 131 "grammar.y"
+#line 132 "grammar.y"
     { (yyval.obj) = cnfobjNew(CNFOBJ_TPL, (yyvsp[(2) - (6)].nvlst));
 					  (yyval.obj)->subobjs = (yyvsp[(5) - (6)].objlst);
 					}
@@ -1680,7 +1681,7 @@ yyreduce:
 
   case 11:
 /* Line 1813 of yacc.c  */
-#line 135 "grammar.y"
+#line 136 "grammar.y"
     { (yyval.obj) = cnfobjNew(CNFOBJ_RULESET, (yyvsp[(2) - (6)].nvlst));
 					  (yyval.obj)->script = (yyvsp[(5) - (6)].stmt);
 					}
@@ -1688,85 +1689,85 @@ yyreduce:
 
   case 12:
 /* Line 1813 of yacc.c  */
-#line 138 "grammar.y"
+#line 139 "grammar.y"
     { (yyval.objlst) = NULL; }
     break;
 
   case 13:
 /* Line 1813 of yacc.c  */
-#line 139 "grammar.y"
+#line 140 "grammar.y"
     { (yyval.objlst) = objlstAdd((yyvsp[(1) - (2)].objlst), (yyvsp[(2) - (2)].obj)); }
     break;
 
   case 14:
 /* Line 1813 of yacc.c  */
-#line 140 "grammar.y"
+#line 141 "grammar.y"
     { (yyval.objlst) = objlstAdd((yyvsp[(1) - (2)].objlst), (yyvsp[(2) - (2)].obj)); }
     break;
 
   case 15:
 /* Line 1813 of yacc.c  */
-#line 141 "grammar.y"
+#line 142 "grammar.y"
     { (yyval.obj) = cnfobjNew(CNFOBJ_PROPERTY, (yyvsp[(2) - (3)].nvlst)); }
     break;
 
   case 16:
 /* Line 1813 of yacc.c  */
-#line 142 "grammar.y"
+#line 143 "grammar.y"
     { (yyval.obj) = cnfobjNew(CNFOBJ_CONSTANT, (yyvsp[(2) - (3)].nvlst)); }
     break;
 
   case 17:
 /* Line 1813 of yacc.c  */
-#line 143 "grammar.y"
+#line 144 "grammar.y"
     { (yyval.nvlst) = NULL; }
     break;
 
   case 18:
 /* Line 1813 of yacc.c  */
-#line 144 "grammar.y"
+#line 145 "grammar.y"
     { (yyvsp[(2) - (2)].nvlst)->next = (yyvsp[(1) - (2)].nvlst); (yyval.nvlst) = (yyvsp[(2) - (2)].nvlst); }
     break;
 
   case 19:
 /* Line 1813 of yacc.c  */
-#line 145 "grammar.y"
+#line 146 "grammar.y"
     { (yyval.nvlst) = nvlstSetName((yyvsp[(3) - (3)].nvlst), (yyvsp[(1) - (3)].estr)); }
     break;
 
   case 20:
 /* Line 1813 of yacc.c  */
-#line 146 "grammar.y"
+#line 147 "grammar.y"
     { (yyval.nvlst) = nvlstNewStr((yyvsp[(1) - (1)].estr)); }
     break;
 
   case 21:
 /* Line 1813 of yacc.c  */
-#line 147 "grammar.y"
+#line 148 "grammar.y"
     { (yyval.nvlst) = nvlstNewArray((yyvsp[(1) - (1)].arr)); }
     break;
 
   case 22:
 /* Line 1813 of yacc.c  */
-#line 148 "grammar.y"
+#line 149 "grammar.y"
     { (yyval.stmt) = (yyvsp[(1) - (1)].stmt); }
     break;
 
   case 23:
 /* Line 1813 of yacc.c  */
-#line 149 "grammar.y"
+#line 150 "grammar.y"
     { (yyval.stmt) = scriptAddStmt((yyvsp[(1) - (2)].stmt), (yyvsp[(2) - (2)].stmt)); }
     break;
 
   case 24:
 /* Line 1813 of yacc.c  */
-#line 150 "grammar.y"
+#line 151 "grammar.y"
     { (yyval.stmt) = (yyvsp[(1) - (1)].stmt); }
     break;
 
   case 25:
 /* Line 1813 of yacc.c  */
-#line 151 "grammar.y"
+#line 152 "grammar.y"
     { (yyval.stmt) = cnfstmtNew(S_IF);
 					  (yyval.stmt)->d.s_if.expr = (yyvsp[(2) - (4)].expr);
 					  (yyval.stmt)->d.s_if.t_then = (yyvsp[(4) - (4)].stmt);
@@ -1775,7 +1776,7 @@ yyreduce:
 
   case 26:
 /* Line 1813 of yacc.c  */
-#line 155 "grammar.y"
+#line 156 "grammar.y"
     { (yyval.stmt) = cnfstmtNew(S_IF);
 					  (yyval.stmt)->d.s_if.expr = (yyvsp[(2) - (6)].expr);
 					  (yyval.stmt)->d.s_if.t_then = (yyvsp[(4) - (6)].stmt);
@@ -1784,277 +1785,277 @@ yyreduce:
 
   case 27:
 /* Line 1813 of yacc.c  */
-#line 159 "grammar.y"
+#line 160 "grammar.y"
     { (yyval.stmt) = cnfstmtNewSet((yyvsp[(2) - (5)].s), (yyvsp[(4) - (5)].expr)); }
     break;
 
   case 28:
 /* Line 1813 of yacc.c  */
-#line 160 "grammar.y"
+#line 161 "grammar.y"
     { (yyval.stmt) = cnfstmtNewUnset((yyvsp[(2) - (3)].s)); }
     break;
 
   case 29:
 /* Line 1813 of yacc.c  */
-#line 161 "grammar.y"
+#line 162 "grammar.y"
     { (yyval.stmt) = cnfstmtNewPRIFILT((yyvsp[(1) - (2)].s), (yyvsp[(2) - (2)].stmt)); }
     break;
 
   case 30:
 /* Line 1813 of yacc.c  */
-#line 162 "grammar.y"
+#line 163 "grammar.y"
     { (yyval.stmt) = cnfstmtNewPROPFILT((yyvsp[(1) - (2)].s), (yyvsp[(2) - (2)].stmt)); }
     break;
 
   case 31:
 /* Line 1813 of yacc.c  */
-#line 163 "grammar.y"
+#line 164 "grammar.y"
     { (yyval.stmt) = (yyvsp[(1) - (1)].stmt); }
     break;
 
   case 32:
 /* Line 1813 of yacc.c  */
-#line 164 "grammar.y"
+#line 165 "grammar.y"
     { (yyval.stmt) = (yyvsp[(2) - (3)].stmt); }
     break;
 
   case 33:
 /* Line 1813 of yacc.c  */
-#line 165 "grammar.y"
+#line 166 "grammar.y"
     { (yyval.stmt) = (yyvsp[(1) - (1)].stmt); }
     break;
 
   case 34:
 /* Line 1813 of yacc.c  */
-#line 166 "grammar.y"
+#line 167 "grammar.y"
     { (yyval.stmt) = scriptAddStmt((yyvsp[(1) - (3)].stmt), (yyvsp[(3) - (3)].stmt)); }
     break;
 
   case 35:
 /* Line 1813 of yacc.c  */
-#line 168 "grammar.y"
+#line 169 "grammar.y"
     { (yyval.stmt) = cnfstmtNewAct((yyvsp[(2) - (3)].nvlst)); }
     break;
 
   case 36:
 /* Line 1813 of yacc.c  */
-#line 169 "grammar.y"
+#line 170 "grammar.y"
     { (yyval.stmt) = cnfstmtNewLegaAct((yyvsp[(1) - (1)].s)); }
     break;
 
   case 37:
 /* Line 1813 of yacc.c  */
-#line 170 "grammar.y"
+#line 171 "grammar.y"
     { (yyval.stmt) = cnfstmtNew(S_STOP); }
     break;
 
   case 38:
 /* Line 1813 of yacc.c  */
-#line 171 "grammar.y"
+#line 172 "grammar.y"
     { (yyval.stmt) = cnfstmtNewCall((yyvsp[(2) - (2)].estr)); }
     break;
 
   case 39:
 /* Line 1813 of yacc.c  */
-#line 172 "grammar.y"
+#line 173 "grammar.y"
     { (yyval.stmt) = cnfstmtNewContinue(); }
     break;
 
   case 40:
 /* Line 1813 of yacc.c  */
-#line 173 "grammar.y"
+#line 174 "grammar.y"
     { (yyval.expr) = cnfexprNew(AND, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr)); }
     break;
 
   case 41:
 /* Line 1813 of yacc.c  */
-#line 174 "grammar.y"
+#line 175 "grammar.y"
     { (yyval.expr) = cnfexprNew(OR, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr)); }
     break;
 
   case 42:
 /* Line 1813 of yacc.c  */
-#line 175 "grammar.y"
+#line 176 "grammar.y"
     { (yyval.expr) = cnfexprNew(NOT, NULL, (yyvsp[(2) - (2)].expr)); }
     break;
 
   case 43:
 /* Line 1813 of yacc.c  */
-#line 176 "grammar.y"
+#line 177 "grammar.y"
     { (yyval.expr) = cnfexprNew(CMP_EQ, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr)); }
     break;
 
   case 44:
 /* Line 1813 of yacc.c  */
-#line 177 "grammar.y"
+#line 178 "grammar.y"
     { (yyval.expr) = cnfexprNew(CMP_NE, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr)); }
     break;
 
   case 45:
 /* Line 1813 of yacc.c  */
-#line 178 "grammar.y"
+#line 179 "grammar.y"
     { (yyval.expr) = cnfexprNew(CMP_LE, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr)); }
     break;
 
   case 46:
 /* Line 1813 of yacc.c  */
-#line 179 "grammar.y"
+#line 180 "grammar.y"
     { (yyval.expr) = cnfexprNew(CMP_GE, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr)); }
     break;
 
   case 47:
 /* Line 1813 of yacc.c  */
-#line 180 "grammar.y"
+#line 181 "grammar.y"
     { (yyval.expr) = cnfexprNew(CMP_LT, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr)); }
     break;
 
   case 48:
 /* Line 1813 of yacc.c  */
-#line 181 "grammar.y"
+#line 182 "grammar.y"
     { (yyval.expr) = cnfexprNew(CMP_GT, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr)); }
     break;
 
   case 49:
 /* Line 1813 of yacc.c  */
-#line 182 "grammar.y"
+#line 183 "grammar.y"
     { (yyval.expr) = cnfexprNew(CMP_CONTAINS, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr)); }
     break;
 
   case 50:
 /* Line 1813 of yacc.c  */
-#line 183 "grammar.y"
+#line 184 "grammar.y"
     { (yyval.expr) = cnfexprNew(CMP_CONTAINSI, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr)); }
     break;
 
   case 51:
 /* Line 1813 of yacc.c  */
-#line 184 "grammar.y"
+#line 185 "grammar.y"
     { (yyval.expr) = cnfexprNew(CMP_STARTSWITH, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr)); }
     break;
 
   case 52:
 /* Line 1813 of yacc.c  */
-#line 185 "grammar.y"
+#line 186 "grammar.y"
     { (yyval.expr) = cnfexprNew(CMP_STARTSWITHI, (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr)); }
     break;
 
   case 53:
 /* Line 1813 of yacc.c  */
-#line 186 "grammar.y"
+#line 187 "grammar.y"
     { (yyval.expr) = cnfexprNew('&', (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr)); }
     break;
 
   case 54:
 /* Line 1813 of yacc.c  */
-#line 187 "grammar.y"
+#line 188 "grammar.y"
     { (yyval.expr) = cnfexprNew('+', (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr)); }
     break;
 
   case 55:
 /* Line 1813 of yacc.c  */
-#line 188 "grammar.y"
+#line 189 "grammar.y"
     { (yyval.expr) = cnfexprNew('-', (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr)); }
     break;
 
   case 56:
 /* Line 1813 of yacc.c  */
-#line 189 "grammar.y"
+#line 190 "grammar.y"
     { (yyval.expr) = cnfexprNew('*', (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr)); }
     break;
 
   case 57:
 /* Line 1813 of yacc.c  */
-#line 190 "grammar.y"
+#line 191 "grammar.y"
     { (yyval.expr) = cnfexprNew('/', (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr)); }
     break;
 
   case 58:
 /* Line 1813 of yacc.c  */
-#line 191 "grammar.y"
+#line 192 "grammar.y"
     { (yyval.expr) = cnfexprNew('%', (yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].expr)); }
     break;
 
   case 59:
 /* Line 1813 of yacc.c  */
-#line 192 "grammar.y"
+#line 193 "grammar.y"
     { (yyval.expr) = (yyvsp[(2) - (3)].expr); }
     break;
 
   case 60:
 /* Line 1813 of yacc.c  */
-#line 193 "grammar.y"
+#line 194 "grammar.y"
     { (yyval.expr) = cnfexprNew('M', NULL, (yyvsp[(2) - (2)].expr)); }
     break;
 
   case 61:
 /* Line 1813 of yacc.c  */
-#line 194 "grammar.y"
+#line 195 "grammar.y"
     { (yyval.expr) = (struct cnfexpr*) cnffuncNew((yyvsp[(1) - (3)].estr), NULL); }
     break;
 
   case 62:
 /* Line 1813 of yacc.c  */
-#line 195 "grammar.y"
+#line 196 "grammar.y"
     { (yyval.expr) = (struct cnfexpr*) cnffuncNew((yyvsp[(1) - (4)].estr), (yyvsp[(3) - (4)].fparams)); }
     break;
 
   case 63:
 /* Line 1813 of yacc.c  */
-#line 196 "grammar.y"
+#line 197 "grammar.y"
     { (yyval.expr) = (struct cnfexpr*) cnfnumvalNew((yyvsp[(1) - (1)].n)); }
     break;
 
   case 64:
 /* Line 1813 of yacc.c  */
-#line 197 "grammar.y"
+#line 198 "grammar.y"
     { (yyval.expr) = (struct cnfexpr*) cnfstringvalNew((yyvsp[(1) - (1)].estr)); }
     break;
 
   case 65:
 /* Line 1813 of yacc.c  */
-#line 198 "grammar.y"
+#line 199 "grammar.y"
     { (yyval.expr) = (struct cnfexpr*) cnfvarNew((yyvsp[(1) - (1)].s)); }
     break;
 
   case 66:
 /* Line 1813 of yacc.c  */
-#line 199 "grammar.y"
+#line 200 "grammar.y"
     { (yyval.expr) = (struct cnfexpr*) (yyvsp[(1) - (1)].arr); }
     break;
 
   case 67:
 /* Line 1813 of yacc.c  */
-#line 200 "grammar.y"
+#line 201 "grammar.y"
     { (yyval.fparams) = cnffparamlstNew((yyvsp[(1) - (1)].expr), NULL); }
     break;
 
   case 68:
 /* Line 1813 of yacc.c  */
-#line 201 "grammar.y"
+#line 202 "grammar.y"
     { (yyval.fparams) = cnffparamlstNew((yyvsp[(1) - (3)].expr), (yyvsp[(3) - (3)].fparams)); }
     break;
 
   case 69:
 /* Line 1813 of yacc.c  */
-#line 202 "grammar.y"
+#line 203 "grammar.y"
     { (yyval.arr) = (yyvsp[(2) - (3)].arr); }
     break;
 
   case 70:
 /* Line 1813 of yacc.c  */
-#line 203 "grammar.y"
+#line 204 "grammar.y"
     { (yyval.arr) = cnfarrayNew((yyvsp[(1) - (1)].estr)); }
     break;
 
   case 71:
 /* Line 1813 of yacc.c  */
-#line 204 "grammar.y"
+#line 205 "grammar.y"
     { (yyval.arr) = cnfarrayAdd((yyvsp[(1) - (3)].arr), (yyvsp[(3) - (3)].estr)); }
     break;
 
 
 /* Line 1813 of yacc.c  */
-#line 2058 "grammar.c"
+#line 2059 "grammar.c"
       default: break;
     }
   /* User semantic actions sometimes alter yychar, and that requires
@@ -2286,7 +2287,7 @@ yyreturn:
 
 
 /* Line 2076 of yacc.c  */
-#line 206 "grammar.y"
+#line 207 "grammar.y"
 
 /*
 int yyerror(char *s)

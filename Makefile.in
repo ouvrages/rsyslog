@@ -593,7 +593,6 @@ pkgconfigdir = $(libdir)/pkgconfig
 @HAVE_SYSTEMD_TRUE@	rsyslog.service
 
 EXTRA_DIST = \
-	rsyslog-doc.tar.gz \
 	platform/README \
 	platform/freebsd/rsyslogd \
 	platform/slackware/rc.rsyslogd \

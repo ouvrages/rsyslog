@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[8.2.0],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[8.2.1],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE([subdir-objects])
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -22,9 +22,6 @@ AC_PROG_LEX
 AC_PROG_YACC
 AC_PROG_CC
 AM_PROG_CC_C_O
-if test "$GCC" = "yes"
-then CFLAGS="$CFLAGS -W -Wall -Wformat-security -Wshadow -Wcast-align -Wpointer-arith -Wmissing-format-attribute -g"
-fi
 AC_DISABLE_STATIC
 AC_PROG_LIBTOOL
 AC_CANONICAL_HOST
@@ -126,6 +123,7 @@ AC_FUNC_STAT
 AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([flock inotify_init recvmmsg basename alarm clock_gettime gethostbyname gethostname gettimeofday localtime_r memset mkdir regcomp select setsid socket strcasecmp strchr strdup strerror strndup strnlen strrchr strstr strtol strtoul uname ttyname_r getline malloc_trim prctl epoll_create epoll_create1 fdatasync syscall lseek64])
+AC_CHECK_TYPES([off64_t])
 
 # getifaddrs is in libc (mostly) or in libsocket (eg Solaris 11) or not defined (eg Solaris 10)
 AC_SEARCH_LIBS([getifaddrs], [socket], [AC_DEFINE(HAVE_GETIFADDRS, [1], [set define])])
@@ -855,6 +853,9 @@ if test "x$enable_rsyslogrt" = "xyes"; then
 fi
 AM_CONDITIONAL(ENABLE_RSYSLOGRT, test x$enable_rsyslogrt = xyes)
 RSRT_CFLAGS="\$(RSRT_CFLAGS1) \$(LIBESTR_CFLAGS) \$(JSON_C_CFLAGS)"
+if test "$GCC" = "yes"
+then RSRT_CFLAGS="$RSRT_CFLAGS -W -Wall -Wformat-security -Wshadow -Wcast-align -Wpointer-arith -Wmissing-format-attribute -g"
+fi
 RSRT_LIBS="\$(RSRT_LIBS1) \$(LIBESTR_LIBS) \$(JSON_C_LIBS)"
 AC_SUBST(RSRT_CFLAGS1)
 AC_SUBST(RSRT_LIBS1)
