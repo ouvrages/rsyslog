@@ -89,7 +89,7 @@ Depends: ${shlibs:Depends},
 Recommends: mysql-client
 Suggests: mysql-server
 Description: MySQL output plugin for rsyslog
- This plugin allows rsyslog to write the syslog messages into a MySQL database.
+ This plugin allows rsyslog to write syslog messages into a MySQL database.
 
 Package: rsyslog-pgsql
 Architecture: any
@@ -102,7 +102,7 @@ Depends: ${shlibs:Depends},
 Recommends: postgresql-client
 Suggests: postgresql
 Description: PostgreSQL output plugin for rsyslog
- This plugin allows rsyslog to write the syslog messages into a PostgreSQL
+ This plugin allows rsyslog to write syslog messages into a PostgreSQL
  database.
 
 Package: rsyslog-mongodb
@@ -113,7 +113,7 @@ Depends: ${shlibs:Depends},
          rsyslog (= ${binary:Version}),
 Recommends: mongodb-server
 Description: MongoDB output plugin for rsyslog
- This plugin allows rsyslog to write the syslog messages to MongoDB, a
+ This plugin allows rsyslog to write syslog messages to MongoDB, a
  scalable, high-performance, open source NoSQL database.
 
 Package: rsyslog-elasticsearch
