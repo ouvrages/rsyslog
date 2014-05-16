@@ -1,4 +1,4 @@
-rsyslog (7.6.3-2) UNRELEASED; urgency=medium
+rsyslog (7.6.3-2) unstable; urgency=medium
 
   * Update Build-Depends:
     - Bump librelp-dev to (>= 1.2.5).
@@ -6,7 +6,7 @@ rsyslog (7.6.3-2) UNRELEASED; urgency=medium
     Elasticsearch server. Split that module into a separate package called
     rsyslog-elasticsearch. (Closes: #744951)
 
- -- Michael Biebl <biebl@debian.org>  Thu, 03 Apr 2014 03:13:20 +0200
+ -- Michael Biebl <biebl@debian.org>  Fri, 16 May 2014 22:37:05 +0200
 
 rsyslog (7.6.3-1) unstable; urgency=medium
 
