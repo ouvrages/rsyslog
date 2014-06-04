@@ -1,4 +1,4 @@
-/* A Bison parser, made by GNU Bison 2.6.4.  */
+/* A Bison parser, made by GNU Bison 2.7.  */
 
 /* Bison interface for Yacc-like parsers in C
    
@@ -135,8 +135,8 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 typedef union YYSTYPE
 {
-/* Line 2077 of yacc.c  */
-#line 45 "grammar.y"
+/* Line 2058 of yacc.c  */
+#line 43 "grammar.y"
 
 	char *s;
 	long long n;
@@ -152,7 +152,7 @@ typedef union YYSTYPE
 	struct cnffparamlst *fparams;
 
 
-/* Line 2077 of yacc.c  */
+/* Line 2058 of yacc.c  */
 #line 157 "grammar.h"
 } YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
