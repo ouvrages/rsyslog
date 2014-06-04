@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[8.2.1],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[8.2.2],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE([subdir-objects])
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -399,28 +399,6 @@ if test "$enable_jemalloc" = "yes"; then
     []
     )
 fi
-
-
-#
-# The following define determines whether the package adheres to the
-# file system standard.
-#
-AC_MSG_CHECKING(for FSSTND support)
-AC_ARG_ENABLE([fsstnd],
-  [AS_HELP_STRING([--disable-fsstnd], [Disable support for FSSTND])],
-  [
-    if test "x${enableval}" = "xyes"; then
-      AC_MSG_RESULT([yes])
-      AC_DEFINE([FSSTND], [1], [Description])
-    else
-      AC_MSG_RESULT([no])
-    fi
-  ],
-  [
-    # enabled by default
-    AC_MSG_RESULT([yes])
-    AC_DEFINE([FSSTND], [1], [Description])
-  ])
 
 
 # support for unlimited select() syscall
@@ -923,11 +901,9 @@ AC_ARG_ENABLE(mail,
 AM_CONDITIONAL(ENABLE_MAIL, test x$enable_mail = xyes)
 
 
-# imdiag support (so far we do not need a library, but we need to turn this on and off)
-# note that we enable this be default, because an important point is to make
-# it available to users who do not know much about how to handle things. It
-# would complicate things if we first needed to tell them how to enable imdiag.
-# rgerhards, 2008-07-25
+# imdiag support
+# This is a core testbench tool. You need to enable it if you want to
+# use not only a small subset of the testbench.
 AC_ARG_ENABLE(imdiag,
         [AS_HELP_STRING([--enable-imdiag],[Enable imdiag @<:@default=no@:>@])],
         [case "${enableval}" in
@@ -1421,10 +1397,9 @@ AC_ARG_ENABLE(omhdfs,
          esac],
         [enable_omhdfs=no]
 )
-#
-# you may want to do some library checks here - see snmp, mysql, pgsql modules
-# for samples
-#
+if test "x$enable_omhdfs"; then
+	AC_CHECK_HEADERS([hdfs.h hadoop/hdfs.h])
+fi
 AM_CONDITIONAL(ENABLE_OMHDFS, test x$enable_omhdfs = xyes)
 
 

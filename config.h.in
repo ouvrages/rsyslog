@@ -15,9 +15,6 @@
 /* Regular expressions support enabled. */
 #undef FEATURE_REGEXP
 
-/* Description */
-#undef FSSTND
-
 /* Define to 1 if you have the `alarm' function. */
 #undef HAVE_ALARM
 
@@ -99,6 +96,12 @@
 
 /* set define */
 #undef HAVE_GLOB_NOMAGIC
+
+/* Define to 1 if you have the <hadoop/hdfs.h> header file. */
+#undef HAVE_HADOOP_HDFS_H
+
+/* Define to 1 if you have the <hdfs.h> header file. */
+#undef HAVE_HDFS_H
 
 /* Define to 1 if you have the `inotify_init' function. */
 #undef HAVE_INOTIFY_INIT
