@@ -60,22 +60,6 @@ Description: reliable system and kernel logging daemon
  .
  It is the default syslogd on Debian systems.
 
-Package: rsyslog-doc
-Section: doc
-Priority: extra
-Architecture: all
-Breaks: rsyslog (<< 2.0.1-2)
-Replaces: rsyslog (<< 2.0.1-2)
-Depends: ${misc:Depends}
-Suggests: doc-base,
-          www-browser
-Description: documentation for rsyslog
- This package contains detailed HTML documentation for rsyslog.
- .
- It describes the general configuration file syntax for filters, actions,
- templates, etc, and has detailed information for all available configuration
- directives.
-
 Package: rsyslog-mysql
 Architecture: any
 Priority: extra

@@ -9,6 +9,8 @@ rsyslog (8.2.2-1) UNRELEASED; urgency=medium
     - Drop libee-dev.
   * Drop the omruleset module which has been deprecated and replaced by the
     much more efficient RainerScript "call" statement.
+  * Remove the rsyslog-doc package which is now built from a separate source
+    package.
 
  -- Michael Biebl <biebl@debian.org>  Thu, 03 Apr 2014 03:08:04 +0200
 

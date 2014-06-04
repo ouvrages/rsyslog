@@ -60,8 +60,5 @@ ifeq ($(DEB_HOST_ARCH_OS), linux)
 		debian/rsyslog/usr/lib/rsyslog/
 endif
 
-override_dh_compress:
-	dh_compress -X rsyslog-example.conf
-
 override_dh_installinit:
 	dh_installinit -R
