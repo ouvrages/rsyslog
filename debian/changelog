@@ -1,6 +1,13 @@
 rsyslog (8.2.2-1) UNRELEASED; urgency=medium
 
-  * New upstream release.
+  * New major upstream release.
+    - Rewritten core engine providing higher performance and better
+      scalability with complex configurations.
+    - Simplified script execution.
+    - Global variable support.
+    - Output part was revamped completely and required changes to all output
+      modules.
+    - Support for external plugins which can be written in any language.
   * Switch watch file to track v8 stable branch.
   * Update Build-Depends:
     - Bump librelp-dev to (>= 1.2.5).
