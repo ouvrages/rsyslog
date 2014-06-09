@@ -1,4 +1,4 @@
-rsyslog (8.2.2-1) UNRELEASED; urgency=medium
+rsyslog (8.2.2-1) experimental; urgency=medium
 
   * New major upstream release.
     - Rewritten core engine providing higher performance and better
@@ -20,7 +20,7 @@ rsyslog (8.2.2-1) UNRELEASED; urgency=medium
     package.
   * Fix pidfile location. The pidfile should be stored in /var/run, not /etc.
 
- -- Michael Biebl <biebl@debian.org>  Thu, 03 Apr 2014 03:08:04 +0200
+ -- Michael Biebl <biebl@debian.org>  Mon, 09 Jun 2014 21:16:19 +0200
 
 rsyslog (7.6.3-2) unstable; urgency=medium
 
