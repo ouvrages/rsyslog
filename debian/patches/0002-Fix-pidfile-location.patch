@@ -1,0 +1,29 @@
+From: Michael Biebl <biebl@debian.org>
+Date: Mon, 9 Jun 2014 19:11:33 +0200
+Subject: Fix pidfile location
+
+https://github.com/rsyslog/rsyslog/issues/86
+---
+ tools/syslogd.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
+
+diff --git a/tools/syslogd.c b/tools/syslogd.c
+index ec0beb7..857512b 100644
+--- a/tools/syslogd.c
++++ b/tools/syslogd.c
+@@ -134,13 +134,8 @@ void rsyslogdDebugSwitch();
+ void rsyslogdDoDie(int sig);
+ 
+ 
+-#if defined(SYSLOGD_PIDNAME)
+-#	undef _PATH_LOGPID
+-#	define _PATH_LOGPID "/etc/" SYSLOGD_PIDNAME
+-#else
+-#	ifndef _PATH_LOGPID
+-#		define _PATH_LOGPID "/etc/rsyslogd.pid"
+-#	endif
++#ifndef _PATH_LOGPID
++#	define _PATH_LOGPID "/var/run/rsyslogd.pid"
+ #endif
+ 
+ #ifndef _PATH_TTY

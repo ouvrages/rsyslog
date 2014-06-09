@@ -11,6 +11,7 @@ rsyslog (8.2.2-1) UNRELEASED; urgency=medium
     much more efficient RainerScript "call" statement.
   * Remove the rsyslog-doc package which is now built from a separate source
     package.
+  * Fix pidfile location. The pidfile should be stored in /var/run, not /etc.
 
  -- Michael Biebl <biebl@debian.org>  Thu, 03 Apr 2014 03:08:04 +0200
 
