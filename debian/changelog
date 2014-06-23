@@ -1,9 +1,9 @@
-rsyslog (7.6.3-3) UNRELEASED; urgency=medium
+rsyslog (7.6.3-3) unstable; urgency=medium
 
   * Build against libgnutls28-dev. (Closes: #752304)
   * Use canonical URIs for Vcs-* fields.
 
- -- Michael Biebl <biebl@debian.org>  Mon, 23 Jun 2014 13:43:32 +0200
+ -- Michael Biebl <biebl@debian.org>  Mon, 23 Jun 2014 13:44:55 +0200
 
 rsyslog (7.6.3-2) unstable; urgency=medium
 
