@@ -22,6 +22,13 @@ rsyslog (8.2.2-1) experimental; urgency=medium
 
  -- Michael Biebl <biebl@debian.org>  Mon, 09 Jun 2014 21:16:19 +0200
 
+rsyslog (7.6.3-3) unstable; urgency=medium
+
+  * Build against libgnutls28-dev. (Closes: #752304)
+  * Use canonical URIs for Vcs-* fields.
+
+ -- Michael Biebl <biebl@debian.org>  Mon, 23 Jun 2014 13:44:55 +0200
+
 rsyslog (7.6.3-2) unstable; urgency=medium
 
   * Update Build-Depends:

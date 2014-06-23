@@ -12,7 +12,7 @@ Build-Depends: debhelper (>= 8),
                libmongo-client-dev (>= 0.1.4),
                libcurl4-gnutls-dev,
                libkrb5-dev,
-               libgnutls-dev,
+               libgnutls28-dev,
                librelp-dev (>= 1.2.5),
                libestr-dev (>= 0.1.9),
                liblognorm-dev (>= 1.0.0),
@@ -22,8 +22,8 @@ Build-Depends: debhelper (>= 8),
                pkg-config,
                bison
 Standards-Version: 3.9.5
-Vcs-Git: git://git.debian.org/git/collab-maint/rsyslog.git
-Vcs-Browser: http://git.debian.org/?p=collab-maint/rsyslog.git;a=summary
+Vcs-Git: git://anonscm.debian.org/collab-maint/rsyslog.git
+Vcs-Browser: http://anonscm.debian.org/gitweb/?p=collab-maint/rsyslog.git;a=summary
 Homepage: http://www.rsyslog.com/
 
 Package: rsyslog
