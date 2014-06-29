@@ -1,3 +1,9 @@
+rsyslog (8.2.2-3) UNRELEASED; urgency=low
+
+  * Upload to unstable.
+
+ -- Michael Biebl <biebl@debian.org>  Sun, 29 Jun 2014 13:20:25 +0200
+
 rsyslog (8.2.2-2) experimental; urgency=medium
 
   * Merge changes from unstable branch.
