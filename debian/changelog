@@ -1,3 +1,10 @@
+rsyslog (8.2.2-4) UNRELEASED; urgency=medium
+
+  * Fix wheezy → jessie upgrade failure when running under systemd due to the
+    syslog.service symlink temporarily being missing.
+
+ -- Michael Biebl <biebl@debian.org>  Sun, 17 Aug 2014 18:57:06 +0200
+
 rsyslog (8.2.2-3) unstable; urgency=low
 
   * Upload to unstable.

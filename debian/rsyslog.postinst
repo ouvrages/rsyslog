@@ -23,6 +23,11 @@ case "$1" in
 
 	# Fix permissions of the spool/work directory (Bug: #693099)
 	chmod 700 /var/spool/rsyslog
+
+	# Clean up temporary syslog.service symlink
+	if [ -d /run/systemd/system ] &&  dpkg --compare-versions "$2" lt "7.4.1-2" ; then
+		rm -f /run/systemd/system/syslog.service
+	fi
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
