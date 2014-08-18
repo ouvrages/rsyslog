@@ -1,3 +1,9 @@
+rsyslog (8.4.0-1) UNRELEASED; urgency=medium
+
+  * New upstream release.
+
+ -- Michael Biebl <biebl@debian.org>  Mon, 18 Aug 2014 17:49:11 +0200
+
 rsyslog (8.2.2-5) unstable; urgency=medium
 
   * Make sure to actually only create the temporary syslog.service symlink on
