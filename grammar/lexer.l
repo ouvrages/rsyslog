@@ -30,6 +30,8 @@
 
 %{
 #include "config.h"
+#include "parserif.h"
+extern char *strdup(char*); /* somehow we do not get this from string.h... */
 %}
 
 %option noyywrap nodefault case-insensitive yylineno
@@ -179,6 +181,10 @@ int fileno(FILE *stream);
 					yyterminate();
 				  BEGIN INITIAL; }
 "main_queue"[ \n\t]*"("		{ yylval.objType = CNFOBJ_MAINQ;
+				  BEGIN INOBJ; return BEGINOBJ; }
+"timezone"[ \n\t]*"("		{ yylval.objType = CNFOBJ_TIMEZONE;
+				  BEGIN INOBJ; return BEGINOBJ; }
+"parser"[ \n\t]*"("		{ yylval.objType = CNFOBJ_PARSER;
 				  BEGIN INOBJ; return BEGINOBJ; }
 "global"[ \n\t]*"("		{ yylval.objType = CNFOBJ_GLOBAL;
 				  BEGIN INOBJ; return BEGINOBJ; }

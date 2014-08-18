@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([rsyslog],[8.2.2],[rsyslog@lists.adiscon.com])
+AC_INIT([rsyslog],[8.4.0],[rsyslog@lists.adiscon.com])
 AM_INIT_AUTOMAKE([subdir-objects])
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -32,7 +32,8 @@ PKG_PROG_PKG_CONFIG
 PKG_CHECK_MODULES(LIBESTR, libestr >= 0.1.9)
 PKG_CHECK_MODULES(LIBLOGGING_STDLOG, liblogging-stdlog >= 1.0.3)
 PKG_CHECK_MODULES([JSON_C], [json],, [
-	PKG_CHECK_MODULES([JSON_C], [json-c])
+	PKG_CHECK_MODULES([JSON_C], [json-c],
+	       [AC_DEFINE([HAVE_JSON_TOKENER_ERROR_DESC], [1], [we have the newer JSON-C API])])
 ])
 
 # if int64 is supported, use it
@@ -832,7 +833,7 @@ fi
 AM_CONDITIONAL(ENABLE_RSYSLOGRT, test x$enable_rsyslogrt = xyes)
 RSRT_CFLAGS="\$(RSRT_CFLAGS1) \$(LIBESTR_CFLAGS) \$(JSON_C_CFLAGS)"
 if test "$GCC" = "yes"
-then RSRT_CFLAGS="$RSRT_CFLAGS -W -Wall -Wformat-security -Wshadow -Wcast-align -Wpointer-arith -Wmissing-format-attribute -g"
+then RSRT_CFLAGS="$RSRT_CFLAGS -W -std=c99 -Wall -Wformat-security -Wshadow -Wcast-align -Wpointer-arith -Wmissing-format-attribute -g"
 fi
 RSRT_LIBS="\$(RSRT_LIBS1) \$(LIBESTR_LIBS) \$(JSON_C_LIBS)"
 AC_SUBST(RSRT_CFLAGS1)
@@ -913,6 +914,9 @@ AC_ARG_ENABLE(imdiag,
          esac],
         [enable_imdiag=no]
 )
+if test "x$enable_imdiag" = "xyes"; then
+	AC_DEFINE([ENABLE_IMDIAG], [1], [Indicator that IMDIAG is present])
+fi
 AM_CONDITIONAL(ENABLE_IMDIAG, test x$enable_imdiag = xyes)
 
 
@@ -1277,6 +1281,19 @@ AC_ARG_ENABLE(pmcisconames,
 AM_CONDITIONAL(ENABLE_PMCISCONAMES, test x$enable_pmcisconames = xyes)
 
 
+# settings for pmciscoios
+AC_ARG_ENABLE(pmciscoios,
+        [AS_HELP_STRING([--enable-pmciscoios],[Compiles ciscoios parser module @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_pmciscoios="yes" ;;
+          no) enable_pmciscoios="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-pmciscoios) ;;
+         esac],
+        [enable_pmciscoios=no]
+)
+AM_CONDITIONAL(ENABLE_PMCISCOIOS, test x$enable_pmciscoios = xyes)
+
+
 # settings for pmaixforwardedfrom
 AC_ARG_ENABLE(pmaixforwardedfrom,
         [AS_HELP_STRING([--enable-pmaixforwardedfrom],[Compiles aixforwardedfrom parser module @<:@default=no@:>@])],
@@ -1513,8 +1530,18 @@ if test "x$enable_usertools" = "xyes" && test "x$enable_guardtime" = "xyes"; the
     )
 fi
 
+AC_ARG_ENABLE(generate-man-pages,
+        [AS_HELP_STRING([--enable-generate-man-pages],[Generate man pages from source @<:@default=yes@:>@])],
+        [case "${enableval}" in
+         yes) have_to_generate_man_pages="yes" ;;
+          no) have_to_generate_man_pages="no" ;;
+           *) AC_MSG_ERROR(bad value ${enableval} for --enable-generate-man-pages) ;;
+         esac],
+        [have_to_generate_man_pages=yes]
+)
+
 if test "x$have_to_generate_man_pages" = "xyes"; then
-    AC_MSG_RESULT([Some man pages are missing. We need rst2man to generate the missing man pages from source...])
+    AC_MSG_RESULT([Some man pages are missing or --enable-generate-man-pages given. We need rst2man to generate man pages from source...])
 else
     AC_MSG_RESULT([All required man pages found. We don't need rst2man!])
 fi
@@ -1523,7 +1550,7 @@ if test "x$have_to_generate_man_pages" = "xyes"; then
     # We need rst2man to generate our man pages
     AC_CHECK_PROGS([RST2MAN], [rst2man rst2man.py], [])
     if test -z "$RST2MAN"; then
-        AC_MSG_ERROR([rst2man is required to build man pages. You can use the release tarball with pregenerated man pages to avoid this depedency.])
+        AC_MSG_ERROR([rst2man is required to build man pages. You can use the release tarball with pregenerated man pages to avoid this depedency. Use the --disable-generate-man-pages configure option in that case.])
     fi
 fi
 
@@ -1543,11 +1570,13 @@ AC_CONFIG_FILES([Makefile \
 		plugins/imkmsg/Makefile \
 		plugins/omhdfs/Makefile \
 		plugins/omprog/Makefile \
+		plugins/mmexternal/Makefile \
 		plugins/omstdout/Makefile \
 		plugins/omjournal/Makefile \
 		plugins/pmrfc3164sd/Makefile \
 		plugins/pmlastmsg/Makefile \
 		plugins/pmcisconames/Makefile \
+		plugins/pmciscoios/Makefile \
 		plugins/pmsnare/Makefile \
 		plugins/pmaixforwardedfrom/Makefile \
 		plugins/omruleset/Makefile \
@@ -1639,6 +1668,7 @@ echo "---{ parser modules }---"
 echo "    pmrfc3164sd module will be compiled:      $enable_pmrfc3164sd"
 echo "    pmlastmsg module will be compiled:        $enable_pmlastmsg"
 echo "    pmcisconames module will be compiled:     $enable_pmcisconames"
+echo "    pmciscoios module will be compiled:       $enable_pmciscoios"
 echo "    pmaixforwardedfrom module w.be compiled:  $enable_pmaixforwardedfrom"
 echo "    pmsnare module will be compiled:          $enable_pmsnare"
 echo

@@ -1,4 +1,153 @@
 ---------------------------------------------------------------------------
+Version 8.4.0 [v8-stable] 2014-08-18
+- this is the new stable branch, which incorporates all enhancements of
+  rsyslog 8.3.
+---------------------------------------------------------------------------
+Version 8.3.5 [v8-devel] 2014-08-05
+- mmjsonparse: support selectable cookie and target containers
+  This permits to put different meanings into a json formatted syslog
+  message, e.g. the "traditional" cee or cim data.
+- bugfix: mmjsonparse did not build with json-c < 0.10
+  This was a regression introduced some time in the past in order to
+  support API changes in json-c. Now we check for the version and use
+  proper code.
+- omprog: emit error message via syslog() if loading binary fails
+  This happens after forking, so omprog has no longer access to rsyslog's
+  regular error reporting functions. Previously, this meant any error
+  message was lost. Now it is emitted via regular syslog (which may end up
+  in a different instance, if multiple instances run...)
+- couple of patches imported from v7-stable (7.6.4)
+---------------------------------------------------------------------------
+Version 8.3.4 [v8-devel] 2014-07-11
+- new pmciscoios parser supporting various Cisco IOS formats
+- RFC3164 timestamp parser now accepts timezones and subsecond resolution
+  ... at least for some common formats and where we could do so without
+  running risk of breaking proper formats (or introducing regressions)
+- new parser config object -- permits to define custom parser definitions
+- new tzinfo config object -- permits to define time zone offsets
+  This is a utility object that currently is being used by some parsers.
+- bugfix: mishandling of input modules not supporting new input instances
+  If they did not support this, accidently the output module part of the
+  module union was written, leading to unpredictable results. Note: all
+  core modules do support this interface, but some contributed or very
+  old ones do not.
+- bugfix: double-free when ruleset() parser parameters were used
+  While unlikely, this could cause stability issues even after the
+  config phase.
+---------------------------------------------------------------------------
+Version 8.3.3 [v8-devel] 2014-06-26
+- unify input object naming
+  imudp now supports "name" paramter, as other inputs do. "inputname" has
+  been deprecated, but can still be used. Same applies to "appendport"
+  subparamter". Thanks to "Nick Syslog" for the suggestion.
+- made the missing (contributed) modules build under v8 [import from 8.2.2]
+  Modules:
+  * mmrfc5424addhmac
+  * omrabbitmq
+  * omgssapi
+  * omhdfs
+  * omzmq3
+- added a cleanup process (janitor); permits to close omfile files after a
+  timeout
+- make omgssapi build under v8.3 [import vom v8.2]
+  note that we could do this to the stable, because there is NO regression
+  chance at all: only omgssapi was changed, and this module did NOT work
+  previously.
+- removed obsolete --disable-fsstnd configure option
+  Thanks to Thomas D. for alerting us.
+  Closes: https://github.com/rsyslog/rsyslog/issues/72
+---------------------------------------------------------------------------
+Version 8.3.2 [v8-devel] 2014-05-02
+- new template options for date extraction:
+  - year
+  - month
+  - day
+  - wday
+  - hour
+  - minute
+  - second
+  - tzoffshour
+  - tzoffsmin
+  - tzoffsdirection
+  - wdayname
+  For string templates, these are property options and they are 
+  prefixed with "date-" (e.g. "date-year", "date-month", ...)
+  see also: https://github.com/rsyslog/rsyslog/issues/65
+- bugfix: mmexternal remove framing char before processing JSON reply
+  This did not have any real bad effects, but caused unnecessary
+  processing, as empty replies were not properly detected. Otherwise,
+  the bug was not noticible from the user's PoV.
+- bugfix: mmexternal segfault due to invalid free in non-json input mode
+  closes: https://github.com/rsyslog/rsyslog/issues/70
+- bugfix: mmexternal segfault when external plugin sent invalid reply
+  ... or no reply at all. This happened if the reply was imporper JSON.
+  Now, we emit an error message in those cases.
+  see also: https://github.com/rsyslog/rsyslog/issues/69
+- bugfix: mmexternal did potentially pass incomplete data to restarted
+  external plugin
+  This could happen if EPIPE was returned "too late", in which case the
+  beginning of the data could be lost.
+- bugfix: mmexternal did not properly process messages over 4KiB
+  The data to be passed to the external plugin was truncated after 4KiB.
+  see: https://github.com/rsyslog/rsyslog/issues/64
+- imrelp: added support for per-listener ruleset and inputname
+  see: https://github.com/rsyslog/rsyslog/pull/63
+  Thanks to bobthesecurityguy github user for the patch
+---------------------------------------------------------------------------
+Version 8.3.1 [v8-devel] 2014-04-24
+- external message modification interface now support modifying message PRI
+- "jsonmesg" property will include uuid only if one was previously generated
+  This is primarily a performance optimization. Whenever the message uuid
+  is gotten, it is generated when not already present. As we used the
+  regular setter, this means that always the uuid was generated, which is
+  quite time-consuming. This has now been changed so that it only is
+  generated if it already exists. That also matches more closly the 
+  semantics, as "jsonmesg" should not make modifications to the message.
+  Note that the same applies to "fulljson" passing mode for external
+  plugins.
+- added plugin to rewrite message facility and/or severity
+  Name: fac-sever-rewrite.py
+- permits to build against json-c 0.12
+  Unfortunately, json-c had an ABI breakage, so this is necessary. Note
+  that versions prior to 0.12 had security issues (CVE-2013-6370,
+  CVE-2013-6371) and so it is desirable to link against the new version.
+  Thanks to Thomas D. for the patch. Note that at least some distros
+  have fixed the security issue in older versions of json-c, so this
+  seems to apply mostly when building from sources.
+- bugfix: using UUID property could cause segfault
+- bugfix/mmexternal: memory leak
+- bugfix: memory leak when using "jsonmesg" property
+- bugfix: mmutf8fix did not detect two invalid sequences
+  Thanks to Axel Rau for the patch.
+- bugfix: build problems with lexer.l on some platforms
+  For some reason, the strdup() prototype and others are missing. I admit
+  that I don't know why, as this happens only in 8.3.0+ and there is no
+  indication of changes to the affected files. In any case, we need to
+  fix this, and the current solution works at least as an interim one.
+---------------------------------------------------------------------------
+Version 8.3.0 [v8-devel] 2014-04-10
+- new plugin for anonymizing credit card numbers
+  Thanks to Peter Slavov for providing the code.
+- external message modification modules are now supported
+  They are bound via the new native module "mmexternal". Also, a sample
+  skeleton for an external python message modification module has been
+  added.
+- new $jsonmesg property with JSON representation of whole message object
+  closes: https://github.com/rsyslog/rsyslog/issues/19
+- improved error message for invalid field extraction in string template
+  see also:
+  http://kb.monitorware.com/problem-with-field-based-extraction-t12299.html
+- fix build problems on Solaris
+- NOTE: a json-c API that we begun to use requires the compiler to be in
+  c99 mode. By default, we select it automatically. If you modify this and
+  use gcc, be sure to include "-std=c99" in your compiler flags. This seems
+  to be necessary only for older versions of gcc.
+---------------------------------------------------------------------------
+Version 8.2.3 [v8-stable] 2014-??-??
+- bugfix: ommysql: handle/mem leak upon termination of worker thread
+  This could become bad if the (instance) worker threads are often
+  started and terminated. But it takes quite a while to show effect.
+---------------------------------------------------------------------------
 Version 8.2.2 [v8-stable] 2014-06-02
 - made the missing (contributed) modules build under v8
   Note that we could do this to the stable, because there is NO regression
@@ -61,6 +210,14 @@ This starts a new stable branch based on 8.1.6 plus the following changes:
 - bugfix: ompipe did resume itself even when it was still in error
   See: https://github.com/rsyslog/rsyslog/issues/35
   Thanks to github user schplat for reporting
+- bugfix: ompipe used invalid default template
+  This is a regression from an old change (didn't track it down precisely,
+  but over a year ago). It used the Forwarding template instead of
+  the file template (so we have a full syslog header). This fix corrects
+  it back to previous behaviour, but new scripts that used the wrong
+  format may now need to have the RSYSLOG_ForwardingFormat template
+  explicitely be applied.
+  closes: https://github.com/rsyslog/rsyslog/issues/50
 ---------------------------------------------------------------------------
 Version 8.1.6 [release candidate] 2014-02-20
 - omfile: permit to set global defaults for action parameters
@@ -232,6 +389,12 @@ Version 8.1.0 [experimental] 2013-11-15
   just explicitely be given.
 ---------------------------------------------------------------------------
 Version 7.6.4 [v7.6-stable] 2014-03-??
+- add --enable-generate-man-pages configure switch (default: enabled)
+  This forces generation of man pages, even if cached ones exists. This
+  "fixes" a typical release tarball nit. While it is hackish, the
+  benefit is clear given the history of failed tarball releases since
+  we changed the cached man page handling. It was just too easy to get
+  that wrong.
 - removed obsolete --disable-fsstnd configure option
   Thanks to Thomas D. for alerting us.
   Closes: https://github.com/rsyslog/rsyslog/issues/72
@@ -257,6 +420,36 @@ Version 7.6.4 [v7.6-stable] 2014-03-??
 - bugfix: using UUID property could cause segfault
 - bugfix: mmutf8fix did not detect two invalid sequences
   Thanks to Axel Rau for the patch.
+- bugfix: file descriptor leak with Guardtime signatures
+  When a .gtstate file is opened it is never closed. This is especially
+  bad when dynafiles frequently get evicted from dynafile cache and be
+  re-opened again.
+- bugfix: busy loop in tcp listener when running out of file descriptors
+  Thanks to Susant Sahani for the patch.
+- bugfix: mishandling of input modules not supporting new input instances
+  If they did not support this, accidently the output module part of the
+  module union was written, leading to unpredictable results. Note: all
+  core modules do support this interface, but some contributed or very
+  old ones do not.
+- bugfix: double-free when ruleset() parser parameters were used
+  While unlikely, this could cause stability issues even after the
+  config phase.
+- bugfix: output modules with parameters with multiple passing modes
+  could caused strange behaviour including aborts
+  This was due to the fact that the action module only preserved and
+  processed the last set passing mode. Note that this was not a problem
+  for the plugins provided by the rsyslog git: none of them uses different
+  passing modes.
+  Thanks to Tomas Heinrich for providing a very detailled bug report.
+- various fixes after coverty scan
+  These do not address issues seen in practice but those seen by the tool.
+  Some of them may affect practical deployments.
+  Thanks to Tomas Heinrich for the patches.
+- bugfix imuxsock: "Last message repeated..." was not emitted at shutdown
+  The "Last message repeated..." notice didn't get printed if rsyslog was
+  shut down before the repetition was broken.
+  Thanks to Tomas Heinrich for the patch.
+- bugfix: make dist failed when GUARDTIME or LIBGCRYPT feature was disabled
 ---------------------------------------------------------------------------
 Version 7.6.3 [v7.6-stable] 2014-03-27
 - add capability to override GnuTLS path in build process
@@ -2058,8 +2251,6 @@ Version 6.2.0  [v6-stable], 2012-01-09
 - bugfix: omfile returns fatal error code for things that go really wrong
   previously, RS_RET_RESUME was returned, which lead to a loop inside the
   rule engine as omfile could not really recover.
-- bugfix: rsyslogd -v always said 64 atomics were not present
-  thanks to mono_matsuko for the patch
 - bugfix: potential abort after reading invalid X.509 certificate
   closes: http://bugzilla.adiscon.com/show_bug.cgi?id=290
   Thanks to Tomas Heinrich for the patch

@@ -54,6 +54,7 @@
 #include "cfsysline.h"
 #include "datetime.h"
 #include "dirty.h"
+#include "janitor.h"
 
 DEFobjCurrIf(obj)
 DEFobjCurrIf(prop)
@@ -82,7 +83,6 @@ void syslogd_die(void);
 void syslogd_releaseClassPointers(void);
 void syslogd_sighup_handler();
 char **syslogd_crunch_list(char *list);
-void syslogd_printVersion(void);
 rsRetVal syslogd_doGlblProcessInit(void);
 rsRetVal syslogd_obtainClassPointers(void);
 /* end syslogd.c imports */
@@ -124,22 +124,61 @@ rsyslogd_usage(void)
 	exit(1); /* "good" exit - done to terminate usage() */
 }
 
-/* This is a support function for imdiag. It returns back the approximate
- * current number of messages in the main message queue
- * This number includes the messages that reside in an associated DA queue (if
- * it exists) -- rgerhards, 2009-10-14
- * Note that this is imprecise, but needed for the testbench. It should not be used
- * for any other purpose -- impstats is the right tool for all other cases.
- */
-rsRetVal
-diagGetMainMsgQSize(int *piSize)
+
+/* print version and compile-time setting information */
+static void
+printVersion(void)
 {
-	DEFiRet;
-	assert(piSize != NULL);
-	*piSize = (pMsgQueue->pqDA != NULL) ? pMsgQueue->pqDA->iQueueSize : 0;
-	*piSize += pMsgQueue->iQueueSize;
-	RETiRet;
+	printf("rsyslogd %s, ", VERSION);
+	printf("compiled with:\n");
+#ifdef FEATURE_REGEXP
+	printf("\tFEATURE_REGEXP:\t\t\t\tYes\n");
+#else
+	printf("\tFEATURE_REGEXP:\t\t\t\tNo\n");
+#endif
+#if defined(SYSLOG_INET) && defined(USE_GSSAPI)
+	printf("\tGSSAPI Kerberos 5 support:\t\tYes\n");
+#else
+	printf("\tGSSAPI Kerberos 5 support:\t\tNo\n");
+#endif
+#ifndef	NDEBUG
+	printf("\tFEATURE_DEBUG (debug build, slow code):\tYes\n");
+#else
+	printf("\tFEATURE_DEBUG (debug build, slow code):\tNo\n");
+#endif
+#ifdef	HAVE_ATOMIC_BUILTINS
+	printf("\t32bit Atomic operations supported:\tYes\n");
+#else
+	printf("\t32bit Atomic operations supported:\tNo\n");
+#endif
+#ifdef	HAVE_ATOMIC_BUILTINS64
+	printf("\t64bit Atomic operations supported:\tYes\n");
+#else
+	printf("\t64bit Atomic operations supported:\tNo\n");
+#endif
+#ifdef	HAVE_JEMALLOC
+	printf("\tmemory allocator:\t\t\tjemalloc\n");
+#else
+	printf("\tmemory allocator:\t\t\tsystem default\n");
+#endif
+#ifdef	RTINST
+	printf("\tRuntime Instrumentation (slow code):\tYes\n");
+#else
+	printf("\tRuntime Instrumentation (slow code):\tNo\n");
+#endif
+#ifdef	USE_LIBUUID
+	printf("\tuuid support:\t\t\t\tYes\n");
+#else
+	printf("\tuuid support:\t\t\t\tNo\n");
+#endif
+#ifdef HAVE_JSON_OBJECT_NEW_INT64
+	printf("\tNumber of Bits in RainerScript integers: 64\n");
+#else
+	printf("\tNumber of Bits in RainerScript integers: 32 (due to too-old json-c lib)\n");
+#endif
+	printf("\nSee http://www.rsyslog.com for more information.\n");
 }
+
 
 
 void
@@ -735,16 +774,11 @@ initAll(int argc, char **argv)
                 case '4':
                 case '6':
                 case 'A':
-                case 'a':
 		case 'f': /* configuration file */
-		case 'h':
 		case 'i': /* pid file name */
 		case 'l':
-		case 'm': /* mark interval */
 		case 'n': /* don't fork */
 		case 'N': /* enable config verify mode */
-                case 'o':
-                case 'p':
 		case 'q': /* add hostname if DNS resolving has failed */
 		case 'Q': /* dont resolve hostnames in ACL to IPs */
 		case 's':
@@ -753,13 +787,7 @@ initAll(int argc, char **argv)
 		case 'u': /* misc user settings */
 		case 'w': /* disable disallowed host warnings */
 		case 'x': /* disable dns for remote messages */
-		case 'g': /* enable tcp gssapi logging */
-		case 'r': /* accept remote messages */
-		case 't': /* enable tcp logging */
 			CHKiRet(bufOptAdd(ch, optarg));
-			break;
-		case 'c':		/* compatibility mode */
-			fprintf(stderr, "rsyslogd: error: option -c is no longer supported - ignored\n");
 			break;
 		case 'd': /* debug - must be handled now, so that debug is active during init! */
 			debugging_on = 1;
@@ -776,7 +804,7 @@ initAll(int argc, char **argv)
 			glblModPath = (uchar*) optarg;
 			break;
 		case 'v': /* MUST be carried out immediately! */
-			syslogd_printVersion();
+			printVersion();
 			exit(0); /* exit for -v option - so this is a "good one" */
 		case '?':
 		default:
@@ -827,9 +855,6 @@ initAll(int argc, char **argv)
                 case 'A':
                         send_to_all++;
                         break;
-                case 'a':
-			fprintf(stderr, "rsyslogd: error -a is no longer supported, use module imuxsock instead");
-                        break;
 		case 'S':		/* Source IP for local client to be used on multihomed host */
 			if(glbl.GetSourceIPofLocalClient() != NULL) {
 				fprintf (stderr, "rsyslogd: Only one -S argument allowed, the first one is taken.\n");
@@ -839,11 +864,6 @@ initAll(int argc, char **argv)
 			break;
 		case 'f':		/* configuration file */
 			ConfFile = (uchar*) arg;
-			break;
-		case 'g':		/* enable tcp gssapi logging */
-			fprintf(stderr,	"rsyslogd: -g option no longer supported - ignored\n");
-		case 'h':
-			fprintf(stderr, "rsyslogd: error -h is no longer supported - ignored");
 			break;
 		case 'i':		/* pid file name */
 			PidFile = arg;
@@ -855,20 +875,11 @@ initAll(int argc, char **argv)
 				glbl.SetLocalHosts(syslogd_crunch_list(arg));
 			}
 			break;
-		case 'm':		/* mark interval */
-			fprintf(stderr, "rsyslogd: error -m is no longer supported - use immark instead");
-			break;
 		case 'n':		/* don't fork */
 			doFork = 0;
 			break;
 		case 'N':		/* enable config verify mode */
 			iConfigVerify = atoi(arg);
-			break;
-                case 'o':
-			fprintf(stderr, "error -o is no longer supported, use module imuxsock instead");
-                        break;
-                case 'p':
-			fprintf(stderr, "error -p is no longer supported, use module imuxsock instead");
 			break;
 		case 'q':               /* add hostname if DNS resolving has failed */
 		        *(net.pACLAddHostnameOnFail) = 1;
@@ -876,18 +887,12 @@ initAll(int argc, char **argv)
 		case 'Q':               /* dont resolve hostnames in ACL to IPs */
 		        *(net.pACLDontResolve) = 1;
 		        break;
-		case 'r':		/* accept remote messages */
-			fprintf(stderr, "rsyslogd: error option -r is no longer supported - ignored");
-			break;
 		case 's':
 			if(glbl.GetStripDomains() != NULL) {
 				fprintf (stderr, "rsyslogd: Only one -s argument allowed, the first one is taken.\n");
 			} else {
 				glbl.SetStripDomains(syslogd_crunch_list(arg));
 			}
-			break;
-		case 't':		/* enable tcp logging */
-			fprintf(stderr, "rsyslogd: error option -t is no longer supported - ignored");
 			break;
 		case 'T':/* chroot() immediately at program startup, but only for testing, NOT security yet */
 			if(chroot(arg) != 0) {
@@ -1044,7 +1049,7 @@ static inline void processImInternal(void)
 	msg_t *pMsg;
 
 	while(iminternalRemoveMsg(&pMsg) == RS_RET_OK) {
-		ratelimitAddMsg(dflt_ratelimiter, NULL, pMsg);
+		submitMsgWithDfltRatelimiter(pMsg);
 	}
 }
 
@@ -1182,25 +1187,17 @@ mainloop(void)
 	struct timeval tvSelectTimeout;
 
 	BEGINfunc
-	/* first check if we have any internal messages queued and spit them out. We used
-	 * to do that on any loop iteration, but that is no longer necessry. The reason
-	 * is that once we reach this point here, we always run on multiple threads and
-	 * thus the main queue is properly initialized. -- rgerhards, 2008-06-09
-	 */
+	/* first check if we have any internal messages queued and spit them out. */
 	processImInternal();
 
 	while(!bFinished){
-		/* this is now just a wait - please note that we do use a near-"eternal"
-		 * timeout of 1 day. This enables us to help safe the environment
-		 * by not unnecessarily awaking rsyslog on a regular tick (just think
-		 * powertop, for example). In that case, we primarily wait for a signal,
-		 * but a once-a-day wakeup should be quite acceptable. -- rgerhards, 2008-06-09
-		 */
-		tvSelectTimeout.tv_sec = 86400 /*1 day*/;
+		tvSelectTimeout.tv_sec = janitorInterval * 60; /* interval is in minutes! */
 		tvSelectTimeout.tv_usec = 0;
 		select(1, NULL, NULL, NULL, &tvSelectTimeout);
 		if(bFinished)
 			break;	/* exit as quickly as possible */
+
+		janitorRun();
 
 		if(bHadHUP) {
 			doHUP();
@@ -1210,7 +1207,6 @@ mainloop(void)
 	}
 	ENDfunc
 }
-
 
 /* Finalize and destruct all actions.
  */

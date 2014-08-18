@@ -363,9 +363,12 @@ static rsRetVal doGetGID(uchar **pp, rsRetVal (*pSetHdlr)(void*, uid_t), void *p
 	}
 
 	do {
+		char *p;
+
 		/* Increase bufsize and try again.*/
 		bufSize *= 2;
-		CHKmalloc(stringBuf = realloc(stringBuf, bufSize));
+		CHKmalloc(p = realloc(stringBuf, bufSize));
+		stringBuf = p;
 		err = getgrnam_r((char*)szName, &gBuf, stringBuf, bufSize, &pgBuf);
 	} while((pgBuf == NULL) && (err == ERANGE));
 
@@ -522,15 +525,14 @@ finalize_it:
 static rsRetVal doGetWord(uchar **pp, rsRetVal (*pSetHdlr)(void*, uchar*), void *pVal)
 {
 	DEFiRet;
-	cstr_t *pStrB;
+	cstr_t *pStrB = NULL;
 	uchar *pNewVal;
 
 	ASSERT(pp != NULL);
 	ASSERT(*pp != NULL);
 
 	CHKiRet(getWord(pp, &pStrB));
-	CHKiRet(cstrConvSzStrAndDestruct(pStrB, &pNewVal, 0));
-	pStrB = NULL;
+	CHKiRet(cstrConvSzStrAndDestruct(&pStrB, &pNewVal, 0));
 
 	DBGPRINTF("doGetWord: get newval '%s' (len %d), hdlr %p\n",
 		  pNewVal, (int) ustrlen(pNewVal), pSetHdlr);
@@ -915,7 +917,7 @@ DEFFUNC_llExecFunc(unregHdlrsHeadExec)
 	int iNumElts;
 
 	/* first find element */
-	iRet = llFindAndDelete(&(pListHdr->llCmdHdlrs), pParam);
+	CHKiRet(llFindAndDelete(&(pListHdr->llCmdHdlrs), pParam));
 
 	/* now go back and check how many elements are left */
 	CHKiRet(llGetNumElts(&(pListHdr->llCmdHdlrs), &iNumElts));
