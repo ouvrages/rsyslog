@@ -1,6 +1,9 @@
 rsyslog (8.4.0-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * Update patches:
+    - Refresh 0001-Don-t-create-a-database.patch.
+    - Drop 0002-Fix-pidfile-location.patch, merged upstream.
 
  -- Michael Biebl <biebl@debian.org>  Mon, 18 Aug 2014 17:49:11 +0200
 
