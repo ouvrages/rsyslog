@@ -16,10 +16,9 @@ fi
 # If systemd is reloaded at this point, it loses track of the rsyslogd process.
 # To work around this problem, create a (runtime) copy of the syslog.service
 # symlink before the upgrade and remove it again afterwards. See #724796
-if [ -d /run/systemd/system ] && dpkg --compare-versions "$2" lt "7.4.1-2" ; then
-	target=$(readlink /etc/systemd/system/syslog.service)
-	if [ "$target" = /lib/systemd/system/rsyslog.service ] ; then
-		ln -sf "$target" /run/systemd/system/syslog.service
+if [ "$1" = "upgrade" ] && dpkg --compare-versions "$2" lt "7.4.1-2" ; then
+	if [ -d /run/systemd/system ] && [ -L /etc/systemd/system/syslog.service ] ; then
+		ln -sf /lib/systemd/system/rsyslog.service /run/systemd/system/syslog.service
 	fi
 fi
 

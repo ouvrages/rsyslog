@@ -25,7 +25,7 @@ case "$1" in
 	chmod 700 /var/spool/rsyslog
 
 	# Clean up temporary syslog.service symlink
-	if [ -d /run/systemd/system ] &&  dpkg --compare-versions "$2" lt "7.4.1-2" ; then
+	if [ -d /run/systemd/system ] &&  dpkg --compare-versions "$2" lt-nl "7.4.1-2" ; then
 		rm -f /run/systemd/system/syslog.service
 	fi
     ;;

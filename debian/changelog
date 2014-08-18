@@ -1,3 +1,10 @@
+rsyslog (8.2.2-5) UNRELEASED; urgency=medium
+
+  * Make sure to actually only create the temporary syslog.service symlink on
+    upgrades and avoid the usage of readlink.
+
+ -- Michael Biebl <biebl@debian.org>  Mon, 18 Aug 2014 01:37:44 +0200
+
 rsyslog (8.2.2-4) unstable; urgency=medium
 
   * Fix wheezy → jessie upgrade failure when running under systemd due to the
