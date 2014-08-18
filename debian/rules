@@ -42,6 +42,7 @@ override_dh_auto_configure:
 		--enable-mmsequence \
 		--disable-libgcrypt \
 		--disable-testbench \
+		--disable-generate-man-pages \
 		--with-systemdsystemunitdir=/lib/systemd/system
 
 override_dh_auto_install:
