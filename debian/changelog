@@ -7,6 +7,8 @@ rsyslog (8.4.0-1) UNRELEASED; urgency=medium
   * Add --disable-generate-man-pages to configure flags to avoid a build
     dependency on python-docutils. We don't ship the generated man pages
     anyway.
+  * Add support for external message modification modules which are bound via
+    the new native mmexternal module.
 
  -- Michael Biebl <biebl@debian.org>  Mon, 18 Aug 2014 17:49:11 +0200
 
