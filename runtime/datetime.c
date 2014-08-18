@@ -5,7 +5,7 @@
  * in a useful manner. It is still undecided if all functions will continue
  * to stay here or some will be moved into parser modules (once we have them).
  *
- * Copyright 2008-2012 Rainer Gerhards and Adiscon GmbH.
+ * Copyright 2008-2014 Rainer Gerhards and Adiscon GmbH.
  *
  * This file is part of the rsyslog runtime library.
  *
@@ -363,9 +363,19 @@ finalize_it:
  * If a *valid* timestamp is found, the string length is decremented
  * by the number of characters processed. If it is not a valid timestamp,
  * the length is kept unmodified. -- rgerhards, 2009-09-23
+ *
+ * We support this format:
+ * [yyyy] Mon mm [yyyy] hh:mm:ss[.subsec][ TZSTRING:]
+ * Note that [yyyy] and [.subsec] are non-standard but frequently occur.
+ * Also [yyyy] can only occur once -- if it occurs twice, we flag the
+ * timestamp as invalid. if bParseTZ is true, we try to obtain a
+ * TZSTRING. Note that in this case it MUST be terminated by a colon
+ * (Cisco format). This option is a bit dangerous, as it could already
+ * by the tag. So it MUST only be enabled in specialised parsers.
+ * subsec, [yyyy] in front, TZSTRING was added in 2014-07-08 rgerhards
  */
 static rsRetVal
-ParseTIMESTAMP3164(struct syslogTime *pTime, uchar** ppszTS, int *pLenStr)
+ParseTIMESTAMP3164(struct syslogTime *pTime, uchar** ppszTS, int *pLenStr, const int bParseTZ)
 {
 	/* variables to temporarily hold time information while we parse */
 	int month;
@@ -374,6 +384,12 @@ ParseTIMESTAMP3164(struct syslogTime *pTime, uchar** ppszTS, int *pLenStr)
 	int hour; /* 24 hour clock */
 	int minute;
 	int second;
+	int secfrac;	/* fractional seconds (must be 32 bit!) */
+	int secfracPrecision;
+	char tzstring[16];
+	char OffsetMode = '\0';	/* UTC offset: \0 -> indicate no update */
+	char OffsetHour;	/* UTC offset in hours */
+	int OffsetMinute;	/* UTC offset in minutes */
 	/* end variables to temporarily hold time information while we parse */
 	int lenStr;
 	uchar *pszTS;
@@ -385,6 +401,21 @@ ParseTIMESTAMP3164(struct syslogTime *pTime, uchar** ppszTS, int *pLenStr)
 	assert(pTime != NULL);
 	assert(pLenStr != NULL);
 	lenStr = *pLenStr;
+
+	if(lenStr < 3)
+		ABORT_FINALIZE(RS_RET_INVLD_TIME);
+
+	/* first check if we have a year in front of the timestamp. some devices (e.g. Brocade)
+	 * do this. As it is pretty straightforward to detect and chance of misinterpretation
+	 * is low, we try to parse it.
+	 */
+	if(*pszTS >= '0' && *pszTS <= '9') {
+		/* OK, either we have a prepended year or an invalid format! */
+		year = srSLMGParseInt32(&pszTS, &lenStr);
+		if(year < 1970 || year > 2100 || *pszTS != ' ')
+			ABORT_FINALIZE(RS_RET_INVLD_TIME);
+		++pszTS; /* skip SP */
+	}
 
 	/* If we look at the month (Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec),
 	 * we may see the following character sequences occur:
@@ -407,9 +438,6 @@ ParseTIMESTAMP3164(struct syslogTime *pTime, uchar** ppszTS, int *pLenStr)
 	 * june, when it first manifested. This also lead to invalid parsing of the rest
 	 * of the message, as the time stamp was not detected to be correct. - rgerhards
 	 */
-	if(lenStr < 3)
-		ABORT_FINALIZE(RS_RET_INVLD_TIME);
-
 	switch(*pszTS++)
 	{
 	case 'j':
@@ -558,7 +586,7 @@ ParseTIMESTAMP3164(struct syslogTime *pTime, uchar** ppszTS, int *pLenStr)
 
 	/* time part */
 	hour = srSLMGParseInt32(&pszTS, &lenStr);
-	if(hour > 1970 && hour < 2100) {
+	if(year == 0 && hour > 1970 && hour < 2100) {
 		/* if so, we assume this actually is a year. This is a format found
 		 * e.g. in Cisco devices.
 		 * (if you read this 2100+ trying to fix a bug, congratulate me
@@ -590,6 +618,41 @@ ParseTIMESTAMP3164(struct syslogTime *pTime, uchar** ppszTS, int *pLenStr)
 	if(second < 0 || second > 60)
 		ABORT_FINALIZE(RS_RET_INVLD_TIME);
 
+	/* as an extension e.g. found in CISCO IOS, we support sub-second resultion.
+	 * It's presence is indicated by a dot immediately following the second.
+	 */
+	if(lenStr > 0 && *pszTS == '.') {
+		--lenStr;
+		uchar *pszStart = ++pszTS;
+		secfrac = srSLMGParseInt32(&pszTS, &lenStr);
+		secfracPrecision = (int) (pszTS - pszStart);
+	} else {
+		secfracPrecision = 0;
+		secfrac = 0;
+	}
+
+	/* try to parse the TZSTRING if we are instructed to do so */
+	if(bParseTZ && lenStr > 2 && *pszTS == ' ') {
+		int i;
+		for(  ++pszTS, --lenStr, i = 0
+		    ; lenStr > 0 && i < (int) sizeof(tzstring) - 1 && *pszTS != ':' && *pszTS != ' '
+		    ; --lenStr)
+			tzstring[i++] = *pszTS++;
+		if(i > 0) {
+			/* found TZ, apply it */
+			tzinfo_t* tzinfo;
+			tzstring[i] = '\0';
+			if((tzinfo = glblFindTimezoneInfo((char*) tzstring)) == NULL) {
+				DBGPRINTF("ParseTIMESTAMP3164: invalid TZ string '%s' -- ignored\n",
+					  tzstring);
+			} else {
+				OffsetMode = tzinfo->offsMode;
+				OffsetHour = tzinfo->offsHour;
+				OffsetMinute = tzinfo->offsMin;
+			}
+		}
+	}
+
 	/* we provide support for an extra ":" after the date. While this is an
 	 * invalid format, it occurs frequently enough (e.g. with Cisco devices)
 	 * to permit it as a valid case. -- rgerhards, 2008-09-12
@@ -618,8 +681,13 @@ ParseTIMESTAMP3164(struct syslogTime *pTime, uchar** ppszTS, int *pLenStr)
 	pTime->hour = hour;
 	pTime->minute = minute;
 	pTime->second = second;
- 	pTime->secfracPrecision = 0;
-	pTime->secfrac = 0;
+	pTime->secfrac = secfrac;
+	pTime->secfracPrecision = secfracPrecision;
+	if(OffsetMode != '\0') { /* need to update TZ info? */
+		pTime->OffsetMode = OffsetMode;
+		pTime->OffsetHour = OffsetHour;
+		pTime->OffsetMinute = OffsetMinute;
+	}
 	*pLenStr = lenStr;
 
 finalize_it:
@@ -987,6 +1055,31 @@ int formatTimestampUnix(struct syslogTime *ts, char *pBuf)
 	snprintf(pBuf, 11, "%u", (unsigned) syslogTime2time_t(ts));
 	return 11;
 }
+
+/* 0 - Sunday, 1, Monday, ...
+ * Note that we cannot use strftime() and helpers as they rely on the TZ
+ * variable (again, arghhhh). So we need to do it ourselves...
+ * Note: in the year 2100, this algorithm does not work correctly (due to
+ * leap time rules. To fix it then (*IF* this code really still exists then),
+ * just use 2100 as new anchor year and adapt the initial day number.
+ */
+int getWeekdayNbr(struct syslogTime *ts)
+{
+	int wday;
+	int g, f;
+
+	g = ts->year;
+	if(ts->month < 3) {
+		g--;
+		f = ts->month + 13;
+	} else {
+		f = ts->month + 1;
+	}
+	wday = ((36525*g)/100) + ((306*f)/10) + ts->day - 621049; 
+	wday %= 7;
+	return wday;
+}
+
 
 
 /* queryInterface function

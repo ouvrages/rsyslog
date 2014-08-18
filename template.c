@@ -1,7 +1,7 @@
 /* This is the template processing code of rsyslog.
  * begun 2004-11-17 rgerhards
  *
- * Copyright 2004-2013 Rainer Gerhards and Adiscon
+ * Copyright 2004-2014 Rainer Gerhards and Adiscon
  *
  * This file is part of rsyslog.
  *
@@ -45,6 +45,7 @@
 #include "strgen.h"
 #include "rsconf.h"
 #include "msg.h"
+#include "parserif.h"
 #include "unicode-helper.h"
 
 /* static data */
@@ -474,7 +475,7 @@ doEscape(uchar **pp, rs_size_t *pLen, unsigned short *pbMustBeFreed, int mode)
 		++p;
 	}
 	CHKiRet(cstrFinalize(pStrB));
-	CHKiRet(cstrConvSzStrAndDestruct(pStrB, &pszGenerated, 0));
+	CHKiRet(cstrConvSzStrAndDestruct(&pStrB, &pszGenerated, 0));
 
 	if(*pbMustBeFreed)
 		free(*pp); /* discard previous value */
@@ -635,7 +636,7 @@ do_Constant(unsigned char **pp, struct template *pTpl, int bDoEscapes)
 	 * 2005-09-09 rgerhards
 	 */
 	pTpe->data.constant.iLenConstant = rsCStrLen(pStrB);
-	CHKiRet(cstrConvSzStrAndDestruct(pStrB, &pTpe->data.constant.pConstant, 0));
+	CHKiRet(cstrConvSzStrAndDestruct(&pStrB, &pTpe->data.constant.pConstant, 0));
 
 	*pp = p;
 
@@ -703,6 +704,28 @@ static void doOptions(unsigned char **pp, struct templateEntry *pTpe)
 			pTpe->data.field.eDateFormat = tplFmtUnixDate;
 		 } else if(!strcmp((char*)Buf, "date-subseconds")) {
 			pTpe->data.field.eDateFormat = tplFmtSecFrac;
+		 } else if(!strcmp((char*)Buf, "date-wdayname")) {
+			pTpe->data.field.eDateFormat = tplFmtWDayName;
+		 } else if(!strcmp((char*)Buf, "date-wday")) {
+			pTpe->data.field.eDateFormat = tplFmtWDay;
+		 } else if(!strcmp((char*)Buf, "date-year")) {
+			pTpe->data.field.eDateFormat = tplFmtYear;
+		 } else if(!strcmp((char*)Buf, "date-month")) {
+			pTpe->data.field.eDateFormat = tplFmtMonth;
+		 } else if(!strcmp((char*)Buf, "date-day")) {
+			pTpe->data.field.eDateFormat = tplFmtDay;
+		 } else if(!strcmp((char*)Buf, "date-hour")) {
+			pTpe->data.field.eDateFormat = tplFmtHour;
+		 } else if(!strcmp((char*)Buf, "date-minute")) {
+			pTpe->data.field.eDateFormat = tplFmtMinute;
+		 } else if(!strcmp((char*)Buf, "date-second")) {
+			pTpe->data.field.eDateFormat = tplFmtSecond;
+		 } else if(!strcmp((char*)Buf, "date-tzoffshour")) {
+			pTpe->data.field.eDateFormat = tplFmtTZOffsHour;
+		 } else if(!strcmp((char*)Buf, "date-tzoffsmin")) {
+			pTpe->data.field.eDateFormat = tplFmtTZOffsMin;
+		 } else if(!strcmp((char*)Buf, "date-tzoffsdirection")) {
+			pTpe->data.field.eDateFormat = tplFmtTZOffsDirection;
 		 } else if(!strcmp((char*)Buf, "lowercase")) {
 			pTpe->data.field.eCaseConv = tplCaseConvLower;
 		 } else if(!strcmp((char*)Buf, "uppercase")) {
@@ -931,7 +954,7 @@ do_Parameter(uchar **pp, struct template *pTpl)
 						if(iNum < 0 || iNum > 255) {
 							errmsg.LogError(0, NO_ERRCODE, "error: non-USASCII delimiter character value %d in template - using 9 (HT) as substitute", iNum);
 							pTpe->data.field.field_delim = 9;
-						  } else {
+						} else {
 							pTpe->data.field.field_delim = iNum;
 #							ifdef STRICT_GPLV3
 							if (*p == '+') {
@@ -945,8 +968,12 @@ do_Parameter(uchar **pp, struct template *pTpl)
 								while(isdigit((int)*p))
 									iNum = iNum * 10 + *p++ - '0';
 								pTpe->data.field.iFromPos = iNum;
+							} else if(*p != ':') {
+								parser_errmsg("error: invalid character '%c' in frompos after \"F,\", property: '%s' "
+									      "be sure to use DECIMAL character codes!", *p, (char*) *pp);
+								ABORT_FINALIZE(RS_RET_SYNTAX_ERROR);
 							}
-						  }
+						}
 					}
 				} else {
 					/* invalid character after F, so we need to reject
@@ -1542,6 +1569,28 @@ createPropertyTpe(struct template *pTpl, struct cnfobj *o)
 				datefmt = tplFmtUnixDate;
 			} else if(!es_strbufcmp(pvals[i].val.d.estr, (uchar*)"subseconds", sizeof("subseconds")-1)) {
 				datefmt = tplFmtSecFrac;
+			} else if(!es_strbufcmp(pvals[i].val.d.estr, (uchar*)"wdayname", sizeof("wdayname")-1)) {
+				datefmt = tplFmtWDayName;
+			} else if(!es_strbufcmp(pvals[i].val.d.estr, (uchar*)"wday", sizeof("wday")-1)) {
+				datefmt = tplFmtWDay;
+			} else if(!es_strbufcmp(pvals[i].val.d.estr, (uchar*)"year", sizeof("year")-1)) {
+				datefmt = tplFmtYear;
+			} else if(!es_strbufcmp(pvals[i].val.d.estr, (uchar*)"month", sizeof("month")-1)) {
+				datefmt = tplFmtMonth;
+			} else if(!es_strbufcmp(pvals[i].val.d.estr, (uchar*)"day", sizeof("day")-1)) {
+				datefmt = tplFmtDay;
+			} else if(!es_strbufcmp(pvals[i].val.d.estr, (uchar*)"hour", sizeof("hour")-1)) {
+				datefmt = tplFmtHour;
+			} else if(!es_strbufcmp(pvals[i].val.d.estr, (uchar*)"minute", sizeof("minute")-1)) {
+				datefmt = tplFmtMinute;
+			} else if(!es_strbufcmp(pvals[i].val.d.estr, (uchar*)"second", sizeof("second")-1)) {
+				datefmt = tplFmtSecond;
+			} else if(!es_strbufcmp(pvals[i].val.d.estr, (uchar*)"tzoffshour", sizeof("tzoffshour")-1)) {
+				datefmt = tplFmtTZOffsHour;
+			} else if(!es_strbufcmp(pvals[i].val.d.estr, (uchar*)"tzoffsmin", sizeof("tzoffsmin")-1)) {
+				datefmt = tplFmtTZOffsMin;
+			} else if(!es_strbufcmp(pvals[i].val.d.estr, (uchar*)"tzoffsdirection", sizeof("tzoffsdirection")-1)) {
+				datefmt = tplFmtTZOffsDirection;
 			} else {
 				uchar *typeStr = (uchar*) es_str2cstr(pvals[i].val.d.estr, NULL);
 				errmsg.LogError(0, RS_RET_ERR, "invalid date format '%s' for property",

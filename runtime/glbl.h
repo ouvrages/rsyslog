@@ -104,15 +104,18 @@ ENDinterface(glbl)
 PROTOTYPEObj(glbl);
 
 extern int glblDebugOnShutdown;	/* start debug log when we are shut down */
+extern short janitorInterval;
 
 static inline pid_t glblGetOurPid(void) { return glbl_ourpid; }
 static inline void glblSetOurPid(pid_t pid) { glbl_ourpid = pid; }
 
 void glblPrepCnf(void);
 void glblProcessCnf(struct cnfobj *o);
+void glblProcessTimezone(struct cnfobj *o);
 void glblProcessMainQCnf(struct cnfobj *o);
 void glblDestructMainqCnfObj();
 void glblDoneLoadCnf(void);
 const uchar * glblGetWorkDirRaw(void);
+tzinfo_t* glblFindTimezoneInfo(char *id);
 
 #endif /* #ifndef GLBL_H_INCLUDED */

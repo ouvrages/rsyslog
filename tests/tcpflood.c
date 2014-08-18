@@ -6,7 +6,12 @@
  * -p	target port (default 13514)
  * -n	number of target ports (targets are in range -p..(-p+-n-1)
  *      Note -c must also be set to at LEAST the number of -n!
- * -c	number of connections (default 1)
+ * -c	number of connections (default 1), use negative number
+ *      to set a "soft limit": if tcpflood cannot open the 
+ *      requested number of connections, gracefully degrade to
+ *      whatever number could be opened. This is useful in environments
+ *      where system config constraints cannot be overriden (e.g.
+ *      vservers, non-admin users, ...)
  * -m	number of messages to send (connection is random)
  * -i	initial message number (optional)
  * -P	PRI to be used for generated messages (default is 167).
@@ -52,6 +57,7 @@
  * -z	private key file for TLS mode
  * -Z	cert (public key) file for TLS mode
  * -L	loglevel to use for GnuTLS troubleshooting (0-off to 10-all, 0 default)
+ * -j	format message in json, parameter is JSON cookie
  *
  * Part of the testbench for rsyslog.
  *
@@ -115,7 +121,8 @@ static int extraDataLen = 0; /* amount of extra data to add to message */
 static int useRFC5424Format = 0; /* should the test message be in RFC5424 format? */
 static int bRandomizeExtraData = 0; /* randomize amount of extra data added */
 static int numMsgsToSend; /* number of messages to send */
-static unsigned numConnections = 1; /* number of connections to create */
+static int numConnections = 1; /* number of connections to create */
+static int softLimitConnections  = 0; /* soft connection limit, see -c option description */
 static int *sockArray;  /* array of sockets to use */
 static int msgNum = 0;	/* initial message number to start with */
 static int bShowProgress = 1; /* show progress messages */
@@ -139,6 +146,7 @@ static int numThrds = 1;	/* number of threads to use */
 static char *tlsCertFile = NULL;
 static char *tlsKeyFile = NULL;
 static int tlsLogLevel = 0;
+static char *jsonCookie = NULL; /* if non-NULL, use JSON format with this cookie */
 
 #ifdef ENABLE_GNUTLS
 static gnutls_session_t *sessArray;	/* array of TLS sessions to use */
@@ -210,7 +218,7 @@ int openConn(int *fd)
 	int rnd;
 
 	if((sock=socket(AF_INET, SOCK_STREAM, 0))==-1) {
-		perror("socket()");
+		perror("\nsocket()");
 		return(1);
 	}
 
@@ -252,7 +260,7 @@ int openConn(int *fd)
  */
 int openConnections(void)
 {
-	unsigned i;
+	int i;
 	char msgBuf[128];
 	size_t lenMsg;
 
@@ -272,6 +280,12 @@ int openConnections(void)
 		}
 		if(openConn(&(sockArray[i])) != 0) {
 			printf("error in trying to open connection i=%d\n", i);
+			if(softLimitConnections) {
+				numConnections = i - 1;
+				printf("Connection limit is soft, continuing with only %d "
+				       "connections.\n", numConnections);
+				break;
+			}
 			return 1;
 		}
 		if(transport == TP_TLS) {
@@ -296,7 +310,7 @@ int openConnections(void)
  */
 void closeConnections(void)
 {
-	unsigned i;
+	int i;
 	size_t lenMsg;
 	struct linger ling;
 	char msgBuf[128];
@@ -360,6 +374,15 @@ genMsg(char *buf, size_t maxBuf, int *pLenBuf, struct instdata *inst)
 				}
 			}
 		} while(!done); /* Attention: do..while()! */
+	} else if(jsonCookie != NULL) {
+		if(useRFC5424Format) {
+			*pLenBuf = snprintf(buf, maxBuf, "<%s>1 2003-03-01T01:00:00.000Z mymachine.example.com tcpflood "
+					     "- tag [tcpflood@32473 MSGNUM=\"%8.8d\"] %s{\"msgnum\":%d}%c",
+					       msgPRI, msgNum, jsonCookie, msgNum, frameDelim);
+		} else {
+			*pLenBuf = snprintf(buf, maxBuf, "<%s>Mar  1 01:00:00 172.20.245.8 tag %s{\"msgnum\":%d}%c",
+					       msgPRI, jsonCookie, msgNum, frameDelim);
+		}
 	} else if(MsgToSend == NULL) {
 		if(dynFileIDs > 0) {
 			snprintf(dynFileIDBuf, sizeof(dynFileIDBuf), "%d:", rand() % dynFileIDs);
@@ -433,7 +456,7 @@ int sendMessages(struct instdata *inst)
 		if(runMultithreaded) {
 			socknum = inst->idx;
 		} else {
-			if(i < numConnections)
+			if((int) i < numConnections)
 				socknum = i;
 			else if(i >= inst->numMsgs - numConnections) {
 				socknum = i - (inst->numMsgs - numConnections);
@@ -844,7 +867,7 @@ int main(int argc, char *argv[])
 
 	setvbuf(stdout, buf, _IONBF, 48);
 	
-	while((opt = getopt(argc, argv, "b:ef:F:t:p:c:C:m:i:I:P:d:Dn:L:M:rsBR:S:T:XW:yYz:Z:")) != -1) {
+	while((opt = getopt(argc, argv, "b:ef:F:t:p:c:C:m:i:I:P:d:Dn:L:M:rsBR:S:T:XW:yYz:Z:j:")) != -1) {
 		switch (opt) {
 		case 'b':	batchsize = atoll(optarg);
 				break;
@@ -854,7 +877,11 @@ int main(int argc, char *argv[])
 				break;
 		case 'n':	numTargetPorts = atoi(optarg);
 				break;
-		case 'c':	numConnections = (unsigned) atoi(optarg);
+		case 'c':	numConnections = atoi(optarg);
+				if(numConnections < 0) {
+					numConnections *= -1;
+					softLimitConnections = 1;
+				}
 				break;
 		case 'C':	numFileIterations = atoi(optarg);
 				break;
@@ -863,6 +890,8 @@ int main(int argc, char *argv[])
 		case 'i':	msgNum = atoi(optarg);
 				break;
 		case 'P':	msgPRI = optarg;
+				break;
+		case 'j':	jsonCookie = optarg;
 				break;
 		case 'd':	extraDataLen = atoi(optarg);
 				if(extraDataLen > MAX_EXTRADATA_LEN) {

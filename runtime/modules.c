@@ -64,7 +64,6 @@
 /* static data */
 DEFobjStaticHelpers
 DEFobjCurrIf(errmsg)
-DEFobjCurrIf(parser)
 DEFobjCurrIf(strgen)
 
 static modInfo_t *pLoadedModules = NULL;	/* list of currently-loaded modules */
@@ -358,7 +357,7 @@ addModToGlblList(modInfo_t *pThis)
 rsRetVal
 readyModForCnf(modInfo_t *pThis, cfgmodules_etry_t **ppNew, cfgmodules_etry_t **ppLast)
 {
-	cfgmodules_etry_t *pNew;
+	cfgmodules_etry_t *pNew = NULL;
 	cfgmodules_etry_t *pLast;
 	DEFiRet;
 	assert(pThis != NULL);
@@ -403,6 +402,10 @@ readyModForCnf(modInfo_t *pThis, cfgmodules_etry_t **ppNew, cfgmodules_etry_t **
 	*ppLast = pLast;
 	*ppNew = pNew;
 finalize_it:
+	if(iRet != RS_RET_OK) {
+		if(pNew != NULL)
+			free(pNew);
+	}
 	RETiRet;
 }
 
@@ -555,7 +558,6 @@ doModInit(rsRetVal (*modInit)(int, int*, rsRetVal(**)(), rsRetVal(*)(), modInfo_
 	rsRetVal localRet;
 	modInfo_t *pNew = NULL;
 	uchar *pName;
-	parser_t *pParser; /* used for parser modules */
 	strgen_t *pStrgen; /* used for strgen modules */
 	rsRetVal (*GetName)(uchar**);
 	rsRetVal (*modGetType)(eModType_t *pType);
@@ -641,7 +643,7 @@ doModInit(rsRetVal (*modInit)(int, int*, rsRetVal(**)(), rsRetVal(*)(), modInfo_
 			pNew->mod.im.bCanRun = 0;
 			localRet = (*pNew->modQueryEtryPt)((uchar*)"newInpInst", &pNew->mod.im.newInpInst);
 			if(localRet == RS_RET_MODULE_ENTRY_POINT_NOT_FOUND) {
-				pNew->mod.om.newActInst = NULL;
+				pNew->mod.im.newInpInst = NULL;
 			} else if(localRet != RS_RET_OK) {
 				ABORT_FINALIZE(localRet);
 			}
@@ -732,31 +734,25 @@ doModInit(rsRetVal (*modInit)(int, int*, rsRetVal(**)(), rsRetVal(*)(), modInfo_
 		case eMOD_LIB:
 			break;
 		case eMOD_PARSER:
-			/* first, we need to obtain the parser object. We could not do that during
-			 * init as that would have caused class bootstrap issues which are not
-			 * absolutely necessary. Note that we can call objUse() multiple times, it
-			 * handles that.
-			 */
-			CHKiRet(objUse(parser, CORE_COMPONENT));
-			/* here, we create a new parser object */
-			CHKiRet((*pNew->modQueryEtryPt)((uchar*)"parse", &pNew->mod.pm.parse));
+			localRet = (*pNew->modQueryEtryPt)((uchar*)"parse2",
+				   &pNew->mod.pm.parse2);
+			if(localRet == RS_RET_OK) {
+				pNew->mod.pm.parse = NULL;
+				CHKiRet((*pNew->modQueryEtryPt)((uchar*)"newParserInst",
+					&pNew->mod.pm.newParserInst));
+				CHKiRet((*pNew->modQueryEtryPt)((uchar*)"freeParserInst",
+					&pNew->mod.pm.freeParserInst));
+			} else if(localRet == RS_RET_MODULE_ENTRY_POINT_NOT_FOUND) {
+				pNew->mod.pm.parse2 = NULL;
+				pNew->mod.pm.newParserInst = NULL;
+				pNew->mod.pm.freeParserInst = NULL;
+				CHKiRet((*pNew->modQueryEtryPt)((uchar*)"parse", &pNew->mod.pm.parse));
+			} else {
+				ABORT_FINALIZE(localRet);
+			}
 			CHKiRet((*pNew->modQueryEtryPt)((uchar*)"GetParserName", &GetName));
 			CHKiRet(GetName(&pName));
-			CHKiRet(parser.Construct(&pParser));
-
-			/* check some features */
-			localRet = pNew->isCompatibleWithFeature(sFEATUREAutomaticSanitazion);
-			if(localRet == RS_RET_OK){
-				CHKiRet(parser.SetDoSanitazion(pParser, RSTRUE));
-			}
-			localRet = pNew->isCompatibleWithFeature(sFEATUREAutomaticPRIParsing);
-			if(localRet == RS_RET_OK){
-				CHKiRet(parser.SetDoPRIParsing(pParser, RSTRUE));
-			}
-
-			CHKiRet(parser.SetName(pParser, pName));
-			CHKiRet(parser.SetModPtr(pParser, pNew));
-			CHKiRet(parser.ConstructFinalize(pParser));
+			CHKiRet(parserConstructViaModAndName(pNew, pName, NULL));
 			break;
 		case eMOD_STRGEN:
 			/* first, we need to obtain the strgen object. We could not do that during
@@ -765,7 +761,6 @@ doModInit(rsRetVal (*modInit)(int, int*, rsRetVal(**)(), rsRetVal(*)(), modInfo_
 			 * handles that.
 			 */
 			CHKiRet(objUse(strgen, CORE_COMPONENT));
-			/* here, we create a new parser object */
 			CHKiRet((*pNew->modQueryEtryPt)((uchar*)"strgen", &pNew->mod.sm.strgen));
 			CHKiRet((*pNew->modQueryEtryPt)((uchar*)"GetName", &GetName));
 			CHKiRet(GetName(&pName));
@@ -1130,7 +1125,7 @@ Load(uchar *pModName, sbool bConfLoad, struct nvlst *lst)
 					free(pPathBuf);
 				/* we always alloc enough memory for everything we potentiall need to add */
 				lenPathBuf = PATHBUF_OVERHEAD;
-				CHKmalloc(pPathBuf = malloc(sizeof(char)*lenPathBuf));
+				CHKmalloc(pPathBuf = malloc(sizeof(uchar)*lenPathBuf));
 			}
 			*pPathBuf = '\0';	/* we do not need to append the path - its already in the module name */
 			iPathLen = 0;
@@ -1153,7 +1148,7 @@ Load(uchar *pModName, sbool bConfLoad, struct nvlst *lst)
 					free(pPathBuf);
 				/* we always alloc enough memory for everything we potentiall need to add */
 				lenPathBuf = iPathLen + PATHBUF_OVERHEAD;
-				CHKmalloc(pPathBuf = malloc(sizeof(char)*lenPathBuf));
+				CHKmalloc(pPathBuf = malloc(sizeof(uchar)*lenPathBuf));
 			}
 
 			memcpy((char *) pPathBuf, (char *)pModDirCurr, iPathLen);
@@ -1177,7 +1172,6 @@ Load(uchar *pModName, sbool bConfLoad, struct nvlst *lst)
 			 * algo over time... -- rgerhards, 2008-03-05
 			 */
 			strncat((char *) pPathBuf, ".so", lenPathBuf - strlen((char*) pPathBuf) - 1);
-			iPathLen += 3;
 		}
 
 		/* complete load path constructed, so ... GO! */
@@ -1373,7 +1367,6 @@ BEGINObjClassExit(module, OBJ_IS_LOADABLE_MODULE) /* CHANGE class also in END MA
 CODESTARTObjClassExit(module)
 	/* release objects we no longer need */
 	objRelease(errmsg, CORE_COMPONENT);
-	objRelease(parser, CORE_COMPONENT);
 	free(pModDir);
 #	ifdef DEBUG
 	modUsrPrintAll(); /* debug aid - TODO: integrate with debug.c, at least the settings! */

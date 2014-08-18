@@ -58,6 +58,7 @@ CLEANFILES = \
 endif
 
 EXTRA_DIST = \
+	README.md \
 	platform/README \
 	platform/freebsd/rsyslogd \
 	platform/slackware/rc.rsyslogd \
@@ -72,6 +73,8 @@ EXTRA_DIST = \
 	rsyslog.service.in
 
 SUBDIRS = compat runtime grammar . plugins/immark plugins/imuxsock plugins/imtcp plugins/imudp plugins/omtesting
+# external plugin driver is always enabled (core component)
+SUBDIRS += plugins/mmexternal
 
 if ENABLE_RSYSLOGD
 SUBDIRS += tools
@@ -127,6 +130,10 @@ endif
 
 if ENABLE_PMCISCONAMES
 SUBDIRS += plugins/pmcisconames
+endif
+
+if ENABLE_PMCISCOIOS
+SUBDIRS += plugins/pmciscoios
 endif
 
 if ENABLE_PMAIXFORWARDEDFROM

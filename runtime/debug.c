@@ -695,10 +695,11 @@ static dbgThrdInfo_t *dbgGetThrdInfo(void)
 	pthread_mutex_lock(&mutCallStack);
 	if((pThrd = pthread_getspecific(keyCallStack)) == NULL) {
 		/* construct object */
-		pThrd = calloc(1, sizeof(dbgThrdInfo_t));
-		pThrd->thrd = pthread_self();
-		(void) pthread_setspecific(keyCallStack, pThrd);
-		DLL_Add(CallStack, pThrd);
+		if((pThrd = calloc(1, sizeof(dbgThrdInfo_t))) != NULL) {
+			pThrd->thrd = pthread_self();
+			(void) pthread_setspecific(keyCallStack, pThrd);
+			DLL_Add(CallStack, pThrd);
+		}
 	}
 	pthread_mutex_unlock(&mutCallStack);
 	return pThrd;
@@ -738,25 +739,27 @@ static void dbgGetThrdName(char *pszBuf, size_t lenBuf, pthread_t thrd, int bInc
 		snprintf(pszBuf, lenBuf, "%lx", (long) thrd);
 	} else {
 		if(bIncludeNumID) {
-			snprintf(pszBuf, lenBuf, "%s (%lx)", pThrd->pszThrdName, (long) thrd);
+			snprintf(pszBuf, lenBuf, "%-15s (%lx)", pThrd->pszThrdName, (long) thrd);
 		} else {
-			snprintf(pszBuf, lenBuf, "%s", pThrd->pszThrdName);
+			snprintf(pszBuf, lenBuf, "%-15s", pThrd->pszThrdName);
 		}
 	}
-
 }
 
 
 /* set a name for the current thread. The caller provided string is duplicated.
+ * Note: we must lock the "dbgprint" mutex, because dbgprint() uses the thread
+ * name and we could get a race (and abort) in cases where both are executed in
+ * parallel and we free or incompletely-copy the string.
  */
 void dbgSetThrdName(uchar *pszName)
 {
-return;
-
+	pthread_mutex_lock(&mutdbgprint);
 	dbgThrdInfo_t *pThrd = dbgGetThrdInfo();
 	if(pThrd->pszThrdName != NULL)
 		free(pThrd->pszThrdName);
 	pThrd->pszThrdName = strdup((char*)pszName);
+	pthread_mutex_unlock(&mutdbgprint);
 }
 
 

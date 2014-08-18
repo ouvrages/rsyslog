@@ -82,6 +82,8 @@ DEFobjCurrIf(prop)
 DEFobjCurrIf(net)
 DEFobjCurrIf(var)
 
+static char *one_digit[10] = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9" };
+
 static char *two_digits[100] = {
 	"00", "01", "02", "03", "04", "05", "06", "07", "08", "09",
 	"10", "11", "12", "13", "14", "15", "16", "17", "18", "19",
@@ -93,6 +95,32 @@ static char *two_digits[100] = {
 	"70", "71", "72", "73", "74", "75", "76", "77", "78", "79",
 	"80", "81", "82", "83", "84", "85", "86", "87", "88", "89",
 	"90", "91", "92", "93", "94", "95", "96", "97", "98", "99"};
+
+static char *wdayNames[7] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+
+/* The following is a table of supported years. This permits us
+ * to avoid dynamic memory allocation. Note that the time-based
+ * algos need to be upgraded after the year 2099 in any case.
+ * Quite honestly, I don't expect that this is a real problem ;)
+ */
+static char *years[] = {
+	"1967", "1968", "1969", "1970", "1971", "1972", "1973", "1974",
+	"1975", "1976", "1977", "1978", "1979", "1980", "1981", "1982",
+	"1983", "1984", "1985", "1986", "1987", "1988", "1989", "1990",
+	"1991", "1992", "1993", "1994", "1995", "1996", "1997", "1998",
+	"1999", "2000", "2001", "2002", "2003", "2004", "2005", "2006",
+	"2007", "2008", "2009", "2010", "2011", "2012", "2013", "2014",
+	"2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022",
+	"2023", "2024", "2025", "2026", "2027", "2028", "2029", "2030",
+	"2031", "2032", "2033", "2034", "2035", "2036", "2037", "2038",
+	"2039", "2040", "2041", "2042", "2043", "2044", "2045", "2046",
+	"2047", "2048", "2049", "2050", "2051", "2052", "2053", "2054",
+	"2055", "2056", "2057", "2058", "2059", "2060", "2061", "2062",
+	"2063", "2064", "2065", "2066", "2067", "2068", "2069", "2070",
+	"2071", "2072", "2073", "2074", "2075", "2076", "2077", "2078",
+	"2079", "2080", "2081", "2082", "2083", "2084", "2085", "2086",
+	"2087", "2088", "2089", "2090", "2091", "2092", "2093", "2094",
+	"2095", "2096", "2097", "2098", "2099" };
 
 static struct {
 	uchar *pszName;
@@ -505,6 +533,8 @@ propNameToID(uchar *pName, propid_t *pPropID)
 		*pPropID = PROP_PROCID;
 	} else if(!strcmp((char*) pName, "msgid")) {
 		*pPropID = PROP_MSGID;
+	} else if(!strcmp((char*) pName, "jsonmesg")) {
+		*pPropID = PROP_JSONMESG;
 	} else if(!strcmp((char*) pName, "parsesuccess")) {
 		*pPropID = PROP_PARSESUCCESS;
 #ifdef USE_LIBUUID
@@ -600,6 +630,8 @@ uchar *propIDToName(propid_t propID)
 			return UCHAR_CONSTANT("procid");
 		case PROP_MSGID:
 			return UCHAR_CONSTANT("msgid");
+		case PROP_JSONMESG:
+			return UCHAR_CONSTANT("jsonmesg");
 		case PROP_PARSESUCCESS:
 			return UCHAR_CONSTANT("parsesuccess");
 		case PROP_SYS_NOW:
@@ -1600,6 +1632,31 @@ getTimeReported(msg_t * const pM, enum tplFormatTypes eFmt)
 			MsgUnlock(pM);
 		}
 		return(pM->pszTIMESTAMP_SecFrac);
+	case tplFmtWDayName:
+		return wdayNames[getWeekdayNbr(&pM->tTIMESTAMP)];
+	case tplFmtWDay:
+		return one_digit[getWeekdayNbr(&pM->tTIMESTAMP)];
+	case tplFmtMonth:
+		return two_digits[(int)pM->tTIMESTAMP.month];
+	case tplFmtYear:
+		if(pM->tTIMESTAMP.year >= 1967 && pM->tTIMESTAMP.year <= 2099)
+			return years[pM->tTIMESTAMP.year - 1967];
+		else
+			return "YEAR OUT OF RANGE(1967-2099)";
+	case tplFmtDay:
+		return two_digits[(int)pM->tTIMESTAMP.day];
+	case tplFmtHour:
+		return two_digits[(int)pM->tTIMESTAMP.hour];
+	case tplFmtMinute:
+		return two_digits[(int)pM->tTIMESTAMP.minute];
+	case tplFmtSecond:
+		return two_digits[(int)pM->tTIMESTAMP.second];
+	case tplFmtTZOffsHour:
+		return two_digits[(int)pM->tTIMESTAMP.OffsetHour];
+	case tplFmtTZOffsMin:
+		return two_digits[(int)pM->tTIMESTAMP.OffsetMinute];
+	case tplFmtTZOffsDirection:
+		return (pM->tTIMESTAMP.OffsetMode == '+')? "+" : "-";
 	}
 	ENDfunc
 	return "INVALID eFmt OPTION!";
@@ -1686,6 +1743,31 @@ static char *getTimeGenerated(msg_t * const pM, enum tplFormatTypes eFmt)
 			MsgUnlock(pM);
 		}
 		return(pM->pszRcvdAt_SecFrac);
+	case tplFmtWDayName:
+		return wdayNames[getWeekdayNbr(&pM->tRcvdAt)];
+	case tplFmtWDay:
+		return one_digit[getWeekdayNbr(&pM->tRcvdAt)];
+	case tplFmtMonth:
+		return two_digits[(int)pM->tRcvdAt.month];
+	case tplFmtYear:
+		if(pM->tRcvdAt.year >= 1967 && pM->tRcvdAt.year <= 2099)
+			return years[pM->tRcvdAt.year - 1967];
+		else
+			return "YEAR OUT OF RANGE(1967-2099)";
+	case tplFmtDay:
+		return two_digits[(int)pM->tRcvdAt.day];
+	case tplFmtHour:
+		return two_digits[(int)pM->tRcvdAt.hour];
+	case tplFmtMinute:
+		return two_digits[(int)pM->tRcvdAt.minute];
+	case tplFmtSecond:
+		return two_digits[(int)pM->tRcvdAt.second];
+	case tplFmtTZOffsHour:
+		return two_digits[(int)pM->tRcvdAt.OffsetHour];
+	case tplFmtTZOffsMin:
+		return two_digits[(int)pM->tRcvdAt.OffsetMinute];
+	case tplFmtTZOffsDirection:
+		return (pM->tRcvdAt.OffsetMode == '+')? "+" : "-";
 	}
 	ENDfunc
 	return "INVALID eFmt OPTION!";
@@ -1927,6 +2009,95 @@ void MsgSetParseSuccess(msg_t * const pMsg, int bSuccess)
 {
 	assert(pMsg != NULL);
 	pMsg->bParseSuccess = bSuccess;
+}
+
+
+/* return full message as a json string */
+const uchar*
+msgGetJSONMESG(msg_t *__restrict__ const pMsg)
+{
+	struct json_object *json;
+	struct json_object *jval;
+	uchar *pRes; /* result pointer */
+	rs_size_t bufLen = -1; /* length of string or -1, if not known */
+
+	json = json_object_new_object();
+
+	jval = json_object_new_string((char*)getMSG(pMsg));
+	json_object_object_add(json, "msg", jval);
+
+	getRawMsg(pMsg, &pRes, &bufLen);
+	jval = json_object_new_string((char*)pRes);
+	json_object_object_add(json, "rawmsg", jval);
+
+	pRes = (uchar*)getTimeReported(pMsg, tplFmtRFC3339Date);
+	jval = json_object_new_string((char*)pRes);
+	json_object_object_add(json, "timereported", jval);
+
+	jval = json_object_new_string(getHOSTNAME(pMsg));
+	json_object_object_add(json, "hostname", jval);
+
+	getTAG(pMsg, &pRes, &bufLen);
+	jval = json_object_new_string((char*)pRes);
+	json_object_object_add(json, "syslogtag", jval);
+
+	getInputName(pMsg, &pRes, &bufLen);
+	jval = json_object_new_string((char*)pRes);
+	json_object_object_add(json, "inputname", jval);
+
+	jval = json_object_new_string((char*)getRcvFrom(pMsg));
+	json_object_object_add(json, "fromhost", jval);
+
+	jval = json_object_new_string((char*)getRcvFromIP(pMsg));
+	json_object_object_add(json, "fromhost-ip", jval);
+
+	jval = json_object_new_string(getPRI(pMsg));
+	json_object_object_add(json, "pri", jval);
+
+	jval = json_object_new_string(getFacility(pMsg));
+	json_object_object_add(json, "syslogfacility", jval);
+
+	jval = json_object_new_string(getSeverity(pMsg));
+	json_object_object_add(json, "syslogseverity", jval);
+
+	pRes = (uchar*)getTimeGenerated(pMsg, tplFmtRFC3339Date);
+	jval = json_object_new_string((char*)pRes);
+	json_object_object_add(json, "timegenerated", jval);
+
+	jval = json_object_new_string((char*)getProgramName(pMsg, LOCK_MUTEX));
+	json_object_object_add(json, "programname", jval);
+
+	jval = json_object_new_string(getProtocolVersionString(pMsg));
+	json_object_object_add(json, "protocol-version", jval);
+
+	MsgGetStructuredData(pMsg, &pRes, &bufLen);
+	jval = json_object_new_string((char*)pRes);
+	json_object_object_add(json, "structured-data", jval);
+
+	jval = json_object_new_string(getAPPNAME(pMsg, LOCK_MUTEX));
+	json_object_object_add(json, "app-name", jval);
+
+	jval = json_object_new_string(getPROCID(pMsg, LOCK_MUTEX));
+	json_object_object_add(json, "procid", jval);
+
+	jval = json_object_new_string(getMSGID(pMsg));
+	json_object_object_add(json, "msgid", jval);
+
+#ifdef USE_LIBUUID
+	if(pMsg->pszUUID == NULL) {
+		jval = NULL;
+	} else {
+		getUUID(pMsg, &pRes, &bufLen);
+		jval = json_object_new_string((char*)pRes);
+	}
+	json_object_object_add(json, "uuid", jval);
+#endif
+
+	json_object_object_add(json, "$!", pMsg->json);
+
+	pRes = (uchar*) strdup(json_object_get_string(json));
+	json_object_put(json);
+	return pRes;
 }
 
 /* rgerhards 2009-06-12: set associated ruleset
@@ -2322,7 +2493,7 @@ finalize_it:
  * we need it. The rest of the code already knows how to handle an
  * unset HOSTNAME.
  */
-void MsgSetHOSTNAME(msg_t *pThis, uchar* pszHOSTNAME, int lenHOSTNAME)
+void MsgSetHOSTNAME(msg_t *pThis, const uchar* pszHOSTNAME, const int lenHOSTNAME)
 {
 	assert(pThis != NULL);
 
@@ -2373,7 +2544,7 @@ void MsgSetMSGoffs(msg_t * const pMsg, short offs)
  * the caller is responsible for freeing it.
  * rgerhards, 2009-06-23
  */
-rsRetVal MsgReplaceMSG(msg_t *pThis, uchar* pszMSG, int lenMSG)
+rsRetVal MsgReplaceMSG(msg_t *pThis, const uchar* pszMSG, int lenMSG)
 {
 	int lenNew;
 	uchar *bufNew;
@@ -2406,12 +2577,14 @@ finalize_it:
  * terminated by '\0'.
  * rgerhards, 2009-06-16
  */
-void MsgSetRawMsg(msg_t *pThis, char* pszRawMsg, size_t lenMsg)
+void MsgSetRawMsg(msg_t *pThis, const char* pszRawMsg, size_t lenMsg)
 {
+	int deltaSize;
 	assert(pThis != NULL);
 	if(pThis->pszRawMsg != pThis->szRawMsg)
 		free(pThis->pszRawMsg);
 
+	deltaSize = lenMsg - pThis->iLenRawMsg;
 	pThis->iLenRawMsg = lenMsg;
 	if(pThis->iLenRawMsg < CONF_RAWMSG_BUFSIZE) {
 		/* small enough: use fixed buffer (faster!) */
@@ -2424,6 +2597,11 @@ void MsgSetRawMsg(msg_t *pThis, char* pszRawMsg, size_t lenMsg)
 
 	memcpy(pThis->pszRawMsg, pszRawMsg, pThis->iLenRawMsg);
 	pThis->pszRawMsg[pThis->iLenRawMsg] = '\0'; /* this also works with truncation! */
+	/* correct other information */
+	if(pThis->iLenRawMsg > pThis->offMSG)
+		pThis->iLenMSG += deltaSize;
+	else
+		pThis->iLenMSG = 0;
 }
 
 
@@ -2638,7 +2816,8 @@ jsonAddVal(uchar *pSrc, unsigned buflen, es_str_t **dst, int escapeAll)
 
 	for(i = 0 ; i < buflen ; ++i) {
 		c = pSrc[i];
-		if(   (c >= 0x23 && c <= 0x5b)
+		if(   (c >= 0x23 && c <= 0x2e)
+		   || (c >= 0x30 && c <= 0x5b)
 		   || (c >= 0x5d /* && c <= 0x10FFFF*/)
 		   || c == 0x20 || c == 0x21) {
 			/* no need to escape */
@@ -2947,6 +3126,10 @@ uchar *MsgGetProp(msg_t *__restrict__ const pMsg, struct templateEntry *__restri
 		case PROP_MSGID:
 			pRes = (uchar*)getMSGID(pMsg);
 			break;
+		case PROP_JSONMESG:
+			pRes = (uchar*)msgGetJSONMESG(pMsg);
+			*pbMustBeFreed = 1;
+			break;
 #ifdef USE_LIBUUID
 		case PROP_UUID:
 			getUUID(pMsg, &pRes, &bufLen);
@@ -3024,8 +3207,6 @@ uchar *MsgGetProp(msg_t *__restrict__ const pMsg, struct templateEntry *__restri
 			break;
 		case PROP_CEE_ALL_JSON:
 			if(pMsg->json == NULL) {
-				if(*pbMustBeFreed == 1)
-					free(pRes);
 				pRes = (uchar*) "{}";
 				bufLen = 2;
 				*pbMustBeFreed = 0;
@@ -3040,8 +3221,6 @@ uchar *MsgGetProp(msg_t *__restrict__ const pMsg, struct templateEntry *__restri
 			getJSONPropVal(pMsg, pProp, &pRes, &bufLen, pbMustBeFreed);
 			break;
 		case PROP_SYS_BOM:
-			if(*pbMustBeFreed == 1)
-				free(pRes);
 			pRes = (uchar*) "\xEF\xBB\xBF";
 			*pbMustBeFreed = 0;
 			break;
@@ -3058,18 +3237,18 @@ uchar *MsgGetProp(msg_t *__restrict__ const pMsg, struct templateEntry *__restri
 			{
 			struct timespec tp;
 
-			if(*pbMustBeFreed == 1)
-				free(pRes);
 			if((pRes = (uchar*) MALLOC(sizeof(uchar) * 32)) == NULL) {
 				RET_OUT_OF_MEMORY;
 			}
-			*pbMustBeFreed = 1;
  
 			if(clock_gettime(CLOCK_UPTIME, &tp) == -1) {
+				free(pRes);
  				*pPropLen = sizeof("**SYSCALL FAILED**") - 1;
  				return(UCHAR_CONSTANT("**SYSCALL FAILED**"));
  			}
  
+			*pbMustBeFreed = 1;
+
 			snprintf((char*) pRes, sizeof(uchar) * 32, "%ld", tp.tv_sec);
  			}
 
@@ -3078,17 +3257,17 @@ uchar *MsgGetProp(msg_t *__restrict__ const pMsg, struct templateEntry *__restri
 			{
 			struct sysinfo s_info;
 
-			if(*pbMustBeFreed == 1)
-				free(pRes);
 			if((pRes = (uchar*) MALLOC(sizeof(uchar) * 32)) == NULL) {
 				RET_OUT_OF_MEMORY;
 			}
-			*pbMustBeFreed = 1;
 
 			if(sysinfo(&s_info) < 0) {
+				free(pRes);
 				*pPropLen = sizeof("**SYSCALL FAILED**") - 1;
 				return(UCHAR_CONSTANT("**SYSCALL FAILED**"));
 			}
+
+			*pbMustBeFreed = 1;
 
 			snprintf((char*) pRes, sizeof(uchar) * 32, "%ld", s_info.uptime);
 			}
@@ -3157,7 +3336,7 @@ uchar *MsgGetProp(msg_t *__restrict__ const pMsg, struct templateEntry *__restri
 			/* we got our end pointer, now do the copy */
 			/* TODO: code copied from below, this is a candidate for a separate function */
 			iLen = pFldEnd - pFld + 1; /* the +1 is for an actual char, NOT \0! */
-			pBufStart = pBuf = MALLOC((iLen + 1) * sizeof(char));
+			pBufStart = pBuf = MALLOC((iLen + 1) * sizeof(uchar));
 			if(pBuf == NULL) {
 				if(*pbMustBeFreed == 1)
 					free(pRes);
@@ -3335,7 +3514,7 @@ uchar *MsgGetProp(msg_t *__restrict__ const pMsg, struct templateEntry *__restri
 			if(iTo > bufLen) /* iTo is very large, if no to-position is set in the template! */
 				iTo = bufLen;
 			iLen = iTo - iFrom + 1; /* the +1 is for an actual char, NOT \0! */
-			pBufStart = pBuf = MALLOC((iLen + 1) * sizeof(char));
+			pBufStart = pBuf = MALLOC((iLen + 1) * sizeof(uchar));
 			if(pBuf == NULL) {
 				if(*pbMustBeFreed == 1)
 					free(pRes);
@@ -3389,7 +3568,7 @@ uchar *MsgGetProp(msg_t *__restrict__ const pMsg, struct templateEntry *__restri
 			uchar *pBStart;
 			uchar *pB;
 			uchar *pSrc;
-			pBStart = pB = MALLOC((bufLen + 1) * sizeof(char));
+			pBStart = pB = MALLOC((bufLen + 1) * sizeof(uchar));
 			if(pB == NULL) {
 				if(*pbMustBeFreed == 1)
 					free(pRes);
@@ -3793,6 +3972,132 @@ finalize_it:
 	RETiRet;
 }
 #undef	isProp
+
+
+/* Set a single property based on the JSON object provided. The
+ * property name is extracted from the JSON object.
+ */
+static rsRetVal
+msgSetPropViaJSON(msg_t *__restrict__ const pMsg, const char *name, struct json_object *json)
+{
+	const char *psz;
+	int val;
+	prop_t *propFromHost = NULL;
+	prop_t *propRcvFromIP = NULL;
+	DEFiRet;
+
+	// TODO: think if we need to lock the message mutex. For some updates
+	// we probably need to!
+	
+	/* note: json_object_get_string() manages the memory of the returned
+	 *       string. So we MUST NOT free it!
+	 */
+	dbgprintf("DDDD: msgSetPropViaJSON key: '%s'\n", name);
+	if(!strcmp(name, "rawmsg")) {
+		psz = json_object_get_string(json);
+		MsgSetRawMsg(pMsg, psz, strlen(psz));
+	} else if(!strcmp(name, "msg")) {
+		psz = json_object_get_string(json);
+		MsgReplaceMSG(pMsg, (const uchar*)psz, strlen(psz)); 
+	} else if(!strcmp(name, "syslogtag")) {
+		psz = json_object_get_string(json);
+		MsgSetTAG(pMsg, (const uchar*)psz, strlen(psz)); 
+	} else if(!strcmp(name, "syslogfacility")) {
+		val = json_object_get_int(json);
+		if(val >= 0 && val <= 24)
+			pMsg->iFacility = val;
+		else
+			DBGPRINTF("mmexternal: invalid fac %d requested -- ignored\n", val);
+	} else if(!strcmp(name, "syslogseverity")) {
+		val = json_object_get_int(json);
+		if(val >= 0 && val <= 7)
+			pMsg->iSeverity = val;
+		else
+			DBGPRINTF("mmexternal: invalid fac %d requested -- ignored\n", val);
+	} else if(!strcmp(name, "procid")) {
+		psz = json_object_get_string(json);
+		MsgSetPROCID(pMsg, psz);
+	} else if(!strcmp(name, "msgid")) {
+		psz = json_object_get_string(json);
+		MsgSetMSGID(pMsg, psz);
+	} else if(!strcmp(name, "structured-data")) {
+		psz = json_object_get_string(json);
+		MsgSetStructuredData(pMsg, psz);
+	} else if(!strcmp(name, "hostname") || !strcmp(name, "source")) {
+		psz = json_object_get_string(json);
+		MsgSetHOSTNAME(pMsg, (const uchar*)psz, strlen(psz)); 
+	} else if(!strcmp(name, "fromhost")) {
+		psz = json_object_get_string(json);
+		MsgSetRcvFromStr(pMsg, (const uchar*) psz, 0, &propFromHost);
+	} else if(!strcmp(name, "fromhost-ip")) {
+		psz = json_object_get_string(json);
+		MsgSetRcvFromIPStr(pMsg, (const uchar*)psz, strlen(psz), &propRcvFromIP);
+	} else if(!strcmp(name, "$!")) {
+		msgAddJSON(pMsg, (uchar*)"!", json);
+	} else {
+		/* we ignore unknown properties */
+		DBGPRINTF("msgSetPropViaJSON: unkonwn property ignored: %s\n",
+			  name);
+	}
+	RETiRet;
+}
+
+
+/* set message properties based on JSON string. This function does it all,
+ * including parsing the JSON string. If an error is detected, the operation
+ * is aborted at the time of error. Any modifications made before the
+ * error ocurs are still PERSISTED.
+ * This function is meant to support the external message modifiction module
+ * interface. As such, replacing properties is expressively permited. Note that
+ * properties which were derived from the message during parsing are NOT
+ * updated if the underlying (raw)msg property is changed.
+ */
+rsRetVal
+MsgSetPropsViaJSON(msg_t *__restrict__ const pMsg, const uchar *__restrict__ const jsonstr)
+{
+	struct json_tokener *tokener = NULL;
+	struct json_object *json;
+	const char *errMsg;
+	DEFiRet;
+
+	DBGPRINTF("DDDDDD: JSON string for message mod: '%s'\n", jsonstr);
+	if(!strcmp((char*)jsonstr, "{}")) /* shortcut for a common case */
+		FINALIZE;
+
+	tokener = json_tokener_new();
+
+	json = json_tokener_parse_ex(tokener, (char*)jsonstr, ustrlen(jsonstr));
+	if(Debug) {
+		errMsg = NULL;
+		if(json == NULL) {
+			enum json_tokener_error err;
+
+			err = tokener->err;
+			if(err != json_tokener_continue)
+				errMsg = json_tokener_errors[err];
+			else
+				errMsg = "Unterminated input";
+		} else if(!json_object_is_type(json, json_type_object))
+			errMsg = "JSON value is not an object";
+		if(errMsg != NULL) {
+			DBGPRINTF("MsgSetPropsViaJSON: Error parsing JSON '%s': %s\n",
+					jsonstr, errMsg);
+		}
+	}
+	if(json == NULL || !json_object_is_type(json, json_type_object)) {
+		ABORT_FINALIZE(RS_RET_JSON_PARSE_ERR);
+	}
+ 
+	json_object_object_foreach(json, name, val) {
+		msgSetPropViaJSON(pMsg, name, val);
+	}
+	json_object_put(json);
+
+finalize_it:
+	if(tokener != NULL)
+		json_tokener_free(tokener);
+	RETiRet;
+}
 
 
 /* get the severity - this is an entry point that
