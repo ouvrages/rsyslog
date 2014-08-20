@@ -2,6 +2,8 @@ rsyslog (8.4.0-2) UNRELEASED; urgency=medium
 
   * Tweak rsyslog systemd service file. Add Documentation field and restart
     the rsyslogd daemon on failures.
+  * Cherry-pick upstream patch to fix build failures on platforms without
+    atomic instructions.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 20 Aug 2014 19:31:37 +0200
 
