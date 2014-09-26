@@ -1,11 +1,12 @@
-rsyslog (8.4.1-1) UNRELEASED; urgency=medium
+rsyslog (8.4.1-1) UNRELEASED; urgency=high
 
   * New upstream release.
    - CVE-2014-3634: Fix remote syslog vulnerability due to improper
      handling of invalid PRI values.
   * Drop patches which have been merged upstream.
+  * Urgency high for the security fix.
 
- -- Michael Biebl <biebl@debian.org>  Fri, 26 Sep 2014 23:42:26 +0200
+ -- Michael Biebl <biebl@debian.org>  Sat, 27 Sep 2014 01:22:40 +0200
 
 rsyslog (8.4.0-2) unstable; urgency=medium
 
