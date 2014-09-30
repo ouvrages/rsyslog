@@ -1,8 +1,8 @@
 rsyslog (8.4.1-1) unstable; urgency=high
 
   * New upstream release.
-   - CVE-2014-3634: Fix remote syslog vulnerability due to improper
-     handling of invalid PRI values.
+    - CVE-2014-3634: Fix remote syslog vulnerability due to improper
+      handling of invalid PRI values.
   * Drop patches which have been merged upstream.
   * Urgency high for the security fix.
 
