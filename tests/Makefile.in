@@ -60,6 +60,10 @@ host_triplet = @host@
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	fac_mail.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	fac_news.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	fac_uucp.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	fac_invld1.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	fac_invld2.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	fac_invld3.sh \
+@ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	fac_invld4_rfc5424.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	rfc5424parser.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	arrayqueue.sh \
 @ENABLE_IMDIAG_TRUE@@ENABLE_TESTBENCH_TRUE@	global_vars.sh \
@@ -653,6 +657,14 @@ EXTRA_DIST = 1.rstest 2.rstest 3.rstest err1.rstest \
 	   testsuites/fac_news.conf \
 	   fac_uucp.sh \
 	   testsuites/fac_uucp.conf \
+	   fac_invld1.sh \
+	   testsuites/fac_invld1.conf \
+	   fac_invld2.sh \
+	   testsuites/fac_invld2.conf \
+	   fac_invld3.sh \
+	   testsuites/fac_invld3.conf \
+	   fac_invld4_rfc5424.sh \
+	   testsuites/fac_invld4_rfc5424.conf \
 	   rs_optimizer_pri.sh \
 	   testsuites/rs_optimizer_pri.conf \
 	   rscript_prifilt.sh \
