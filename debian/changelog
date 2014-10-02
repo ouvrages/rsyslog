@@ -1,11 +1,12 @@
-rsyslog (8.4.2-1) UNRELEASED; urgency=medium
+rsyslog (8.4.2-1) UNRELEASED; urgency=high
 
   * New upstream release.
     - CVE-2014-3683: The fix for CVE-2014-3634 incomplete. It did not cover
       cases where PRI values > MAX_INT caused integer overflows resulting in
       negative values.
+  * Urgency high for the security fix.
 
- -- Michael Biebl <biebl@debian.org>  Thu, 02 Oct 2014 14:39:52 +0200
+ -- Michael Biebl <biebl@debian.org>  Thu, 02 Oct 2014 15:26:48 +0200
 
 rsyslog (8.4.1-1) unstable; urgency=high
 
