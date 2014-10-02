@@ -1511,7 +1511,7 @@ char *yytext;
 #line 32 "lexer.l"
 #include "config.h"
 #include "parserif.h"
-extern char *strdup(char*); /* somehow we do not get this from string.h... */
+extern char *strdup(__const char*); /* somehow we may not get this from string.h... */
 /*%option noyywrap nodefault case-insensitive */
 /* avoid compiler warning: `yyunput' defined but not used */
 #define YY_NO_INPUT 1
