@@ -1,4 +1,4 @@
-rsyslog (8.4.2-1) UNRELEASED; urgency=high
+rsyslog (8.4.2-1) unstable; urgency=high
 
   * New upstream release.
     - CVE-2014-3683: The fix for CVE-2014-3634 incomplete. It did not cover
@@ -6,7 +6,7 @@ rsyslog (8.4.2-1) UNRELEASED; urgency=high
       negative values.
   * Urgency high for the security fix.
 
- -- Michael Biebl <biebl@debian.org>  Thu, 02 Oct 2014 15:26:48 +0200
+ -- Michael Biebl <biebl@debian.org>  Thu, 02 Oct 2014 15:27:25 +0200
 
 rsyslog (8.4.1-1) unstable; urgency=high
 
